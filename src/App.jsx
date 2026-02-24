@@ -132,7 +132,7 @@ export default function App() {
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       
-      {/* AJOUT DES RÈGLES D'IMPRESSION PDF */}
+      {/* RÈGLES D'IMPRESSION PDF */}
       <style>
         {`
           @media print {
@@ -140,12 +140,14 @@ export default function App() {
             body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
             @page { size: landscape; margin: 10mm; }
             * { box-shadow: none !important; }
+            .print-break-avoid { page-break-inside: avoid; }
           }
         `}
       </style>
 
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} />}
 
+      {/* BARRE DE NAVIGATION (Cachée à l'impression) */}
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -161,19 +163,22 @@ export default function App() {
             {[["dashboard","Tableau de bord"],["criteres","Indicateurs"],["axes","Axes prioritaires"],["responsables","Responsables"]].map(([t, l]) => (
               <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{l}</button>
             ))}
-            {/* NOUVEAU BOUTON PDF */}
-            <button className="no-print" onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", marginLeft: "16px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
+            
+            {/* BOUTON EXPORTER PDF */}
+            <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", marginLeft: "16px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
               <span>📄</span> Exporter PDF
             </button>
-            <button className="no-print" onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Deconnexion</button>
+            
+            <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Deconnexion</button>
           </div>
         </div>
       </div>
 
+      {/* CONTENU PRINCIPAL */}
       <div style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
 
         {activeTab === "dashboard" && <>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
+          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
             {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non evalues"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents moins 30j"]].map(([color,bg,border,num,label]) => (
               <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "12px", padding: "20px 22px" }}>
                 <div style={{ fontSize: "34px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div>
@@ -182,7 +187,7 @@ export default function App() {
             ))}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div style={card}>
+            <div className="print-break-avoid" style={card}>
               <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformite global</div>
               <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                 <GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" />
@@ -197,7 +202,7 @@ export default function App() {
               </div>
               <div style={{ marginTop: "14px", background: "#f0f7ff", borderRadius: "8px", padding: "10px 14px", fontSize: "12px", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{stats.total - stats.nonEvalue} / {stats.total} indicateurs evalues</div>
             </div>
-            <div style={card}>
+            <div className="print-break-avoid" style={card}>
               <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critere</div>
               {Object.entries(CRITERES_LABELS).map(([num, cfg]) => {
                 const cr = criteres.filter(c => c.critere === parseInt(num));
@@ -221,7 +226,7 @@ export default function App() {
             </div>
           )}
           {urgents.length > 0 && (
-            <div style={card}>
+            <div className="print-break-avoid" style={card}>
               <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Indicateurs urgents — moins de 30 jours</div>
               {urgents.map(c => (
                 <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", borderRadius: "8px", background: c.statut==="non-conforme"?"#fff5f5":"#fffbeb", border:`1px solid ${c.statut==="non-conforme"?"#fca5a5":"#fcd34d"}`, marginBottom: "8px" }}>
@@ -237,7 +242,7 @@ export default function App() {
         </>}
 
         {activeTab === "criteres" && <>
-          {/* AJOUT DE .no-print SUR LA BARRE DE RECHERCHE */}
+          {/* BARRE DE RECHERCHE (Cachée à l'impression) */}
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
             <input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} />
             <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select>
@@ -246,13 +251,12 @@ export default function App() {
           </div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              {/* MODIFICATION DE L'EN-TÊTE POUR LE PDF */}
               <thead><tr>{["N°","Indicateur","Responsable(s)","Echeance","Statut","Preuves"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
               <tbody>
                 {filtered.map(c => {
                   const col = CRITERES_LABELS[c.critere].color, d = days(c.delai);
                   return (
-                    <tr key={c.id} onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}>
+                    <tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}>
                       <td style={{ ...td, width: "52px" }}><span style={nb(col)}>{c.num}</span></td>
                       <td style={{ ...td, maxWidth: "280px" }}><div style={{ fontWeight: "600", color: "#1e3a5f", marginBottom: "2px" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{CRITERES_LABELS[c.critere].label}</div></td>
                       <td style={{ ...td, maxWidth: "200px" }}>
@@ -263,7 +267,6 @@ export default function App() {
                       <td style={td}><div style={{ fontSize: "12px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div><div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j depasse` : `J-${d}`}</div></td>
                       <td style={td}><StatusBadge statut={c.statut} /></td>
                       <td style={td}>{c.preuves?.trim() ? <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Renseignees</span> : <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vide</span>}</td>
-                      {/* MODIFICATION DU BOUTON ÉDITER POUR LE PDF */}
                       <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "6px", color: "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Editer</button></td>
                     </tr>
                   );
@@ -283,13 +286,13 @@ export default function App() {
             if (items.length === 0) return null;
             const isNC = st === "non-conforme";
             return (
-              <div key={st} style={{ pageBreakInside: "avoid" }}>
-                <div style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "1px", display: "flex", alignItems: "center", gap: "6px" }}>
+              <div key={st}>
+                <div className="print-break-avoid" style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "1px", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: isNC?"#dc2626":"#d97706" }} />
                   {isNC ? "Non conformes — Action immediate" : "En cours — A finaliser"}
                 </div>
                 {items.map(c => (
-                  <div key={c.id} style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px", pageBreakInside: "avoid" }}>
+                  <div key={c.id} className="print-break-avoid" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
                       <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
                       <div style={{ flex: 1 }}>
@@ -321,7 +324,7 @@ export default function App() {
             <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Membres ayant au moins un indicateur assigne</p>
           </div>
           {sansResp.length > 0 && (
-            <div className="no-print" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
+            <div className="no-print print-break-avoid" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
               <div style={{ fontWeight: "700", color: "#92400e", marginBottom: "8px" }}>{sansResp.length} indicateur(s) sans responsable</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{sansResp.map(c => <button key={c.id} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #fcd34d", borderRadius: "6px", color: "#92400e", padding: "5px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>{c.num} — {c.titre.substring(0,38)}{c.titre.length>38?"...":""}</button>)}</div>
             </div>
@@ -333,7 +336,7 @@ export default function App() {
               const nonConformes = r.items.filter(c => c.statut==="non-conforme").length;
               const enCours = r.items.filter(c => c.statut==="en-cours").length;
               return (
-                <div key={r.name} style={{ ...card, pageBreakInside: "avoid" }}>
+                <div key={r.name} className="print-break-avoid" style={card}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
                     <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>{r.nom.split(" ").map(n=>n[0]).join("").substring(0,2).toUpperCase()}</div>
                     <div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f" }}>{r.nom}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{r.role}</div></div>
