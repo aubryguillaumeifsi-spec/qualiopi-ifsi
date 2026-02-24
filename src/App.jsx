@@ -174,8 +174,8 @@ export default function App() {
         </div>
       </div>
 
-      {/* CONTENU PRINCIPAL */}
-      <div style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
+      {/* CONTENU PRINCIPAL (Caché si la modale est ouverte pour ne pas polluer l'impression PDF) */}
+      <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
 
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
