@@ -1,0 +1,78 @@
+export const NOM_ETABLISSEMENT = "IFSI du CHAM";
+export const TODAY = new Date().toISOString().split("T")[0];
+
+export const RESPONSABLES = [
+  "RETARDATO Clementine (Directrice des soins)",
+  "TZOTZIS Christelle (Coordinatrice pedagogique)",
+  "AUBRY Guillaume (Formateur 1A)",
+  "BRASSINE Deborah (Formatrice 3A)",
+  "CHARLES Valerie (Formatrice 2A)",
+  "LEROY Sandra (Formatrice 1A)",
+  "HEGO Coralie (Formatrice 2A)",
+  "KERBIDI Julie (Formatrice 1A)",
+  "LAFONT Laura (Formatrice 1A)",
+  "MARTIN Audrey (Formatrice 1A - Ref. ABS)",
+  "LA GUMINA Samantha (Formatrice 3A)",
+  "MONTAINT Sophie (Formatrice 3A)",
+  "SONVEAU Marie-Cecile (Formatrice 3A)",
+  "JOUBAUD Virginie (Formatrice 2A)",
+  "KRYLYSCHIN Virginie (Formatrice 2A)",
+  "CARRE Joris (Documentaliste)",
+  "QUAAK Jan (Referent TICE)",
+  "HURTER Nathalie (Secretaire)",
+  "MAITREHUT Irene (Secretaire)",
+  "MELITO SAIHI Melanie (Secretaire)",
+  "RATTEZ Eva (Secretaire)",
+];
+
+export const DEFAULT_CRITERES = [
+  { id: 1,  num: "1.1", critere: 1, titre: "Publicite des prestations et conditions d'acces",            responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Informations claires et accessibles sur les prestations, publics vises, prerequis, modalites et delais d'acces.", preuves: "" },
+  { id: 2,  num: "1.2", critere: 1, titre: "Communication sur les resultats obtenus",                    responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Taux de reussite aux certifications, taux d'insertion professionnelle, taux de satisfaction rendus publics.", preuves: "" },
+  { id: 3,  num: "1.3", critere: 1, titre: "Information sur l'accessibilite aux personnes handicapees", responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Coordonnees du referent handicap diffusees, informations sur les adaptations possibles.", preuves: "" },
+  { id: 4,  num: "1.4", critere: 1, titre: "Tarifs et modalites de financement",                        responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Tarifs et conditions de financement clairement affiches et accessibles avant toute inscription.", preuves: "" },
+  { id: 5,  num: "1.5", critere: 1, titre: "Delais d'acces a la formation",                             responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Delais d'acces precises et mis a jour regulierement sur tous les supports de communication.", preuves: "" },
+  { id: 6,  num: "2.1", critere: 2, titre: "Analyse des besoins des beneficiaires",                     responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Processus formalise d'analyse des besoins individuels avant entree en formation.", preuves: "" },
+  { id: 7,  num: "2.2", critere: 2, titre: "Objectifs operationnels et evaluables",                     responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Objectifs de formation clairement definis, mesurables et communiques aux apprenants.", preuves: "" },
+  { id: 8,  num: "2.3", critere: 2, titre: "Contenus et modalites pedagogiques adaptes",                responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Programme pedagogique en adequation avec les objectifs, les publics et les modalites d'apprentissage.", preuves: "" },
+  { id: 9,  num: "2.4", critere: 2, titre: "Modalites d'evaluation des acquis",                         responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Evaluations tout au long du parcours et en fin de formation pour mesurer l'atteinte des objectifs.", preuves: "" },
+  { id: 10, num: "3.1", critere: 3, titre: "Positionnement des beneficiaires a l'entree",               responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Evaluation initiale des acquis et competences de chaque apprenant a l'entree en formation.", preuves: "" },
+  { id: 11, num: "3.2", critere: 3, titre: "Adaptation des parcours",                                   responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Parcours individualises ou modules adaptes selon les resultats du positionnement.", preuves: "" },
+  { id: 12, num: "3.3", critere: 3, titre: "Accompagnement des beneficiaires",                          responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Dispositif d'accompagnement et de suivi tout au long du parcours (referent pedagogique, entretiens...).", preuves: "" },
+  { id: 13, num: "3.4", critere: 3, titre: "Accessibilite et compensation du handicap",                 responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Amenagements et compensations mis en place pour les apprenants en situation de handicap.", preuves: "" },
+  { id: 14, num: "4.1", critere: 4, titre: "Coordination pedagogique assuree",                          responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Responsable pedagogique identifie, reunions de coordination, planification des interventions.", preuves: "" },
+  { id: 15, num: "4.2", critere: 4, titre: "Ressources pedagogiques mobilisees",                        responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Ressources documentaires, numeriques et materielles suffisantes et accessibles aux apprenants.", preuves: "" },
+  { id: 16, num: "4.3", critere: 4, titre: "Environnement numerique adapte",                            responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Outils numeriques disponibles et fonctionnels (ENT, Moodle, visioconference...) adaptes aux besoins.", preuves: "" },
+  { id: 17, num: "4.4", critere: 4, titre: "Locaux et equipements adaptes",                             responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Salles de cours, laboratoires, salles de simulation conformes aux exigences de la formation.", preuves: "" },
+  { id: 18, num: "4.5", critere: 4, titre: "Encadrement et suivi des stages",                           responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Conventionnement avec les terrains de stage, suivi des apprenants en stage, livret d'encadrement.", preuves: "" },
+  { id: 19, num: "4.6", critere: 4, titre: "Sous-traitance et partenariats",                            responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Partenariats formalises, sous-traitants identifies et controles quant a la qualite de leurs interventions.", preuves: "" },
+  { id: 20, num: "5.1", critere: 5, titre: "Qualification des intervenants",                            responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "CV, diplomes et titres des formateurs en adequation avec les modules enseignes, tenus a jour.", preuves: "" },
+  { id: 21, num: "5.2", critere: 5, titre: "Developpement des competences des formateurs",              responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Plan de developpement des competences annuel, formations suivies, traces des actions realisees.", preuves: "" },
+  { id: 22, num: "5.3", critere: 5, titre: "Integration des nouveaux intervenants",                     responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Processus d'accueil et d'integration formalise pour tout nouvel intervenant (livret, tutorat...).", preuves: "" },
+  { id: 23, num: "5.4", critere: 5, titre: "Veille legale et reglementaire",                            responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Dispositif de veille operationnel, traces des mises a jour effectuees suite a evolutions reglementaires.", preuves: "" },
+  { id: 24, num: "6.1", critere: 6, titre: "Veille sur les evolutions du secteur",                      responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Participation a des instances professionnelles, suivi des evolutions metiers, adaptation des contenus.", preuves: "" },
+  { id: 25, num: "6.2", critere: 6, titre: "Partenariats avec l'environnement professionnel",           responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Conventions de partenariat signees avec etablissements de sante, employeurs, universites...", preuves: "" },
+  { id: 26, num: "6.3", critere: 6, titre: "Insertion professionnelle des apprenants",                  responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Suivi de l'insertion a 6 mois, taux d'emploi, outils d'aide a l'insertion mis en place.", preuves: "" },
+  { id: 27, num: "6.4", critere: 6, titre: "Contribution a l'environnement",                            responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Actions de rayonnement (journees portes ouvertes, interventions externes, publications...).", preuves: "" },
+  { id: 28, num: "6.5", critere: 6, titre: "Pratiques ecoresponsables",                                 responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Demarche RSE engagee, bilan carbone, actions en faveur du developpement durable documentees.", preuves: "" },
+  { id: 29, num: "7.1", critere: 7, titre: "Recueil des appreciations",                                 responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Enquetes de satisfaction regulieres aupres des apprenants, employeurs et intervenants, resultats analyses.", preuves: "" },
+  { id: 30, num: "7.2", critere: 7, titre: "Traitement des reclamations",                               responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Procedure de reclamation formalisee, accessible, tracee et avec suivi des reponses apportees.", preuves: "" },
+  { id: 31, num: "7.3", critere: 7, titre: "Mesures d'amelioration mises en oeuvre",                    responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Plan d'amelioration continue documente, actions realisees tracees, bilan annuel qualite produit.", preuves: "" },
+  { id: 32, num: "7.4", critere: 7, titre: "Analyse des causes d'abandon",                              responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Suivi et analyse des ruptures de parcours, actions correctives mises en place et evaluees.", preuves: "" },
+];
+
+export const CRITERES_LABELS = {
+  1: { label: "Information du public",         color: "#1d4ed8" },
+  2: { label: "Identification des objectifs",  color: "#6d28d9" },
+  3: { label: "Adaptation aux publics",        color: "#be185d" },
+  4: { label: "Moyens pedagogiques",           color: "#b45309" },
+  5: { label: "Qualification du personnel",    color: "#065f46" },
+  6: { label: "Environnement professionnel",   color: "#0e7490" },
+  7: { label: "Appreciations et reclamations", color: "#b91c1c" },
+};
+
+export const STATUT_CONFIG = {
+  "non-evalue":   { label: "Non evalue",   color: "#6b7280", bg: "#f3f4f6", border: "#d1d5db" },
+  "conforme":     { label: "Conforme",     color: "#065f46", bg: "#d1fae5", border: "#6ee7b7" },
+  "en-cours":     { label: "En cours",     color: "#92400e", bg: "#fef3c7", border: "#fcd34d" },
+  "non-conforme": { label: "Non conforme", color: "#991b1b", bg: "#fee2e2", border: "#fca5a5" },
+};
