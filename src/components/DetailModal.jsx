@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { CRITERES_LABELS, STATUT_CONFIG, TODAY, RESPONSABLES } from "../data";
+import { CRITERES_LABELS, STATUT_CONFIG, TODAY, RESPONSABLES, GUIDE_QUALIOPI } from "../data";
 
 function MultiSelect({ selected, onChange }) {
   const [open, setOpen] = useState(false);
@@ -56,6 +56,7 @@ export default function DetailModal({ critere, onClose, onSave }) {
   const cfg = CRITERES_LABELS[critere.critere];
   const lbl = { display: "block", fontSize: "11px", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: "700", marginBottom: "7px" };
   const inp = { background: "white", border: "1px solid #d1d5db", borderRadius: "8px", color: "#1e3a5f", padding: "9px 12px", fontSize: "13px", outline: "none", width: "100%" };
+  const guide = GUIDE_QUALIOPI[critere.id];
   
   return (
     <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={onClose}>
@@ -81,72 +82,126 @@ export default function DetailModal({ critere, onClose, onSave }) {
           }
           .print-label { display: block !important; margin-bottom: 4px; font-weight: bold; font-size: 14px; color: #1e3a5f; }
           .print-value { display: block !important; margin-bottom: 16px; font-size: 13px; color: #374151; }
+          .print-grid { display: block !important; }
+          .print-col { margin-bottom: 24px !important; }
         }
       `}</style>
 
-      <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "32px", width: "100%", maxWidth: "700px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+      {/* On a élargi la modale à 1000px pour avoir la place pour 2 colonnes confortables */}
+      <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "32px", width: "100%", maxWidth: "1000px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
+        
+        {/* EN-TÊTE DE LA MODALE */}
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "24px", paddingBottom: "16px", borderBottom: "1px solid #f1f5f9" }}>
-          
-          {/* MODIFICATION ICI : whiteSpace: "nowrap" pour que le badge ne se coupe pas */}
           <span style={{ padding: "5px 12px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "14px", fontWeight: "800", textAlign: "center", border: `1px solid ${cfg.color}30`, whiteSpace: "nowrap" }}>{critere.num}</span>
-          
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "16px", fontWeight: "700", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre}</div>
-            <div style={{ fontSize: "12px", color: "#6b7280" }}>{cfg.label}</div>
+            <div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre}</div>
+            <div style={{ fontSize: "12px", color: "#6b7280", fontWeight: "600" }}>CRITÈRE {critere.critere} — {cfg.label}</div>
           </div>
           <button className="no-print" onClick={onClose} style={{ background: "none", border: "none", color: "#9ca3af", fontSize: "22px", cursor: "pointer", lineHeight: 1 }}>x</button>
         </div>
         
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "18px" }}>
-          <div>
-            <label style={lbl}>Statut</label>
-            <select className="no-print" value={data.statut} onChange={e => setData({ ...data, statut: e.target.value })}
-              style={{ ...inp, background: STATUT_CONFIG[data.statut].bg, color: STATUT_CONFIG[data.statut].color, fontWeight: "600", border: `1.5px solid ${STATUT_CONFIG[data.statut].border}` }}>
-              {Object.entries(STATUT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-            </select>
-            <div className="print-value" style={{ display: "none" }}>{STATUT_CONFIG[data.statut].label}</div>
+        {/* MISE EN PAGE 2 COLONNES */}
+        <div className="print-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", marginBottom: "24px" }}>
+          
+          {/* COLONNE GAUCHE : GUIDE OFFICIEL EN LECTURE SEULE */}
+          <div className="print-col" style={{ background: "#f8fafc", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px" }}>
+              <span style={{ fontSize: "18px" }}>📖</span>
+              <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>Référentiel Officiel V9</h3>
+            </div>
+            
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Indicateur d'appréciation</div>
+              <div style={{ fontSize: "13px", color: "#1e3a5f", fontWeight: "600", fontStyle: "italic", lineHeight: "1.5" }}>"{guide.appreciation}"</div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Niveau attendu</div>
+              <div style={{ fontSize: "13px", color: "#374151", lineHeight: "1.5" }}>{guide.niveau}</div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Exemples de preuves</div>
+              <div style={{ fontSize: "12px", color: "#4b5563", lineHeight: "1.5", background: "white", padding: "10px", border: "1px dashed #d1d5db", borderRadius: "6px" }}>{guide.preuves}</div>
+            </div>
+
+            {guide.obligations && (
+              <div style={{ marginBottom: "16px" }}>
+                <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Obligations spécifiques</div>
+                <div style={{ fontSize: "12px", color: "#0e7490", background: "#ecfeff", border: "1px solid #a5f3fc", padding: "8px 10px", borderRadius: "6px", lineHeight: "1.5" }}>{guide.obligations}</div>
+              </div>
+            )}
+
+            {/* ENCADRÉ ROUGE POUR LA NON-CONFORMITÉ */}
+            <div style={{ marginTop: "20px", background: "#fef2f2", border: "1px solid #fca5a5", borderLeft: "4px solid #ef4444", padding: "12px", borderRadius: "6px" }}>
+              <div style={{ fontSize: "11px", color: "#991b1b", fontWeight: "800", textTransform: "uppercase", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>⚠️</span> Règle de non-conformité
+              </div>
+              <div style={{ fontSize: "12px", color: "#7f1d1d", lineHeight: "1.4", fontWeight: "500" }}>{guide.nonConformite}</div>
+            </div>
           </div>
-          <div>
-            <label style={lbl}>Echéance</label>
-            <input className="no-print" type="date" value={data.delai} min={TODAY} onChange={e => setData({ ...data, delai: e.target.value })} style={{ ...inp, width: "100%", boxSizing: "border-box" }} />
-            <div className="print-value" style={{ display: "none" }}>{new Date(data.delai).toLocaleDateString("fr-FR")}</div>
+
+          {/* COLONNE DROITE : ESPACE ÉDITION IFSI */}
+          <div className="print-col">
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px" }}>
+              <span style={{ fontSize: "18px" }}>✍️</span>
+              <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>Notre Réponse IFSI</h3>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
+              <div>
+                <label style={lbl}>Statut actuel</label>
+                <select className="no-print" value={data.statut} onChange={e => setData({ ...data, statut: e.target.value })}
+                  style={{ ...inp, background: STATUT_CONFIG[data.statut].bg, color: STATUT_CONFIG[data.statut].color, fontWeight: "600", border: `1.5px solid ${STATUT_CONFIG[data.statut].border}` }}>
+                  {Object.entries(STATUT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                </select>
+                <div className="print-value" style={{ display: "none" }}>{STATUT_CONFIG[data.statut].label}</div>
+              </div>
+              <div>
+                <label style={lbl}>Échéance visée</label>
+                <input className="no-print" type="date" value={data.delai} min={TODAY} onChange={e => setData({ ...data, delai: e.target.value })} style={{ ...inp, width: "100%", boxSizing: "border-box" }} />
+                <div className="print-value" style={{ display: "none" }}>{new Date(data.delai).toLocaleDateString("fr-FR")}</div>
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: "16px" }}>
+              <label style={lbl}>Responsable(s) assigné(s)</label>
+              <MultiSelect selected={data.responsables} onChange={val => setData({ ...data, responsables: val })} />
+              <div className="print-value" style={{ display: "none" }}>
+                {data.responsables.length > 0 ? data.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable assigné"}
+              </div>
+            </div>
+            
+            <div style={{ marginBottom: "16px" }}>
+              <label style={lbl}>Nos éléments de preuves (Liens, Emplacements...)</label>
+              <textarea className="no-print" value={data.preuves} onChange={e => setData({ ...data, preuves: e.target.value })} rows={5}
+                placeholder="Ex: Livret d'accueil p.12, Lien Sharepoint du PV de réunion..."
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: "#bfdbfe", background: "#f0f7ff" }} />
+              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#f0f7ff", padding: "10px", borderLeft: "3px solid #3b82f6", borderRadius: "4px" }}>{data.preuves || "—"}</div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={lbl}>Commentaires sur les attendus (Démarche interne)</label>
+              <textarea className="no-print" value={data.attendus} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3}
+                placeholder="Comment nous traduisons l'exigence Qualiopi dans notre quotidien..."
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} />
+              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.attendus || "—"}</div>
+            </div>
+            
+            <div style={{ marginBottom: "16px" }}>
+              <label style={lbl}>Notes internes (Points de vigilance, etc.)</label>
+              <textarea className="no-print" value={data.notes} onChange={e => setData({ ...data, notes: e.target.value })} rows={2}
+                placeholder="Ex: Attention à bien mettre à jour ce document à la rentrée..."
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: "#fef9c3", borderColor: "#fde68a" }} />
+              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", fontStyle: "italic", color: "#92400e" }}>{data.notes || "—"}</div>
+            </div>
           </div>
         </div>
         
-        <div style={{ marginBottom: "18px" }}>
-          <label style={lbl}>Responsable(s)</label>
-          <MultiSelect selected={data.responsables} onChange={val => setData({ ...data, responsables: val })} />
-          <div className="print-value" style={{ display: "none" }}>
-            {data.responsables.length > 0 ? data.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable assigné"}
-          </div>
-        </div>
-        
-        <div style={{ marginBottom: "16px" }}>
-          <label style={lbl}>Ce qu'attend l'évaluateur Qualiopi</label>
-          <textarea className="no-print" value={data.attendus} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3}
-            style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: "#f8fafc", borderColor: "#e2e8f0" }} />
-          <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.attendus || "—"}</div>
-        </div>
-        
-        <div style={{ marginBottom: "16px" }}>
-          <label style={lbl}>Ce que nous montrerons a l'évaluateur</label>
-          <textarea className="no-print" value={data.preuves} onChange={e => setData({ ...data, preuves: e.target.value })} rows={3}
-            placeholder="Ex: Livret d'accueil p.12, PV de reunion du 15/01..."
-            style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: "#bfdbfe", background: "#f0f7ff" }} />
-          <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.preuves || "—"}</div>
-        </div>
-        
-        <div style={{ marginBottom: "28px" }}>
-          <label style={lbl}>Notes internes</label>
-          <textarea className="no-print" value={data.notes} onChange={e => setData({ ...data, notes: e.target.value })} rows={2}
-            placeholder="Points de vigilance, remarques..."
-            style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} />
-          <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.notes || "—"}</div>
-        </div>
-        
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        {/* BARRE DES BOUTONS */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
           <button className="no-print" onClick={() => window.print()} style={{ padding: "8px 16px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", color: "#1d4ed8", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
-            <span>📄</span> Imprimer la fiche
+            <span>📄</span> Imprimer cette fiche
           </button>
           
           <div className="no-print" style={{ display: "flex", gap: "10px" }}>
