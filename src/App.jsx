@@ -4,11 +4,7 @@ import { useState, useEffect, useRef } from "react";
 import { getDoc, setDoc } from "firebase/firestore";
 import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth, DOC_REF } from "./firebase";
-// AJOUT : On importe toutes nos données depuis data.js
 import { NOM_ETABLISSEMENT, TODAY, RESPONSABLES, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
-
-
-
 
 function GaugeChart({ value, max, color }) {
   const pct = (value / max) * 100, r = 38, circ = 2 * Math.PI * r;
@@ -29,7 +25,6 @@ function StatusBadge({ statut }) {
 function ProgressBar({ value, max, color }) {
   return <div style={{ background: "#f1f5f9", borderRadius: "4px", height: "7px", overflow: "hidden" }}><div style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color, height: "100%", borderRadius: "4px", transition: "width 0.8s ease" }} /></div>;
 }
-
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -130,15 +125,28 @@ export default function App() {
   const SaveIndicator = () => {
     if (saveStatus === "idle") return null;
     const cfg = { saving: ["#6b7280","Sauvegarde..."], saved: ["#065f46","Sauvegarde"], error: ["#991b1b","Erreur"] }[saveStatus];
-    return <span style={{ fontSize: "11px", color: cfg[0], background: saveStatus==="saved"?"#d1fae5":saveStatus==="error"?"#fee2e2":"#f3f4f6", border:`1px solid ${saveStatus==="saved"?"#6ee7b7":saveStatus==="error"?"#fca5a5":"#d1d5db"}`, borderRadius:"6px", padding:"3px 10px", marginLeft:"10px" }}>{saveStatus==="saved"?"✓":saveStatus==="saving"?"⟳":"✕"} {cfg[1]}</span>;
+    return <span className="no-print" style={{ fontSize: "11px", color: cfg[0], background: saveStatus==="saved"?"#d1fae5":saveStatus==="error"?"#fee2e2":"#f3f4f6", border:`1px solid ${saveStatus==="saved"?"#6ee7b7":saveStatus==="error"?"#fca5a5":"#d1d5db"}`, borderRadius:"6px", padding:"3px 10px", marginLeft:"10px" }}>{saveStatus==="saved"?"✓":saveStatus==="saving"?"⟳":"✕"} {cfg[1]}</span>;
   };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      
+      {/* AJOUT DES RÈGLES D'IMPRESSION PDF */}
+      <style>
+        {`
+          @media print {
+            .no-print { display: none !important; }
+            body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+            @page { size: landscape; margin: 10mm; }
+            * { box-shadow: none !important; }
+          }
+        `}
+      </style>
+
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} />}
 
-      <div style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+      <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ width: "42px", height: "42px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
@@ -153,7 +161,11 @@ export default function App() {
             {[["dashboard","Tableau de bord"],["criteres","Indicateurs"],["axes","Axes prioritaires"],["responsables","Responsables"]].map(([t, l]) => (
               <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{l}</button>
             ))}
-            <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Deconnexion</button>
+            {/* NOUVEAU BOUTON PDF */}
+            <button className="no-print" onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", marginLeft: "16px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>📄</span> Exporter PDF
+            </button>
+            <button className="no-print" onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Deconnexion</button>
           </div>
         </div>
       </div>
@@ -203,7 +215,7 @@ export default function App() {
             </div>
           </div>
           {sansResp.length > 0 && (
-            <div style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
+            <div className="no-print" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
               <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", marginBottom: "4px" }}>{sansResp.length} indicateur(s) sans responsable assigne</div>
               <div style={{ fontSize: "12px", color: "#6b7280" }}>Allez dans l'onglet "Indicateurs" pour assigner les responsables.</div>
             </div>
@@ -217,7 +229,7 @@ export default function App() {
                   <div style={{ flex: 1 }}><div style={{ fontWeight: "600", fontSize: "13px" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>{c.responsables.length > 0 ? c.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable"}</div></div>
                   <StatusBadge statut={c.statut} />
                   <span style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", minWidth: "70px", textAlign: "right" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j depasse` : `J-${days(c.delai)}`}</span>
-                  <button onClick={() => setModalCritere(c)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", color: "#1d4ed8", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
+                  <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", color: "#1d4ed8", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
                 </div>
               ))}
             </div>
@@ -225,7 +237,8 @@ export default function App() {
         </>}
 
         {activeTab === "criteres" && <>
-          <div style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
+          {/* AJOUT DE .no-print SUR LA BARRE DE RECHERCHE */}
+          <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
             <input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} />
             <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select>
             <select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les criteres</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select>
@@ -233,7 +246,8 @@ export default function App() {
           </div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{["N°","Indicateur","Responsable(s)","Echeance","Statut","Preuves",""].map(h => <th key={h} style={th}>{h}</th>)}</tr></thead>
+              {/* MODIFICATION DE L'EN-TÊTE POUR LE PDF */}
+              <thead><tr>{["N°","Indicateur","Responsable(s)","Echeance","Statut","Preuves"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
               <tbody>
                 {filtered.map(c => {
                   const col = CRITERES_LABELS[c.critere].color, d = days(c.delai);
@@ -249,7 +263,8 @@ export default function App() {
                       <td style={td}><div style={{ fontSize: "12px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div><div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j depasse` : `J-${d}`}</div></td>
                       <td style={td}><StatusBadge statut={c.statut} /></td>
                       <td style={td}>{c.preuves?.trim() ? <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Renseignees</span> : <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vide</span>}</td>
-                      <td style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "6px", color: "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Editer</button></td>
+                      {/* MODIFICATION DU BOUTON ÉDITER POUR LE PDF */}
+                      <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "6px", color: "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Editer</button></td>
                     </tr>
                   );
                 })}
@@ -268,13 +283,13 @@ export default function App() {
             if (items.length === 0) return null;
             const isNC = st === "non-conforme";
             return (
-              <div key={st}>
+              <div key={st} style={{ pageBreakInside: "avoid" }}>
                 <div style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "1px", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: isNC?"#dc2626":"#d97706" }} />
                   {isNC ? "Non conformes — Action immediate" : "En cours — A finaliser"}
                 </div>
                 {items.map(c => (
-                  <div key={c.id} style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px" }}>
+                  <div key={c.id} style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px", pageBreakInside: "avoid" }}>
                     <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
                       <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
                       <div style={{ flex: 1 }}>
@@ -288,7 +303,7 @@ export default function App() {
                         <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div>
                         <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j depasse` : `J-${days(c.delai)}`}</div>
                         <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>{c.responsables.length > 0 ? c.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Non assigne"}</div>
-                        <button onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isNC?"#fff5f5":"#fffbeb", border:`1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderRadius: "6px", color: isNC?"#dc2626":"#92400e", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isNC?"#fff5f5":"#fffbeb", border:`1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderRadius: "6px", color: isNC?"#dc2626":"#92400e", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
                       </div>
                     </div>
                   </div>
@@ -306,7 +321,7 @@ export default function App() {
             <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Membres ayant au moins un indicateur assigne</p>
           </div>
           {sansResp.length > 0 && (
-            <div style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
+            <div className="no-print" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
               <div style={{ fontWeight: "700", color: "#92400e", marginBottom: "8px" }}>{sansResp.length} indicateur(s) sans responsable</div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{sansResp.map(c => <button key={c.id} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #fcd34d", borderRadius: "6px", color: "#92400e", padding: "5px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>{c.num} — {c.titre.substring(0,38)}{c.titre.length>38?"...":""}</button>)}</div>
             </div>
@@ -318,7 +333,7 @@ export default function App() {
               const nonConformes = r.items.filter(c => c.statut==="non-conforme").length;
               const enCours = r.items.filter(c => c.statut==="en-cours").length;
               return (
-                <div key={r.name} style={card}>
+                <div key={r.name} style={{ ...card, pageBreakInside: "avoid" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
                     <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>{r.nom.split(" ").map(n=>n[0]).join("").substring(0,2).toUpperCase()}</div>
                     <div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f" }}>{r.nom}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{r.role}</div></div>
@@ -338,7 +353,7 @@ export default function App() {
                         <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
                         <div style={{ flex: 1, fontSize: "12px", color: "#374151" }}>{c.titre}</div>
                         <StatusBadge statut={c.statut} />
-                        <button onClick={() => setModalCritere(c)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "5px", color: "#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "5px", color: "#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
                       </div>
                     ))}
                   </div>
