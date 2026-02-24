@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
+import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDY6ZTEOi-g0_98QHHzSJFNgPC0DMTdaus",
@@ -10,11 +11,12 @@ const firebaseConfig = {
   messagingSenderId: "350382146811",
   appId: "1:350382146811:web:4962b341a25cd20ebb5c5e"
 };
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
 const DOC_REF = doc(db, "qualiopi", "criteres");
 
-const MOT_DE_PASSE = "Qualiopi2025!";
 const NOM_ETABLISSEMENT = "IFSI du CHAM";
 const TODAY = new Date().toISOString().split("T")[0];
 
@@ -43,8 +45,8 @@ const RESPONSABLES = [
 ];
 
 const DEFAULT_CRITERES = [
-  { id: 1,  num: "1.1", critere: 1, titre: "Publicite des prestations et conditions d'acces",           responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Informations claires et accessibles sur les prestations, publics vises, prerequis, modalites et delais d'acces.", preuves: "" },
-  { id: 2,  num: "1.2", critere: 1, titre: "Communication sur les resultats obtenus",                   responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Taux de reussite aux certifications, taux d'insertion professionnelle, taux de satisfaction rendus publics.", preuves: "" },
+  { id: 1,  num: "1.1", critere: 1, titre: "Publicite des prestations et conditions d'acces",            responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Informations claires et accessibles sur les prestations, publics vises, prerequis, modalites et delais d'acces.", preuves: "" },
+  { id: 2,  num: "1.2", critere: 1, titre: "Communication sur les resultats obtenus",                    responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Taux de reussite aux certifications, taux d'insertion professionnelle, taux de satisfaction rendus publics.", preuves: "" },
   { id: 3,  num: "1.3", critere: 1, titre: "Information sur l'accessibilite aux personnes handicapees", responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Coordonnees du referent handicap diffusees, informations sur les adaptations possibles.", preuves: "" },
   { id: 4,  num: "1.4", critere: 1, titre: "Tarifs et modalites de financement",                        responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Tarifs et conditions de financement clairement affiches et accessibles avant toute inscription.", preuves: "" },
   { id: 5,  num: "1.5", critere: 1, titre: "Delais d'acces a la formation",                             responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Delais d'acces precises et mis a jour regulierement sur tous les supports de communication.", preuves: "" },
@@ -73,7 +75,7 @@ const DEFAULT_CRITERES = [
   { id: 28, num: "6.5", critere: 6, titre: "Pratiques ecoresponsables",                                 responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Demarche RSE engagee, bilan carbone, actions en faveur du developpement durable documentees.", preuves: "" },
   { id: 29, num: "7.1", critere: 7, titre: "Recueil des appreciations",                                 responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Enquetes de satisfaction regulieres aupres des apprenants, employeurs et intervenants, resultats analyses.", preuves: "" },
   { id: 30, num: "7.2", critere: 7, titre: "Traitement des reclamations",                               responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Procedure de reclamation formalisee, accessible, tracee et avec suivi des reponses apportees.", preuves: "" },
-  { id: 31, num: "7.3", critere: 7, titre: "Mesures d'amelioration mises en oeuvre",                   responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Plan d'amelioration continue documente, actions realisees tracees, bilan annuel qualite produit.", preuves: "" },
+  { id: 31, num: "7.3", critere: 7, titre: "Mesures d'amelioration mises en oeuvre",                    responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Plan d'amelioration continue documente, actions realisees tracees, bilan annuel qualite produit.", preuves: "" },
   { id: 32, num: "7.4", critere: 7, titre: "Analyse des causes d'abandon",                              responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "Suivi et analyse des ruptures de parcours, actions correctives mises en place et evaluees.", preuves: "" },
 ];
 
@@ -140,14 +142,29 @@ function MultiSelect({ selected, onChange }) {
   );
 }
 
-function LoginPage({ onLogin }) {
+function LoginPage() {
+  const [email, setEmail] = useState("");
   const [pwd, setPwd] = useState("");
   const [error, setError] = useState(false);
   const [shake, setShake] = useState(false);
-  function submit() {
-    if (pwd === MOT_DE_PASSE) { onLogin(); }
-    else { setError(true); setShake(true); setTimeout(() => setShake(false), 500); setTimeout(() => setError(false), 3000); setPwd(""); }
+  const [loading, setLoading] = useState(false);
+
+  async function submit() {
+    if (!email || !pwd) return;
+    setLoading(true);
+    try {
+      await signInWithEmailAndPassword(auth, email, pwd);
+    } catch (err) {
+      setError(true);
+      setShake(true);
+      setTimeout(() => setShake(false), 500);
+      setTimeout(() => setError(false), 3000);
+      setPwd("");
+    } finally {
+      setLoading(false);
+    }
   }
+
   return (
     <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#f0f4ff,#e8f0fe,#f0f4ff)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit,sans-serif" }}>
       <style>{`@keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-6px)}80%{transform:translateX(6px)}}`}</style>
@@ -157,14 +174,24 @@ function LoginPage({ onLogin }) {
           <div style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Qualiopi Tracker</div>
         </div>
         <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "6px" }}>{NOM_ETABLISSEMENT}</div>
-        <div style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", borderRadius: "6px", padding: "6px 12px", marginBottom: "32px", border: "1px solid #f3f4f6" }}>Acces securise — Donnees confidentielles RGPD</div>
+        <div style={{ fontSize: "11px", color: "#9ca3af", background: "#f9fafb", borderRadius: "6px", padding: "6px 12px", marginBottom: "32px", border: "1px solid #f3f4f6" }}>Accès sécurisé Firebase Auth</div>
+        
         <div style={{ textAlign: "left", marginBottom: "16px" }}>
-          <label style={{ fontSize: "12px", color: "#374151", fontWeight: "600", display: "block", marginBottom: "6px" }}>Mot de passe</label>
-          <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="Saisir le mot de passe" autoFocus
-            style={{ width: "100%", background: "white", border: `1.5px solid ${error ? "#ef4444" : "#d1d5db"}`, borderRadius: "8px", color: "#1e3a5f", padding: "11px 14px", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
-          {error && <div style={{ fontSize: "12px", color: "#ef4444", marginTop: "6px" }}>Mot de passe incorrect</div>}
+          <label style={{ fontSize: "12px", color: "#374151", fontWeight: "600", display: "block", marginBottom: "6px" }}>Email</label>
+          <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="direction@ifsi-cham.fr" autoFocus
+            style={{ width: "100%", background: "white", border: "1.5px solid #d1d5db", borderRadius: "8px", color: "#1e3a5f", padding: "11px 14px", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
         </div>
-        <button onClick={submit} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontSize: "14px", fontWeight: "700", cursor: "pointer" }}>Acceder au tableau de bord</button>
+
+        <div style={{ textAlign: "left", marginBottom: "24px" }}>
+          <label style={{ fontSize: "12px", color: "#374151", fontWeight: "600", display: "block", marginBottom: "6px" }}>Mot de passe</label>
+          <input type="password" value={pwd} onChange={e => setPwd(e.target.value)} onKeyDown={e => e.key === "Enter" && submit()} placeholder="••••••••"
+            style={{ width: "100%", background: "white", border: `1.5px solid ${error ? "#ef4444" : "#d1d5db"}`, borderRadius: "8px", color: "#1e3a5f", padding: "11px 14px", fontSize: "14px", outline: "none", boxSizing: "border-box" }} />
+          {error && <div style={{ fontSize: "12px", color: "#ef4444", marginTop: "6px" }}>Identifiants incorrects</div>}
+        </div>
+
+        <button onClick={submit} disabled={loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontSize: "14px", fontWeight: "700", cursor: loading ? "wait" : "pointer", opacity: loading ? 0.7 : 1 }}>
+          {loading ? "Connexion..." : "Accéder au tableau de bord"}
+        </button>
       </div>
     </div>
   );
@@ -251,6 +278,7 @@ function DetailModal({ critere, onClose, onSave }) {
 
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [authChecked, setAuthChecked] = useState(false);
   const [criteres, setCriteres] = useState(null);
   const [saveStatus, setSaveStatus] = useState("idle");
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -260,22 +288,32 @@ export default function App() {
   const [modalCritere, setModalCritere] = useState(null);
 
   useEffect(() => {
-    if (sessionStorage.getItem("qualiopi_auth") === "ok") setIsLoggedIn(true);
-    async function load() {
-      try {
-        const snap = await getDoc(DOC_REF);
-        if (snap.exists() && snap.data().liste) {
-          setCriteres(snap.data().liste);
-        } else {
-          setCriteres(DEFAULT_CRITERES);
-        }
-      } catch (e) {
-        console.error("Erreur Firebase:", e);
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        loadData();
+      } else {
+        setIsLoggedIn(false);
+      }
+      setAuthChecked(true);
+    });
+    
+    return () => unsubscribe();
+  }, []);
+
+  async function loadData() {
+    try {
+      const snap = await getDoc(DOC_REF);
+      if (snap.exists() && snap.data().liste) {
+        setCriteres(snap.data().liste);
+      } else {
         setCriteres(DEFAULT_CRITERES);
       }
+    } catch (e) {
+      console.error("Erreur Firebase:", e);
+      setCriteres(DEFAULT_CRITERES);
     }
-    load();
-  }, []);
+  }
 
   async function saveCriteres(newCriteres) {
     setCriteres(newCriteres);
@@ -291,11 +329,11 @@ export default function App() {
     }
   }
 
-  function handleLogin() { sessionStorage.setItem("qualiopi_auth", "ok"); setIsLoggedIn(true); }
-  function handleLogout() { sessionStorage.removeItem("qualiopi_auth"); setIsLoggedIn(false); }
+  function handleLogout() { signOut(auth); }
   function saveModal(updated) { saveCriteres(criteres.map(c => c.id === updated.id ? updated : c)); setModalCritere(null); }
 
-  if (!isLoggedIn) return <LoginPage onLogin={handleLogin} />;
+  if (!authChecked) return null;
+  if (!isLoggedIn) return <LoginPage />;
   if (criteres === null) return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit,sans-serif" }}>
       <div style={{ textAlign: "center" }}><div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div><div style={{ fontSize: "14px", color: "#6b7280" }}>Chargement des donnees...</div></div>
