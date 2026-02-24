@@ -60,14 +60,13 @@ export default function DetailModal({ critere, onClose, onSave }) {
   return (
     <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={onClose}>
       
-      {/* MAGIE CSS POUR L'IMPRESSION DE LA MODALE */}
       <style>{`
         @media print {
           .no-print { display: none !important; }
           .modal-overlay { 
             position: absolute !important; 
             top: 0 !important; left: 0 !important; 
-            background: white !important; /* Cache le tableau de bord derrière */
+            background: white !important; 
             align-items: flex-start !important; 
             padding: 0 !important; 
           }
@@ -87,7 +86,10 @@ export default function DetailModal({ critere, onClose, onSave }) {
 
       <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "32px", width: "100%", maxWidth: "700px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "24px", paddingBottom: "16px", borderBottom: "1px solid #f1f5f9" }}>
-          <span style={{ minWidth: "48px", padding: "5px 0", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "14px", fontWeight: "800", textAlign: "center", border: `1px solid ${cfg.color}30` }}>{critere.num}</span>
+          
+          {/* MODIFICATION ICI : whiteSpace: "nowrap" pour que le badge ne se coupe pas */}
+          <span style={{ padding: "5px 12px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "14px", fontWeight: "800", textAlign: "center", border: `1px solid ${cfg.color}30`, whiteSpace: "nowrap" }}>{critere.num}</span>
+          
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: "16px", fontWeight: "700", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre}</div>
             <div style={{ fontSize: "12px", color: "#6b7280" }}>{cfg.label}</div>
@@ -102,7 +104,6 @@ export default function DetailModal({ critere, onClose, onSave }) {
               style={{ ...inp, background: STATUT_CONFIG[data.statut].bg, color: STATUT_CONFIG[data.statut].color, fontWeight: "600", border: `1.5px solid ${STATUT_CONFIG[data.statut].border}` }}>
               {Object.entries(STATUT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
-            {/* Version texte affichée uniquement à l'impression */}
             <div className="print-value" style={{ display: "none" }}>{STATUT_CONFIG[data.statut].label}</div>
           </div>
           <div>
@@ -143,7 +144,6 @@ export default function DetailModal({ critere, onClose, onSave }) {
           <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.notes || "—"}</div>
         </div>
         
-        {/* BARRE DES BOUTONS (Avec le nouveau bouton Exporter PDF) */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
           <button className="no-print" onClick={() => window.print()} style={{ padding: "8px 16px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", color: "#1d4ed8", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
             <span>📄</span> Imprimer la fiche
