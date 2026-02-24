@@ -1,25 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { initializeApp } from "firebase/app";
-import { getFirestore, doc, getDoc, setDoc } from "firebase/firestore";
-import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyDY6ZTEOi-g0_98QHHzSJFNgPC0DMTdaus",
-  authDomain: "qualiopi-cham.firebaseapp.com",
-  projectId: "qualiopi-cham",
-  storageBucket: "qualiopi-cham.firebasestorage.app",
-  messagingSenderId: "350382146811",
-  appId: "1:350382146811:web:4962b341a25cd20ebb5c5e"
-};
-
-const firebaseApp = initializeApp(firebaseConfig);
-const db = getFirestore(firebaseApp);
-const auth = getAuth(firebaseApp);
-const DOC_REF = doc(db, "qualiopi", "criteres");
+import { getDoc, setDoc } from "firebase/firestore";
+import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+import { db, auth, DOC_REF } from "./firebase";
 
 const NOM_ETABLISSEMENT = "IFSI du CHAM";
 const TODAY = new Date().toISOString().split("T")[0];
-
 const RESPONSABLES = [
   "RETARDATO Clementine (Directrice des soins)",
   "TZOTZIS Christelle (Coordinatrice pedagogique)",
