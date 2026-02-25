@@ -51,11 +51,12 @@ function MultiSelect({ selected, onChange, disabled }) {
   );
 }
 
-export default function DetailModal({ critere, onClose, onSave, isReadOnly }) {
+// NOUVEAU : Récupération de la prop isAuditMode
+export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode }) {
   const [data, setData] = useState({ ...critere, responsables: [...(critere.responsables || [])] });
   const cfg = CRITERES_LABELS[critere.critere];
   const lbl = { display: "block", fontSize: "11px", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: "700", marginBottom: "7px" };
-  const inp = { background: isReadOnly ? "#f9fafb" : "white", border: "1px solid #d1d5db", borderRadius: "8px", color: "#1e3a5f", padding: "9px 12px", fontSize: "13px", outline: "none", width: "100%", cursor: isReadOnly ? "not-allowed" : "text" };
+  const inp = { background: (isReadOnly || isAuditMode) ? "#f9fafb" : "white", border: "1px solid #d1d5db", borderRadius: "8px", color: "#1e3a5f", padding: "9px 12px", fontSize: "13px", outline: "none", width: "100%", cursor: (isReadOnly || isAuditMode) ? "not-allowed" : "text" };
   const guide = GUIDE_QUALIOPI[critere.id];
   
   return (
@@ -148,7 +149,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly }) {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
               <div>
                 <label style={lbl}>Statut actuel</label>
-                <select className="no-print" disabled={isReadOnly} value={data.statut} onChange={e => setData({ ...data, statut: e.target.value })}
+                <select className="no-print" disabled={isReadOnly || isAuditMode} value={data.statut} onChange={e => setData({ ...data, statut: e.target.value })}
                   style={{ ...inp, background: STATUT_CONFIG[data.statut].bg, color: STATUT_CONFIG[data.statut].color, fontWeight: "600", border: `1.5px solid ${STATUT_CONFIG[data.statut].border}` }}>
                   {Object.entries(STATUT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
@@ -156,50 +157,55 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly }) {
               </div>
               <div>
                 <label style={lbl}>Échéance visée</label>
-                <input className="no-print" disabled={isReadOnly} type="date" value={data.delai} min={TODAY} onChange={e => setData({ ...data, delai: e.target.value })} style={{ ...inp, width: "100%", boxSizing: "border-box" }} />
+                <input className="no-print" disabled={isReadOnly || isAuditMode} type="date" value={data.delai} min={TODAY} onChange={e => setData({ ...data, delai: e.target.value })} style={{ ...inp, width: "100%", boxSizing: "border-box" }} />
                 <div className="print-value" style={{ display: "none" }}>{new Date(data.delai).toLocaleDateString("fr-FR")}</div>
               </div>
             </div>
             
             <div style={{ marginBottom: "16px" }}>
               <label style={lbl}>Responsable(s) assigné(s)</label>
-              <MultiSelect disabled={isReadOnly} selected={data.responsables} onChange={val => setData({ ...data, responsables: val })} />
+              <MultiSelect disabled={isReadOnly || isAuditMode} selected={data.responsables} onChange={val => setData({ ...data, responsables: val })} />
               <div className="print-value" style={{ display: "none" }}>
                 {data.responsables.length > 0 ? data.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable assigné"}
               </div>
             </div>
             
             <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>✅ Preuves FINALISÉES (Liens, Emplacements)</label>
-              <textarea className="no-print" readOnly={isReadOnly} value={data.preuves || ""} onChange={e => setData({ ...data, preuves: e.target.value })} rows={3}
+              <label style={lbl}>{isAuditMode ? "Preuves (Liens, Emplacements)" : "✅ Preuves FINALISÉES (Liens, Emplacements)"}</label>
+              <textarea className="no-print" readOnly={isReadOnly || isAuditMode} value={data.preuves || ""} onChange={e => setData({ ...data, preuves: e.target.value })} rows={5}
                 placeholder="Ex: Livret d'accueil p.12, Lien Sharepoint..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: isReadOnly ? "#d1d5db" : "#6ee7b7", background: isReadOnly ? "#f9fafb" : "#f0fdf4" }} />
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: (isReadOnly || isAuditMode) ? "#d1d5db" : "#6ee7b7", background: (isReadOnly || isAuditMode) ? "#f9fafb" : "#f0fdf4" }} />
               <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#f0fdf4", padding: "10px", borderLeft: "3px solid #10b981", borderRadius: "4px" }}>{data.preuves || "—"}</div>
             </div>
 
-            <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>⏳ Preuves EN COURS d'élaboration</label>
-              <textarea className="no-print" readOnly={isReadOnly} value={data.preuves_encours || ""} onChange={e => setData({ ...data, preuves_encours: e.target.value })} rows={3}
-                placeholder="Ex: Trame d'entretien en cours de rédaction, en attente signature..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: isReadOnly ? "#d1d5db" : "#fcd34d", background: isReadOnly ? "#f9fafb" : "#fffbeb" }} />
-              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#fffbeb", padding: "10px", borderLeft: "3px solid #f59e0b", borderRadius: "4px" }}>{data.preuves_encours || "—"}</div>
-            </div>
+            {/* MASQUAGE DES DONNÉES SENSIBLES SI MODE AUDIT */}
+            {!isAuditMode && (
+              <>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={lbl}>⏳ Preuves EN COURS d'élaboration</label>
+                  <textarea className="no-print" readOnly={isReadOnly} value={data.preuves_encours || ""} onChange={e => setData({ ...data, preuves_encours: e.target.value })} rows={3}
+                    placeholder="Ex: Trame d'entretien en cours de rédaction, en attente signature..."
+                    style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: isReadOnly ? "#d1d5db" : "#fcd34d", background: isReadOnly ? "#f9fafb" : "#fffbeb" }} />
+                  <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#fffbeb", padding: "10px", borderLeft: "3px solid #f59e0b", borderRadius: "4px" }}>{data.preuves_encours || "—"}</div>
+                </div>
 
-            <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>Commentaires / Attendus demandés par l'évaluateur</label>
-              <textarea className="no-print" readOnly={isReadOnly} value={data.attendus || ""} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3}
-                placeholder="Ex: L'auditeur a demandé à ce qu'on précise la date sur la feuille d'émargement..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: isReadOnly ? "#f9fafb" : "#f8fafc", borderColor: "#e2e8f0" }} />
-              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.attendus || "—"}</div>
-            </div>
-            
-            <div style={{ marginBottom: "28px" }}>
-              <label style={lbl}>Notes internes IFSI (Points de vigilance)</label>
-              <textarea className="no-print" readOnly={isReadOnly} value={data.notes || ""} onChange={e => setData({ ...data, notes: e.target.value })} rows={2}
-                placeholder="Ex: Attention à bien valider ce document en Copil..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} />
-              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", fontStyle: "italic", color: "#6b7280" }}>{data.notes || "—"}</div>
-            </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={lbl}>Commentaires / Attendus demandés par l'évaluateur</label>
+                  <textarea className="no-print" readOnly={isReadOnly} value={data.attendus || ""} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3}
+                    placeholder="Ex: L'auditeur a demandé à ce qu'on précise la date sur la feuille d'émargement..."
+                    style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: isReadOnly ? "#f9fafb" : "#f8fafc", borderColor: "#e2e8f0" }} />
+                  <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.attendus || "—"}</div>
+                </div>
+                
+                <div style={{ marginBottom: "28px" }}>
+                  <label style={lbl}>Notes internes IFSI (Points de vigilance)</label>
+                  <textarea className="no-print" readOnly={isReadOnly} value={data.notes || ""} onChange={e => setData({ ...data, notes: e.target.value })} rows={2}
+                    placeholder="Ex: Attention à bien valider ce document en Copil..."
+                    style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} />
+                  <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", fontStyle: "italic", color: "#6b7280" }}>{data.notes || "—"}</div>
+                </div>
+              </>
+            )}
           </div>
         </div>
         
@@ -211,9 +217,9 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly }) {
           
           <div className="no-print" style={{ display: "flex", gap: "10px" }}>
             <button onClick={onClose} style={{ padding: "10px 22px", background: "white", border: "1px solid #d1d5db", borderRadius: "8px", color: "#374151", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
-              {isReadOnly ? "Fermer" : "Annuler"}
+              {(isReadOnly || isAuditMode) ? "Fermer" : "Annuler"}
             </button>
-            {!isReadOnly && (
+            {(!isReadOnly && !isAuditMode) && (
               <button onClick={() => onSave(data)} style={{ padding: "10px 28px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>
                 Enregistrer
               </button>
