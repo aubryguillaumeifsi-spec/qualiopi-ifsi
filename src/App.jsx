@@ -57,11 +57,9 @@ export default function App() {
       if (snap.exists()) {
         const d = snap.data();
         if (d.campaigns && d.campaigns.length > 0) {
-          // Format récent (V1.4)
           setCampaigns(d.campaigns);
           setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
         } else if (d.liste) {
-          // Migration automatique de l'ancien format vers le système de campagnes
           const mig = [{ id: Date.now().toString(), name: "Évaluation initiale", liste: d.liste, locked: false }];
           setCampaigns(mig);
           setActiveCampaignId(mig[0].id);
@@ -103,13 +101,11 @@ export default function App() {
     if (e.target.value === "NEW") {
       const name = prompt("Nom de la nouvelle certification (ex: Audit de Surveillance 2026) :");
       if (name && name.trim() !== "") {
-        const latest = campaigns[campaigns.length - 1]; // On se base sur la dernière campagne
-        // Duplication avec remise à zéro des statuts
+        const latest = campaigns[campaigns.length - 1]; 
         const duplicatedListe = latest.liste.map(c => ({
           ...c,
-          statut: "non-evalue" // Tout repasse à "Non évalué"
+          statut: "non-evalue" 
         }));
-        // Verrouillage des anciennes campagnes
         const locked = campaigns.map(c => ({ ...c, locked: true }));
         const newCamp = {
           id: Date.now().toString(),
@@ -121,11 +117,28 @@ export default function App() {
         saveData(newCampaigns);
         setActiveCampaignId(newCamp.id);
       } else {
-        // Annulation du prompt, on remet le selecteur sur la campagne actuelle
         e.target.value = activeCampaignId;
       }
     } else {
       setActiveCampaignId(e.target.value);
+    }
+  }
+
+  // NOUVELLE FONCTION : SUPPRESSION DE CAMPAGNE
+  function handleDeleteCampaign() {
+    if (campaigns.length <= 1) {
+      alert("Vous ne pouvez pas supprimer la seule évaluation existante.");
+      return;
+    }
+    const currentName = campaigns.find(c => c.id === activeCampaignId)?.name;
+    const confirmDelete = window.confirm(`⚠️ ATTENTION ⚠️\n\nÊtes-vous sûr de vouloir supprimer définitivement l'évaluation :\n"${currentName}" ?\n\nToutes les données de cette session seront perdues. Cette action est IRRÉVERSIBLE.`);
+    
+    if (confirmDelete) {
+      const updatedCampaigns = campaigns.filter(c => c.id !== activeCampaignId);
+      // On bascule automatiquement sur la dernière campagne restante
+      const newActiveId = updatedCampaigns[updatedCampaigns.length - 1].id;
+      saveData(updatedCampaigns);
+      setActiveCampaignId(newActiveId);
     }
   }
 
@@ -137,13 +150,12 @@ export default function App() {
     </div>
   );
 
-  // Variables calculées pour la campagne active
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId);
   const criteres = currentCampaign.liste;
   const isArchive = currentCampaign.locked;
 
   function saveModal(updated) {
-    if (isArchive) return; // Sécurité supplémentaire
+    if (isArchive) return; 
     const newListe = criteres.map(c => c.id === updated.id ? updated : c);
     const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp);
     saveData(newCampaigns);
@@ -213,12 +225,16 @@ export default function App() {
             <div style={{ width: "42px", height: "42px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
             <div>
               <div style={{ fontSize: "17px", fontWeight: "800", color: "#1e3a5f", display: "flex", alignItems: "center" }}>
-                Qualiopi Tracker — {NOM_ETABLISSEMENT}<SaveIndicator />
+                Qualiopi Tracker 
+                {/* MODIFICATION ICI : Ajout du petit badge de version v1.4 */}
+                <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", marginLeft: "8px", border: "1px solid #e2e8f0", letterSpacing: "0.5px" }}>V1.4</span>
+                <span style={{ margin: "0 8px", color: "#d1d5db" }}>—</span> 
+                {NOM_ETABLISSEMENT}
+                <SaveIndicator />
               </div>
-              <div style={{ fontSize: "11px", color: "#9ca3af" }}>Référentiel National Qualité · 32 indicateurs</div>
+              <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Référentiel National Qualité · 32 indicateurs</div>
             </div>
             
-            {/* NOUVEAU SÉLECTEUR DE CAMPAGNE (V1.4) */}
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "20px", borderLeft: "2px solid #f1f5f9", paddingLeft: "20px" }}>
               <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ ...sel, fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", background: "#eff6ff", padding: "8px 14px", outline: "none" }}>
                 {campaigns.map(c => (
@@ -227,6 +243,13 @@ export default function App() {
                 <option disabled>──────────</option>
                 <option value="NEW">➕ Nouvelle certification...</option>
               </select>
+              
+              {/* MODIFICATION ICI : Bouton de suppression de la campagne affiché avec sa condition */}
+              {campaigns.length > 1 && (
+                <button onClick={handleDeleteCampaign} className="no-print" title="Supprimer définitivement cette évaluation" style={{ background: "white", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "14px", color: "#ef4444", padding: "6px 8px", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }} onMouseOver={e => e.currentTarget.style.background = '#fef2f2'} onMouseOut={e => e.currentTarget.style.background = 'white'}>
+                  🗑️
+                </button>
+              )}
             </div>
           </div>
 
@@ -242,7 +265,6 @@ export default function App() {
         </div>
       </div>
 
-      {/* BANDEAU D'ALERTE ARCHIVE */}
       {isArchive && (
         <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
           <span>🔒</span> Mode Lecture Seule : Cette évaluation est une archive historique. Les modifications sont bloquées.
@@ -341,8 +363,6 @@ export default function App() {
                           <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vides</span>
                         )}
                       </td>
-                      
-                      {/* BOUTON DYNAMIQUE SELON LE MODE ARCHIVE */}
                       <td className="no-print" style={{ ...td, width: "80px" }}>
                         <button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
                           {isArchive ? "Consulter" : "Éditer"}
