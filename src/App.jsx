@@ -37,8 +37,6 @@ export default function App() {
   const [filterCritere, setFilterCritere] = useState("tous");
   const [searchTerm, setSearchTerm] = useState("");
   const [modalCritere, setModalCritere] = useState(null);
-  
-  // NOUVEAU : État pour le Mode Audit
   const [isAuditMode, setIsAuditMode] = useState(false);
 
   useEffect(() => {
@@ -163,6 +161,49 @@ export default function App() {
     setModalCritere(null);
   }
 
+  // NOUVELLE FONCTION : Export CSV
+  function exportToCSV() {
+    if (!criteres) return;
+    
+    // Entêtes des colonnes
+    const headers = ["Indicateur", "Critère Qualiopi", "Titre", "Statut", "Échéance", "Responsables", "Preuves finalisées", "Preuves en cours", "Remarques Évaluateur", "Notes internes"];
+    
+    // Formatage des lignes
+    const rows = criteres.map(c => {
+      // Fonction pour nettoyer les textes (retirer les sauts de ligne qui cassent le CSV et gérer les guillemets)
+      const escapeCell = (text) => `"${(text || "").toString().replace(/"/g, '""').replace(/\n/g, ' - ')}"`;
+      
+      return [
+        c.num,
+        `Critère ${c.critere}`,
+        escapeCell(c.titre),
+        STATUT_CONFIG[c.statut]?.label || c.statut,
+        new Date(c.delai).toLocaleDateString("fr-FR"),
+        escapeCell((c.responsables || []).map(r => r.split("(")[0].trim()).join(", ")),
+        escapeCell(c.preuves),
+        escapeCell(c.preuves_encours),
+        escapeCell(c.attendus),
+        escapeCell(c.notes)
+      ].join(";"); // Séparateur point-virgule adapté à Excel français
+    });
+    
+    // \uFEFF est la magie (le BOM) qui force Excel à lire les accents (UTF-8)
+    const csvString = "\uFEFF" + headers.join(";") + "\n" + rows.join("\n");
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    
+    // Nettoyage du nom de la campagne pour le nom du fichier
+    const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    
+    // Déclenchement du téléchargement
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  }
+
   const today = new Date();
   const days = d => Math.round((new Date(d) - today) / 86400000);
   const dayColor = d => days(d) < 0 ? "#dc2626" : days(d) < 30 ? "#d97706" : "#6b7280";
@@ -217,7 +258,6 @@ export default function App() {
         `}
       </style>
 
-      {/* On passe la variable isAuditMode à la modale */}
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} />}
 
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
@@ -260,14 +300,20 @@ export default function App() {
               <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{l}</button>
             ))}
             
-            {/* BOUTON MODE AUDIT */}
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "16px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px", transition: "all 0.3s" }}>
               <span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span>
             </button>
 
-            <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", marginLeft: "8px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>📄</span> Exporter PDF
-            </button>
+            {/* LES DEUX BOUTONS D'EXPORT SONT ICI */}
+            <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}>
+              <button onClick={exportToCSV} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>📊</span> Excel
+              </button>
+              <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
+                <span>📄</span> PDF
+              </button>
+            </div>
+            
             <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Déconnexion</button>
           </div>
         </div>
@@ -413,7 +459,6 @@ export default function App() {
                         <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "4px" }}>{c.titre}</div>
                         <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>{CRITERES_LABELS[c.critere].label}</div>
                         
-                        {/* Masquage conditionnel des éléments sensibles si Mode Audit est actif */}
                         {(!isAuditMode && c.attendus) && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Remarques Évaluateur : </span>{c.attendus}</div>}
                         {c.preuves && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>{isAuditMode ? "Preuves :" : "Preuves finalisées :"} </span>{c.preuves}</div>}
                         {(!isAuditMode && c.preuves_encours) && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#d97706" }}>Preuves en cours : </span>{c.preuves_encours}</div>}
