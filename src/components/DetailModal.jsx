@@ -87,7 +87,6 @@ export default function DetailModal({ critere, onClose, onSave }) {
         }
       `}</style>
 
-      {/* On a élargi la modale à 1000px pour avoir la place pour 2 colonnes confortables */}
       <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "32px", width: "100%", maxWidth: "1000px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
         
         {/* EN-TÊTE DE LA MODALE */}
@@ -132,7 +131,6 @@ export default function DetailModal({ critere, onClose, onSave }) {
               </div>
             )}
 
-            {/* ENCADRÉ ROUGE POUR LA NON-CONFORMITÉ */}
             <div style={{ marginTop: "20px", background: "#fef2f2", border: "1px solid #fca5a5", borderLeft: "4px solid #ef4444", padding: "12px", borderRadius: "6px" }}>
               <div style={{ fontSize: "11px", color: "#991b1b", fontWeight: "800", textTransform: "uppercase", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
                 <span>⚠️</span> Règle de non-conformité
@@ -173,27 +171,35 @@ export default function DetailModal({ critere, onClose, onSave }) {
             </div>
             
             <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>Nos éléments de preuves (Liens, Emplacements...)</label>
-              <textarea className="no-print" value={data.preuves} onChange={e => setData({ ...data, preuves: e.target.value })} rows={5}
-                placeholder="Ex: Livret d'accueil p.12, Lien Sharepoint du PV de réunion..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: "#bfdbfe", background: "#f0f7ff" }} />
-              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#f0f7ff", padding: "10px", borderLeft: "3px solid #3b82f6", borderRadius: "4px" }}>{data.preuves || "—"}</div>
+              <label style={lbl}>✅ Preuves FINALISÉES (Liens, Emplacements)</label>
+              <textarea className="no-print" value={data.preuves || ""} onChange={e => setData({ ...data, preuves: e.target.value })} rows={3}
+                placeholder="Ex: Livret d'accueil p.12, Lien Sharepoint..."
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: "#6ee7b7", background: "#f0fdf4" }} />
+              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#f0fdf4", padding: "10px", borderLeft: "3px solid #10b981", borderRadius: "4px" }}>{data.preuves || "—"}</div>
             </div>
 
             <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>Commentaires sur les attendus (Démarche interne)</label>
-              <textarea className="no-print" value={data.attendus} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3}
-                placeholder="Comment nous traduisons l'exigence Qualiopi dans notre quotidien..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} />
+              <label style={lbl}>⏳ Preuves EN COURS d'élaboration</label>
+              <textarea className="no-print" value={data.preuves_encours || ""} onChange={e => setData({ ...data, preuves_encours: e.target.value })} rows={3}
+                placeholder="Ex: Trame d'entretien en cours de rédaction, en attente signature..."
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: "#fcd34d", background: "#fffbeb" }} />
+              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#fffbeb", padding: "10px", borderLeft: "3px solid #f59e0b", borderRadius: "4px" }}>{data.preuves_encours || "—"}</div>
+            </div>
+
+            <div style={{ marginBottom: "16px" }}>
+              <label style={lbl}>Commentaires / Attendus demandés par l'évaluateur</label>
+              <textarea className="no-print" value={data.attendus || ""} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3}
+                placeholder="Ex: L'auditeur a demandé à ce qu'on précise la date sur la feuille d'émargement..."
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: "#f8fafc", borderColor: "#e2e8f0" }} />
               <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.attendus || "—"}</div>
             </div>
             
-            <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>Notes internes (Points de vigilance, etc.)</label>
-              <textarea className="no-print" value={data.notes} onChange={e => setData({ ...data, notes: e.target.value })} rows={2}
-                placeholder="Ex: Attention à bien mettre à jour ce document à la rentrée..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: "#fef9c3", borderColor: "#fde68a" }} />
-              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", fontStyle: "italic", color: "#92400e" }}>{data.notes || "—"}</div>
+            <div style={{ marginBottom: "28px" }}>
+              <label style={lbl}>Notes internes IFSI (Points de vigilance)</label>
+              <textarea className="no-print" value={data.notes || ""} onChange={e => setData({ ...data, notes: e.target.value })} rows={2}
+                placeholder="Ex: Attention à bien valider ce document en Copil..."
+                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} />
+              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", fontStyle: "italic", color: "#6b7280" }}>{data.notes || "—"}</div>
             </div>
           </div>
         </div>
