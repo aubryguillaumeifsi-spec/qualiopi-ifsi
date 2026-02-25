@@ -161,7 +161,10 @@ export default function App() {
     setModalCritere(null);
   }
 
-  // NOUVELLE FONCTION MAGIQUE : EXPORT EXCELJS (BEAU DESIGN)
+  const today = new Date();
+  const days = d => Math.round((new Date(d) - today) / 86400000);
+
+  // EXPORT EXCELJS AVEC LES COULEURS 🎨
   async function exportToExcel() {
     if (!criteres) return;
     if (typeof window.ExcelJS === "undefined") {
@@ -169,15 +172,13 @@ export default function App() {
       return;
     }
 
-    // 1. Création du classeur
     const workbook = new window.ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Suivi Qualiopi');
 
-    // 2. Définition des colonnes et de leur largeur
     worksheet.columns = [
-      { header: 'Indicateur', key: 'num', width: 14 },
-      { header: 'Critère Qualiopi', key: 'critere', width: 18 },
-      { header: 'Titre de l\'Indicateur', key: 'titre', width: 45 },
+      { header: 'N°', key: 'num', width: 8 },
+      { header: 'Critère', key: 'critere', width: 12 },
+      { header: 'Indicateur', key: 'titre', width: 45 },
       { header: 'Statut', key: 'statut', width: 18 },
       { header: 'Échéance', key: 'delai', width: 14 },
       { header: 'Responsable(s)', key: 'resp', width: 25 },
@@ -187,9 +188,12 @@ export default function App() {
       { header: 'Notes internes', key: 'notes', width: 45 }
     ];
 
-    // 3. Remplissage des données
+    // Fonction pour convertir les couleurs web (#1d4ed8) en format Excel (FF1D4ED8)
+    const toArgb = (hex) => hex ? hex.replace('#', 'FF').toUpperCase() : 'FF000000';
+
     criteres.forEach(c => {
-      worksheet.addRow({
+      const d = days(c.delai);
+      const row = worksheet.addRow({
         num: c.num,
         critere: `Critère ${c.critere}`,
         titre: c.titre,
@@ -201,40 +205,63 @@ export default function App() {
         attendus: c.attendus || "",
         notes: c.notes || ""
       });
+
+      // 🎨 Coloriser le Numéro (selon la couleur du critère)
+      const cConf = CRITERES_LABELS[c.critere];
+      if (cConf && cConf.color) {
+        row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true };
+        row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+
+      // 🎨 Coloriser le Statut (Fond + Texte)
+      const sConf = STATUT_CONFIG[c.statut];
+      if (sConf) {
+        row.getCell('statut').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(sConf.bg) } };
+        row.getCell('statut').font = { color: { argb: toArgb(sConf.color) }, bold: true };
+        row.getCell('statut').alignment = { horizontal: 'center', vertical: 'middle' };
+      }
+
+      // 🎨 Coloriser l'Échéance si urgence
+      const cellDelai = row.getCell('delai');
+      if (d < 0) {
+        cellDelai.font = { color: { argb: 'FFDC2626' }, bold: true }; // Rouge
+      } else if (d < 30) {
+        cellDelai.font = { color: { argb: 'FFD97706' }, bold: true }; // Orange
+      }
     });
 
-    // 4. DESIGN : Styliser l'entête (Ligne 1)
+    // Styliser l'entête
     const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // Texte blanc
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; // Fond Bleu
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
     headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-
-    // Figer la première ligne pour le scroll
     worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
 
-    // 5. DESIGN : Ajouter des bordures partout et activer le retour à la ligne
+    // Ajouter des bordures et activer le retour à la ligne
     worksheet.eachRow((row, rowNumber) => {
       row.eachCell((cell) => {
-        // Bordures grises légères
         cell.border = {
           top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
           left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
           bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
           right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
         };
-        // Retour à la ligne automatique pour toutes les lignes sous l'entête
         if (rowNumber > 1) {
-          cell.alignment = { vertical: 'top', wrapText: true };
+          // Si l'alignement n'a pas été déjà forcé au centre (comme pour Statut/Num), on aligne en haut
+          if (!cell.alignment) {
+            cell.alignment = { vertical: 'top', wrapText: true };
+          } else {
+            cell.alignment.wrapText = true;
+          }
         }
       });
     });
 
-    // 6. Génération du fichier binaire et téléchargement
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     const url = URL.createObjectURL(blob);
-    
     const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    
     const link = document.createElement("a");
     link.href = url;
     link.setAttribute("download", `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`);
@@ -243,8 +270,6 @@ export default function App() {
     document.body.removeChild(link);
   }
 
-  const today = new Date();
-  const days = d => Math.round((new Date(d) - today) / 86400000);
   const dayColor = d => days(d) < 0 ? "#dc2626" : days(d) < 30 ? "#d97706" : "#6b7280";
   const stats = {
     total: criteres.length,
