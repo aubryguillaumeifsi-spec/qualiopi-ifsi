@@ -118,6 +118,25 @@ export default function App() {
     setModalCritere(null);
   }
 
+  // --- LOGIQUE DRAG & DROP POUR LE KANBAN ---
+  function handleDragStart(e, critereId) {
+    e.dataTransfer.setData("critereId", critereId.toString());
+  }
+  function handleDragOver(e) {
+    e.preventDefault(); // Nécessaire pour autoriser le "drop"
+  }
+  function handleDrop(e, newStatut) {
+    e.preventDefault();
+    if (isArchive) return;
+    const critereId = e.dataTransfer.getData("critereId");
+    if (!critereId) return;
+    
+    // Met à jour le statut du critère déplacé
+    const newListe = criteres.map(c => c.id.toString() === critereId ? { ...c, statut: newStatut } : c);
+    const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp);
+    saveData(newCampaigns);
+  }
+
   const today = new Date();
   const days = d => Math.round((new Date(d) - today) / 86400000);
   
@@ -212,11 +231,9 @@ export default function App() {
   });
   
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({ "non-conforme": 0, "en-cours": 1 }[a.statut] - { "non-conforme": 0, "en-cours": 1 }[b.statut] || new Date(a.delai) - new Date(b.delai)));
-  
-  // LA MAGIE DES COULEURS POUR L'ONGLET RESPONSABLE EST ICI :
   const byResp = RESPONSABLES.map(r => ({ name: r, nom: r.split("(")[0].trim(), role: r.match(/\(([^)]+)\)/)?.[1] || "Défaut", items: criteres.filter(c => c.responsables.includes(r)), })).filter(r => r.items.length > 0);
 
-  const navBtn = active => ({ padding: "8px 18px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
+  const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
   const nb = col => ({ padding: "4px 10px", background: `${col}15`, color: col, borderRadius: "6px", fontSize: "12px", fontWeight: "800", textAlign: "center", border: `1px solid ${col}30`, flexShrink: 0, whiteSpace: "nowrap" });
   const th = { textAlign: "left", padding: "10px 14px", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.8px", borderBottom: "2px solid #f1f5f9", background: "#fafafa" };
@@ -226,7 +243,13 @@ export default function App() {
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
-      <style>{`@media print { .no-print { display: none !important; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: portrait; margin: 10mm; } * { box-shadow: none !important; } .print-break-avoid { page-break-inside: avoid; } }`}</style>
+      <style>{`
+        @media print { .no-print { display: none !important; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: portrait; margin: 10mm; } * { box-shadow: none !important; } .print-break-avoid { page-break-inside: avoid; } }
+        /* Style pour les cartes Kanban survolées */
+        .kanban-card { transition: all 0.2s ease; }
+        .kanban-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; border-color: #bfdbfe !important; }
+        .kanban-col { scrollbar-width: thin; }
+      `}</style>
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} />}
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
@@ -239,8 +262,10 @@ export default function App() {
             </div>
           </div>
           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
-            {[["dashboard","Tableau de bord"],["criteres","Indicateurs"],["axes","Axes prioritaires"],["responsables","Responsables"]].map(([t, l]) => <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{l}</button>)}
-            <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "16px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
+            {/* AJOUT DE L'ONGLET KANBAN */}
+            {[["dashboard","Tableau de bord"],["kanban","Vue Kanban"],["criteres","Indicateurs"],["axes","Axes prioritaires"],["responsables","Responsables"]].map(([t, l]) => <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{l}</button>)}
+            
+            <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
             <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}><button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px" }}><span>📊</span> Excel</button><button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px" }}><span>📄</span> PDF</button></div>
             <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Déconnexion</button>
           </div>
@@ -248,6 +273,7 @@ export default function App() {
       </div>
       {isArchive && <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>🔒 Mode Lecture Seule : Cette évaluation est une archive historique.</div>}
       {isAuditMode && !isArchive && <div className="no-print" style={{ background: "#d1fae5", borderBottom: "1px solid #6ee7b7", color: "#065f46", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>✅ Mode Audit Activé : Les notes internes et preuves en cours sont masquées.</div>}
+      
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
         {activeTab === "dashboard" && <>
@@ -262,6 +288,69 @@ export default function App() {
           </div>
         </>}
 
+        {/* ================= NOUVELLE VUE KANBAN ================= */}
+        {activeTab === "kanban" && (
+          <>
+            <div style={{ marginBottom: "22px" }} className="no-print">
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Tableau Kanban des indicateurs</h2>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Faites glisser les cartes d'une colonne à l'autre pour mettre à jour leur statut.</p>
+            </div>
+            
+            <div style={{ display: "flex", gap: "16px", overflowX: "auto", paddingBottom: "20px", minHeight: "70vh", alignItems: "flex-start" }} className="no-print">
+              {Object.entries(STATUT_CONFIG).map(([stKey, stVal]) => {
+                const items = criteres.filter(c => c.statut === stKey);
+                return (
+                  <div 
+                    key={stKey} 
+                    className="kanban-col"
+                    onDragOver={handleDragOver} 
+                    onDrop={(e) => handleDrop(e, stKey)}
+                    style={{ flex: "0 0 320px", background: "#f8fafc", border: `1px solid ${stVal.border}`, borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "65vh", backgroundColor: stVal.bg }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `3px solid ${stVal.color}`, paddingBottom: "10px", marginBottom: "4px" }}>
+                      <span style={{ fontWeight: "800", color: stVal.color, textTransform: "uppercase", fontSize: "13px", letterSpacing: "0.5px" }}>{stVal.label}</span>
+                      <span style={{ background: "white", color: stVal.color, padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "800", border: `1px solid ${stVal.border}` }}>{items.length}</span>
+                    </div>
+                    
+                    {items.map(c => {
+                      const d = days(c.delai);
+                      return (
+                        <div 
+                          key={c.id} 
+                          className="kanban-card"
+                          draggable={!isArchive} 
+                          onDragStart={(e) => handleDragStart(e, c.id)}
+                          onClick={() => setModalCritere(c)}
+                          style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px", cursor: isArchive ? "pointer" : "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}
+                        >
+                          <div style={{ display: "flex", gap: "10px", marginBottom: "8px", alignItems: "flex-start" }}>
+                            <span style={{ ...nb(CRITERES_LABELS[c.critere].color), padding: "3px 8px", fontSize: "11px" }}>{c.num}</span>
+                            <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e3a5f", lineHeight: "1.3" }}>{c.titre}</div>
+                          </div>
+                          <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "12px", paddingLeft: "2px" }}>{CRITERES_LABELS[c.critere].label}</div>
+                          
+                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f8fafc", paddingTop: "10px" }}>
+                            <div style={{ display: "flex", gap: "4px" }}>
+                              {c.responsables.length > 0 ? c.responsables.slice(0, 3).map(r => {
+                                const rRole = r.match(/\(([^)]+)\)/)?.[1] || "Défaut"; 
+                                const rCfg = ROLE_COLORS[rRole] || ROLE_COLORS["Défaut"];
+                                return <span key={r} title={r} style={{ width: "24px", height: "24px", borderRadius: "50%", background: rCfg.bg, border: `1px solid ${rCfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "800", color: rCfg.text, cursor: "help" }}>{r.split(" ").map(n=>n[0]).join("").substring(0,2).toUpperCase()}</span>
+                              }) : <span style={{ fontSize: "10px", color: "#d97706", fontWeight: "600", background: "#fffbeb", padding: "2px 6px", borderRadius: "4px" }}>À assigner</span>}
+                              {c.responsables.length > 3 && <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#f3f4f6", border: "1px solid #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "800", color: "#6b7280" }}>+{c.responsables.length - 3}</span>}
+                            </div>
+                            <div style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", background: d < 0 ? "#fee2e2" : d < 30 ? "#fef3c7" : "#f3f4f6", padding: "3px 8px", borderRadius: "6px" }}>{d < 0 ? `Dépassé` : `J-${d}`}</div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+
+        {/* VUE LISTE CLASSIQUE */}
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
