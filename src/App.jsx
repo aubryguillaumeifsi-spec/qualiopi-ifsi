@@ -4,11 +4,10 @@ import { useState, useEffect } from "react";
 import { getDoc, setDoc } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth, DOC_REF } from "./firebase";
-// Plus besoin d'importer DATE_AUDIT ici !
 import { NOM_ETABLISSEMENT, RESPONSABLES, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG, ROLE_COLORS } from "./data";
 
 function GaugeChart({ value, max, color }) {
-  const pct = (value / max) * 100, r = 38, circ = 2 * Math.PI * r;
+  const pct = max > 0 ? (value / max) * 100 : 0, r = 38, circ = 2 * Math.PI * r;
   return (
     <svg width="96" height="96" viewBox="0 0 96 96">
       <circle cx="48" cy="48" r={r} fill="none" stroke="#f1f5f9" strokeWidth="9" />
@@ -19,7 +18,7 @@ function GaugeChart({ value, max, color }) {
 }
 
 function StatusBadge({ statut }) {
-  const s = STATUT_CONFIG[statut];
+  const s = STATUT_CONFIG[statut] || STATUT_CONFIG["non-evalue"];
   return <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: "6px", padding: "3px 10px", fontSize: "11px", fontWeight: "700", whiteSpace: "nowrap" }}>{s.label}</span>;
 }
 
@@ -81,25 +80,17 @@ export default function App() {
 
   function handleLogout() { signOut(auth); }
 
-  // MODIFIÉ : Demande la date à la création d'une campagne
   function handleNewCampaign(e) {
     if (e.target.value === "NEW") {
       const name = prompt("Nom de la nouvelle certification (ex: Audit de Surveillance 2026) :");
       if (name && name.trim() !== "") {
-        // Demande de la date
-        const defaultDate = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0]; // L'année prochaine par défaut
+        const defaultDate = new Date(new Date().setFullYear(new Date().getFullYear() + 1)).toISOString().split("T")[0];
         const auditDate = prompt("Date prévue pour cet audit (format AAAA-MM-JJ) :", defaultDate) || defaultDate;
 
         const latest = campaigns[campaigns.length - 1]; 
         const duplicatedListe = latest.liste.map(c => ({ ...c, statut: "non-evalue" }));
         const locked = campaigns.map(c => ({ ...c, locked: true }));
-        const newCamp = { 
-          id: Date.now().toString(), 
-          name: name.trim(), 
-          auditDate: auditDate, // La date est rattachée à la campagne
-          liste: duplicatedListe, 
-          locked: false 
-        };
+        const newCamp = { id: Date.now().toString(), name: name.trim(), auditDate: auditDate, liste: duplicatedListe, locked: false };
         const newCampaigns = [...locked, newCamp];
         saveData(newCampaigns); setActiveCampaignId(newCamp.id);
       } else { e.target.value = activeCampaignId; }
@@ -122,7 +113,7 @@ export default function App() {
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId);
   const criteres = currentCampaign.liste;
   const isArchive = currentCampaign.locked;
-  const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; // Date de la campagne active (avec un filet de sécurité)
+  const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
 
   function saveModal(updated) {
     if (isArchive) return; 
@@ -142,15 +133,11 @@ export default function App() {
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp));
   }
 
-  // NOUVEAU : Fonction pour modifier la date d'une campagne existante
   function handleEditAuditDate() {
     if (isArchive) return;
     const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
     if (newDate) {
-      if (isNaN(new Date(newDate).getTime())) {
-        alert("Format de date invalide. Veuillez utiliser AAAA-MM-JJ.");
-        return;
-      }
+      if (isNaN(new Date(newDate).getTime())) { alert("Format de date invalide. Veuillez utiliser AAAA-MM-JJ."); return; }
       const newCampaigns = campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c);
       saveData(newCampaigns);
     }
@@ -159,91 +146,27 @@ export default function App() {
   const today = new Date();
   const days = d => Math.round((new Date(d) - today) / 86400000);
   
-  // CALCUL POUR LE COMPTE À REBOURS (basé sur la date de la campagne)
   const auditDateObj = new Date(currentAuditDate);
   const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
   let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
-  
-  if (daysToAudit < 0) {
-    bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` };
-  } else if (daysToAudit <= 30) {
-    bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` };
-  } else if (daysToAudit <= 90) {
-    bannerConfig = { bg: "#fff7ed", border: "#fed7aa", color: "#c2410c", icon: "⏳", text: `L'audit approche : plus que ${daysToAudit} jour(s)` };
-  }
+  if (daysToAudit < 0) { bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` }; } 
+  else if (daysToAudit <= 30) { bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` }; } 
+  else if (daysToAudit <= 90) { bannerConfig = { bg: "#fff7ed", border: "#fed7aa", color: "#c2410c", icon: "⏳", text: `L'audit approche : plus que ${daysToAudit} jour(s)` }; }
 
-  async function exportToExcel() {
-    if (!criteres) return;
-    if (typeof window.ExcelJS === "undefined") { alert("Le moteur de génération Excel est en cours de chargement."); return; }
+  // --- NOUVEAU CALCUL DES STATS (Exclusion des Non-Concernés du total) ---
+  const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
+  const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; // Évite la division par zéro
 
-    const workbook = new window.ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
-
-    worksheet.columns = [
-      { header: 'N°', key: 'num', width: 8 },
-      { header: 'Critère', key: 'critere', width: 12 },
-      { header: 'Indicateur', key: 'titre', width: 45 },
-      { header: 'Statut', key: 'statut', width: 18 },
-      { header: 'Échéance', key: 'delai', width: 14 },
-      { header: 'Responsable(s)', key: 'resp', width: 25 },
-      { header: 'Preuves finalisées', key: 'preuves', width: 50 },
-      { header: 'Preuves en cours', key: 'preuves_encours', width: 50 },
-      { header: 'Remarques Évaluateur', key: 'attendus', width: 45 },
-      { header: 'Notes internes', key: 'notes', width: 45 }
-    ];
-
-    const toArgb = (hex) => hex ? hex.replace('#', 'FF').toUpperCase() : 'FF000000';
-
-    criteres.forEach(c => {
-      const d = days(c.delai);
-      const row = worksheet.addRow({
-        num: c.num,
-        critere: `Critère ${c.critere}`,
-        titre: c.titre,
-        statut: STATUT_CONFIG[c.statut]?.label || c.statut,
-        delai: new Date(c.delai).toLocaleDateString("fr-FR"),
-        resp: (c.responsables || []).map(r => r.split("(")[0].trim()).join("\n"),
-        preuves: c.preuves || "",
-        preuves_encours: c.preuves_encours || "",
-        attendus: c.attendus || "",
-        notes: c.notes || ""
-      });
-
-      const cConf = CRITERES_LABELS[c.critere];
-      if (cConf && cConf.color) { row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true }; row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' }; }
-      const sConf = STATUT_CONFIG[c.statut];
-      if (sConf) { row.getCell('statut').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(sConf.bg) } }; row.getCell('statut').font = { color: { argb: toArgb(sConf.color) }, bold: true }; row.getCell('statut').alignment = { horizontal: 'center', vertical: 'middle' }; }
-      const cellDelai = row.getCell('delai');
-      if (d < 0) { cellDelai.font = { color: { argb: 'FFDC2626' }, bold: true }; } else if (d < 30) { cellDelai.font = { color: { argb: 'FFD97706' }, bold: true }; }
-    });
-
-    const headerRow = worksheet.getRow(1);
-    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
-    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
-    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
-    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
-
-    worksheet.eachRow((row, rowNumber) => {
-      row.eachCell((cell) => {
-        cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } };
-        if (rowNumber > 1) { if (!cell.alignment) { cell.alignment = { vertical: 'top', wrapText: true }; } else { cell.alignment.wrapText = true; } }
-      });
-    });
-
-    const buffer = await workbook.xlsx.writeBuffer();
-    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-    const url = URL.createObjectURL(blob);
-    const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const link = document.createElement("a"); link.href = url; link.setAttribute("download", `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`);
-    document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  }
-
-  const dayColor = d => days(d) < 0 ? "#dc2626" : days(d) < 30 ? "#d97706" : "#6b7280";
   const stats = {
-    total: criteres.length, conforme: criteres.filter(c => c.statut === "conforme").length, enCours: criteres.filter(c => c.statut === "en-cours").length,
-    nonConforme: criteres.filter(c => c.statut === "non-conforme").length, nonEvalue: criteres.filter(c => c.statut === "non-evalue").length,
+    total: baseTotal, 
+    conforme: criteres.filter(c => c.statut === "conforme").length, 
+    enCours: criteres.filter(c => c.statut === "en-cours").length,
+    nonConforme: criteres.filter(c => c.statut === "non-conforme").length, 
+    nonEvalue: criteres.filter(c => c.statut === "non-evalue").length,
+    nonConcerne: criteres.filter(c => c.statut === "non-concerne").length
   };
-  const urgents = criteres.filter(c => days(c.delai) <= 30 && c.statut !== "conforme" && c.statut !== "non-evalue");
+  const urgents = criteres.filter(c => days(c.delai) <= 30 && c.statut !== "conforme" && c.statut !== "non-evalue" && c.statut !== "non-concerne");
+  
   const filtered = criteres.filter(c => {
     if (filterStatut !== "tous" && c.statut !== filterStatut) return false;
     if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false;
@@ -253,6 +176,32 @@ export default function App() {
   
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({ "non-conforme": 0, "en-cours": 1 }[a.statut] - { "non-conforme": 0, "en-cours": 1 }[b.statut] || new Date(a.delai) - new Date(b.delai)));
   const byResp = RESPONSABLES.map(r => ({ name: r, nom: r.split("(")[0].trim(), role: r.match(/\(([^)]+)\)/)?.[1] || "Défaut", items: criteres.filter(c => c.responsables.includes(r)), })).filter(r => r.items.length > 0);
+
+  async function exportToExcel() {
+    if (!criteres) return;
+    if (typeof window.ExcelJS === "undefined") { alert("Le moteur de génération Excel est en cours de chargement."); return; }
+    const workbook = new window.ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
+    worksheet.columns = [
+      { header: 'N°', key: 'num', width: 8 }, { header: 'Critère', key: 'critere', width: 12 }, { header: 'Indicateur', key: 'titre', width: 45 }, { header: 'Statut', key: 'statut', width: 18 },
+      { header: 'Échéance', key: 'delai', width: 14 }, { header: 'Responsable(s)', key: 'resp', width: 25 }, { header: 'Preuves finalisées', key: 'preuves', width: 50 },
+      { header: 'Preuves en cours', key: 'preuves_encours', width: 50 }, { header: 'Remarques Évaluateur', key: 'attendus', width: 45 }, { header: 'Notes internes', key: 'notes', width: 45 }
+    ];
+    const toArgb = (hex) => hex ? hex.replace('#', 'FF').toUpperCase() : 'FF000000';
+    criteres.forEach(c => {
+      const d = days(c.delai);
+      const row = worksheet.addRow({
+        num: c.num, critere: `Critère ${c.critere}`, titre: c.titre, statut: STATUT_CONFIG[c.statut]?.label || c.statut, delai: new Date(c.delai).toLocaleDateString("fr-FR"),
+        resp: (c.responsables || []).map(r => r.split("(")[0].trim()).join("\n"), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || ""
+      });
+      const cConf = CRITERES_LABELS[c.critere]; if (cConf && cConf.color) { row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true }; row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' }; }
+      const sConf = STATUT_CONFIG[c.statut]; if (sConf) { row.getCell('statut').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(sConf.bg) } }; row.getCell('statut').font = { color: { argb: toArgb(sConf.color) }, bold: true }; row.getCell('statut').alignment = { horizontal: 'center', vertical: 'middle' }; }
+      const cellDelai = row.getCell('delai'); if (d < 0) { cellDelai.font = { color: { argb: 'FFDC2626' }, bold: true }; } else if (d < 30) { cellDelai.font = { color: { argb: 'FFD97706' }, bold: true }; }
+    });
+    const headerRow = worksheet.getRow(1); headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; headerRow.alignment = { vertical: 'middle', horizontal: 'center' }; worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+    worksheet.eachRow((row, rowNumber) => { row.eachCell((cell) => { cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } }; if (rowNumber > 1) { if (!cell.alignment) { cell.alignment = { vertical: 'top', wrapText: true }; } else { cell.alignment.wrapText = true; } } }); });
+    const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }
 
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
@@ -295,7 +244,6 @@ export default function App() {
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
         {activeTab === "dashboard" && <>
-          {/* BANDEAU COMPTE A REBOURS */}
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <span style={{ fontSize: "24px" }}>{bannerConfig.icon}</span>
@@ -311,14 +259,14 @@ export default function App() {
             )}
           </div>
 
-          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
-            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents moins 30j"]].map(([color,bg,border,num,label]) => (
-              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "12px", padding: "20px 22px", opacity: isArchive ? 0.8 : 1 }}><div style={{ fontSize: "34px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div><div style={{ fontSize: "11px", color, opacity: 0.8, marginTop: "5px", textTransform: "uppercase", fontWeight: "600" }}>{label}</div></div>
+          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: "12px", marginBottom: "24px" }}>
+            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#475569","#e2e8f0","#cbd5e1",stats.nonConcerne,"Non concernés"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents < 30j"]].map(([color,bg,border,num,label]) => (
+              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "14px 16px", opacity: isArchive ? 0.8 : 1 }}><div style={{ fontSize: "28px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div><div style={{ fontSize: "10px", color, opacity: 0.9, marginTop: "4px", textTransform: "uppercase", fontWeight: "700", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div></div>
             ))}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité global</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "10px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num)); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length} color={cfg.color} /></div>); })}</div>
+            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"], ["Non concerné",stats.nonConcerne,"#64748b"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{l==="Non concerné" ? v : `${v}/${stats.total}`}</span></div>{l!=="Non concerné" && <ProgressBar value={v} max={stats.total} color={col} />}</div>))}</div></div></div>
+            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
           </div>
         </>}
 
@@ -338,7 +286,7 @@ export default function App() {
                     {items.map(c => {
                       const d = days(c.delai);
                       return (
-                        <div key={c.id} className="kanban-card" draggable={!isArchive} onDragStart={(e) => handleDragStart(e, c.id)} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px", cursor: isArchive ? "pointer" : "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
+                        <div key={c.id} className="kanban-card" draggable={!isArchive} onDragStart={(e) => handleDragStart(e, c.id)} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px", cursor: isArchive ? "pointer" : "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", opacity: stKey === "non-concerne" ? 0.6 : 1 }}>
                           <div style={{ display: "flex", gap: "10px", marginBottom: "8px", alignItems: "flex-start" }}><span style={{ ...nb(CRITERES_LABELS[c.critere].color), padding: "3px 8px", fontSize: "11px" }}>{c.num}</span><div style={{ fontSize: "13px", fontWeight: "700", color: "#1e3a5f", lineHeight: "1.3" }}>{c.titre}</div></div>
                           <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "12px", paddingLeft: "2px" }}>{CRITERES_LABELS[c.critere].label}</div>
                           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f8fafc", paddingTop: "10px" }}>
@@ -346,7 +294,7 @@ export default function App() {
                               {c.responsables.length > 0 ? c.responsables.slice(0, 3).map(r => { const rRole = r.match(/\(([^)]+)\)/)?.[1] || "Défaut"; const rCfg = ROLE_COLORS[rRole] || ROLE_COLORS["Défaut"]; return <span key={r} title={r} style={{ width: "24px", height: "24px", borderRadius: "50%", background: rCfg.bg, border: `1px solid ${rCfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "800", color: rCfg.text, cursor: "help" }}>{r.split(" ").map(n=>n[0]).join("").substring(0,2).toUpperCase()}</span> }) : <span style={{ fontSize: "10px", color: "#d97706", fontWeight: "600", background: "#fffbeb", padding: "2px 6px", borderRadius: "4px" }}>À assigner</span>}
                               {c.responsables.length > 3 && <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#f3f4f6", border: "1px solid #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "800", color: "#6b7280" }}>+{c.responsables.length - 3}</span>}
                             </div>
-                            <div style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", background: d < 0 ? "#fee2e2" : d < 30 ? "#fef3c7" : "#f3f4f6", padding: "3px 8px", borderRadius: "6px" }}>{d < 0 ? `Dépassé` : `J-${d}`}</div>
+                            {stKey !== "non-concerne" && <div style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", background: d < 0 ? "#fee2e2" : d < 30 ? "#fef3c7" : "#f3f4f6", padding: "3px 8px", borderRadius: "6px" }}>{d < 0 ? `Dépassé` : `J-${d}`}</div>}
                           </div>
                         </div>
                       );
@@ -363,7 +311,7 @@ export default function App() {
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead><tr>{["N°","Indicateur","Responsable(s)","Échéance","Statut","Preuves"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
-              <tbody>{filtered.map(c => { const col = CRITERES_LABELS[c.critere].color, d = days(c.delai); return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(col)}>{c.num}</span></td><td style={{ ...td, maxWidth: "280px" }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{CRITERES_LABELS[c.critere].label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{c.responsables.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{c.responsables.slice(0,2).map(r => { const rRole = r.match(/\(([^)]+)\)/)?.[1] || "Défaut"; const rCfg = ROLE_COLORS[rRole] || ROLE_COLORS["Défaut"]; return <span key={r} style={{ fontSize: "10px", color: rCfg.text, background: rCfg.bg, border: `1px solid ${rCfg.border}`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{r.split("(")[0].trim()}</span> })}{c.responsables.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{c.responsables.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div><div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div></td><td style={td}><StatusBadge statut={c.statut} /></td><td style={td}>{c.preuves?.trim() ? <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Finalisées</span> : c.preuves_encours?.trim() ? <span style={{ fontSize: "10px", color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "5px", border: "1px solid #fcd34d" }}>En cours</span> : <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vides</span>}</td><td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>{isArchive ? "Consulter" : "Éditer"}</button></td></tr>);})}</tbody>
+              <tbody>{filtered.map(c => { const col = CRITERES_LABELS[c.critere].color, d = days(c.delai); return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(col)}>{c.num}</span></td><td style={{ ...td, maxWidth: "280px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{CRITERES_LABELS[c.critere].label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{c.responsables.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{c.responsables.slice(0,2).map(r => { const rRole = r.match(/\(([^)]+)\)/)?.[1] || "Défaut"; const rCfg = ROLE_COLORS[rRole] || ROLE_COLORS["Défaut"]; return <span key={r} style={{ fontSize: "10px", color: rCfg.text, background: rCfg.bg, border: `1px solid ${rCfg.border}`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{r.split("(")[0].trim()}</span> })}{c.responsables.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{c.responsables.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{c.statut==="non-concerne"?"-":new Date(c.delai).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td><td style={td}>{c.preuves?.trim() ? <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Finalisées</span> : c.preuves_encours?.trim() ? <span style={{ fontSize: "10px", color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "5px", border: "1px solid #fcd34d" }}>En cours</span> : <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vides</span>}</td><td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>{isArchive ? "Consulter" : "Éditer"}</button></td></tr>);})}</tbody>
             </table>
           </div>
         </>}
@@ -392,8 +340,8 @@ export default function App() {
                   </div>
                   <ProgressBar value={conformes} max={r.items.length} color={rCfg.text} />
                   <div style={{ marginTop: "12px" }}>
-                    {r.items.sort((a,b) => ({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3}[a.statut])-({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3}[b.statut])).map(c => (
-                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 0", borderBottom: "1px solid #f8fafc" }}><span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span><div style={{ flex: 1, fontSize: "12px" }}>{c.titre}</div><StatusBadge statut={c.statut} /><button onClick={() => setModalCritere(c)} style={{ background: isArchive?"#f1f5f9":"white", border: "1px solid #e2e8f0", borderRadius: "5px", color: isArchive?"#4b5563":"#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>{isArchive?"Vue":"Éditer"}</button></div>
+                    {r.items.sort((a,b) => ({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3,"non-concerne":4}[a.statut])-({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3,"non-concerne":4}[b.statut])).map(c => (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 0", borderBottom: "1px solid #f8fafc", opacity: c.statut==="non-concerne"?0.6:1 }}><span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span><div style={{ flex: 1, fontSize: "12px" }}>{c.titre}</div><StatusBadge statut={c.statut} /><button onClick={() => setModalCritere(c)} style={{ background: isArchive?"#f1f5f9":"white", border: "1px solid #e2e8f0", borderRadius: "5px", color: isArchive?"#4b5563":"#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>{isArchive?"Vue":"Éditer"}</button></div>
                     ))}
                   </div>
                 </div>
