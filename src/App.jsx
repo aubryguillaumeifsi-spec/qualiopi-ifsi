@@ -86,7 +86,7 @@ export default function App() {
   if (!isLoggedIn) return <LoginPage />;
   if (criteres === null) return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit,sans-serif" }}>
-      <div style={{ textAlign: "center" }}><div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div><div style={{ fontSize: "14px", color: "#6b7280" }}>Chargement des donnees...</div></div>
+      <div style={{ textAlign: "center" }}><div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div><div style={{ fontSize: "14px", color: "#6b7280" }}>Chargement des données...</div></div>
     </div>
   );
 
@@ -118,7 +118,6 @@ export default function App() {
   const navBtn = active => ({ padding: "8px 18px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
   
-  // MODIFICATION ICI : whiteSpace: "nowrap" pour empêcher le saut de ligne
   const nb = col => ({ padding: "4px 10px", background: `${col}15`, color: col, borderRadius: "6px", fontSize: "12px", fontWeight: "800", textAlign: "center", border: `1px solid ${col}30`, flexShrink: 0, whiteSpace: "nowrap" });
   
   const th = { textAlign: "left", padding: "10px 14px", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.8px", borderBottom: "2px solid #f1f5f9", background: "#fafafa" };
@@ -157,7 +156,7 @@ export default function App() {
               <div style={{ fontSize: "17px", fontWeight: "800", color: "#1e3a5f", display: "flex", alignItems: "center" }}>
                 Qualiopi Tracker — {NOM_ETABLISSEMENT}<SaveIndicator />
               </div>
-              <div style={{ fontSize: "11px", color: "#9ca3af" }}>Referentiel National Qualite · 32 indicateurs · {new Date().toLocaleDateString("fr-FR")}</div>
+              <div style={{ fontSize: "11px", color: "#9ca3af" }}>Référentiel National Qualité · 32 indicateurs · {new Date().toLocaleDateString("fr-FR")}</div>
             </div>
           </div>
           <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
@@ -167,7 +166,7 @@ export default function App() {
             <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", marginLeft: "16px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
               <span>📄</span> Exporter PDF
             </button>
-            <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Deconnexion</button>
+            <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Déconnexion</button>
           </div>
         </div>
       </div>
@@ -176,7 +175,7 @@ export default function App() {
 
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
-            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non evalues"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents moins 30j"]].map(([color,bg,border,num,label]) => (
+            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents moins 30j"]].map(([color,bg,border,num,label]) => (
               <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "12px", padding: "20px 22px" }}>
                 <div style={{ fontSize: "34px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div>
                 <div style={{ fontSize: "11px", color, opacity: 0.8, marginTop: "5px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>{label}</div>
@@ -185,11 +184,11 @@ export default function App() {
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
             <div className="print-break-avoid" style={card}>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformite global</div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité global</div>
               <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
                 <GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" />
                 <div style={{ flex: 1 }}>
-                  {[["Non evalue",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (
+                  {[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (
                     <div key={l} style={{ marginBottom: "10px" }}>
                       <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div>
                       <ProgressBar value={v} max={stats.total} color={col} />
@@ -197,10 +196,10 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <div style={{ marginTop: "14px", background: "#f0f7ff", borderRadius: "8px", padding: "10px 14px", fontSize: "12px", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{stats.total - stats.nonEvalue} / {stats.total} indicateurs evalues</div>
+              <div style={{ marginTop: "14px", background: "#f0f7ff", borderRadius: "8px", padding: "10px 14px", fontSize: "12px", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{stats.total - stats.nonEvalue} / {stats.total} indicateurs évalués</div>
             </div>
             <div className="print-break-avoid" style={card}>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critere</div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère</div>
               {Object.entries(CRITERES_LABELS).map(([num, cfg]) => {
                 const cr = criteres.filter(c => c.critere === parseInt(num));
                 const ok = cr.filter(c => c.statut === "conforme").length;
@@ -218,7 +217,7 @@ export default function App() {
           </div>
           {sansResp.length > 0 && (
             <div className="no-print" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
-              <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", marginBottom: "4px" }}>{sansResp.length} indicateur(s) sans responsable assigne</div>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", marginBottom: "4px" }}>{sansResp.length} indicateur(s) sans responsable assigné</div>
               <div style={{ fontSize: "12px", color: "#6b7280" }}>Allez dans l'onglet "Indicateurs" pour assigner les responsables.</div>
             </div>
           )}
@@ -230,8 +229,8 @@ export default function App() {
                   <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
                   <div style={{ flex: 1 }}><div style={{ fontWeight: "600", fontSize: "13px" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>{c.responsables.length > 0 ? c.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable"}</div></div>
                   <StatusBadge statut={c.statut} />
-                  <span style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", minWidth: "70px", textAlign: "right" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j depasse` : `J-${days(c.delai)}`}</span>
-                  <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", color: "#1d4ed8", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
+                  <span style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", minWidth: "70px", textAlign: "right" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j dépassé` : `J-${days(c.delai)}`}</span>
+                  <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", color: "#1d4ed8", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Éditer</button>
                 </div>
               ))}
             </div>
@@ -242,29 +241,39 @@ export default function App() {
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
             <input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} />
             <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select>
-            <select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les criteres</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select>
+            <select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select>
             <span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span>
           </div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{["N°","Indicateur","Responsable(s)","Echeance","Statut","Preuves"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
+              <thead><tr>{["N°","Indicateur","Responsable(s)","Échéance","Statut","Preuves"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
               <tbody>
                 {filtered.map(c => {
                   const col = CRITERES_LABELS[c.critere].color, d = days(c.delai);
                   return (
                     <tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}>
-                      {/* MODIFICATION ICI : On a mis width: 110px pour avoir la place du mot "Indicateur 32" */}
                       <td style={{ ...td, width: "110px" }}><span style={nb(col)}>{c.num}</span></td>
                       <td style={{ ...td, maxWidth: "280px" }}><div style={{ fontWeight: "600", color: "#1e3a5f", marginBottom: "2px" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{CRITERES_LABELS[c.critere].label}</div></td>
                       <td style={{ ...td, maxWidth: "200px" }}>
                         {c.responsables.length === 0
-                          ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>A assigner</span>
+                          ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span>
                           : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{c.responsables.slice(0,2).map(r => <span key={r} style={{ fontSize: "10px", color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "4px", padding: "2px 6px" }}>{r.split("(")[0].trim()}</span>)}{c.responsables.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{c.responsables.length-2}</span>}</div>}
                       </td>
-                      <td style={td}><div style={{ fontSize: "12px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div><div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j depasse` : `J-${d}`}</div></td>
+                      <td style={td}><div style={{ fontSize: "12px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div><div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div></td>
                       <td style={td}><StatusBadge statut={c.statut} /></td>
-                      <td style={td}>{c.preuves?.trim() ? <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Renseignees</span> : <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vide</span>}</td>
-                      <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "6px", color: "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Editer</button></td>
+                      
+                      {/* MODIFICATION ICI : Gestion de l'affichage des deux types de preuves */}
+                      <td style={td}>
+                        {c.preuves?.trim() ? (
+                          <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Finalisées</span>
+                        ) : c.preuves_encours?.trim() ? (
+                          <span style={{ fontSize: "10px", color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "5px", border: "1px solid #fcd34d" }}>En cours</span>
+                        ) : (
+                          <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vides</span>
+                        )}
+                      </td>
+                      
+                      <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "6px", color: "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Éditer</button></td>
                     </tr>
                   );
                 })}
@@ -275,7 +284,7 @@ export default function App() {
 
         {activeTab === "axes" && <>
           <div style={{ marginBottom: "22px" }}>
-            <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amelioration</h2>
+            <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2>
             <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>{stats.nonConforme} non conforme(s) · {stats.enCours} en cours</p>
           </div>
           {["non-conforme","en-cours"].map(st => {
@@ -286,7 +295,7 @@ export default function App() {
               <div key={st}>
                 <div className="print-break-avoid" style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "1px", display: "flex", alignItems: "center", gap: "6px" }}>
                   <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: isNC?"#dc2626":"#d97706" }} />
-                  {isNC ? "Non conformes — Action immediate" : "En cours — A finaliser"}
+                  {isNC ? "Non conformes — Action immédiate" : "En cours — À finaliser"}
                 </div>
                 {items.map(c => (
                   <div key={c.id} className="print-break-avoid" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px" }}>
@@ -295,15 +304,19 @@ export default function App() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "4px" }}>{c.titre}</div>
                         <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>{CRITERES_LABELS[c.critere].label}</div>
-                        {c.attendus && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Attendu : </span>{c.attendus}</div>}
-                        {c.preuves ? <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>Preuves : </span>{c.preuves}</div> : <div style={{ fontSize: "11px", color: "#9ca3af", fontStyle: "italic" }}>Aucune preuve renseignee</div>}
+                        
+                        {/* MODIFICATION ICI : Affichage intelligent des nouvelles cases dans les axes */}
+                        {c.attendus && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Remarques Évaluateur : </span>{c.attendus}</div>}
+                        {c.preuves && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>Preuves finalisées : </span>{c.preuves}</div>}
+                        {c.preuves_encours && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#d97706" }}>Preuves en cours : </span>{c.preuves_encours}</div>}
+                        {(!c.preuves && !c.preuves_encours) && <div style={{ fontSize: "11px", color: "#9ca3af", fontStyle: "italic" }}>Aucune preuve renseignée</div>}
                       </div>
                       <div style={{ textAlign: "right", minWidth: "140px", flexShrink: 0 }}>
                         <StatusBadge statut={c.statut} />
                         <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div>
-                        <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j depasse` : `J-${days(c.delai)}`}</div>
-                        <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>{c.responsables.length > 0 ? c.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Non assigne"}</div>
-                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isNC?"#fff5f5":"#fffbeb", border:`1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderRadius: "6px", color: isNC?"#dc2626":"#92400e", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
+                        <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j dépassé` : `J-${days(c.delai)}`}</div>
+                        <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>{c.responsables.length > 0 ? c.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Non assigné"}</div>
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isNC?"#fff5f5":"#fffbeb", border:`1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderRadius: "6px", color: isNC?"#dc2626":"#92400e", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Éditer</button>
                       </div>
                     </div>
                   </div>
@@ -312,13 +325,13 @@ export default function App() {
               </div>
             );
           })}
-          {axes.length === 0 && <div style={{ ...card, textAlign: "center", padding: "60px" }}><div style={{ fontSize: "48px", marginBottom: "12px" }}>🎉</div><div style={{ fontSize: "16px", fontWeight: "700", color: "#1e3a5f" }}>Tous les indicateurs evalues sont conformes !</div></div>}
+          {axes.length === 0 && <div style={{ ...card, textAlign: "center", padding: "60px" }}><div style={{ fontSize: "48px", marginBottom: "12px" }}>🎉</div><div style={{ fontSize: "16px", fontWeight: "700", color: "#1e3a5f" }}>Tous les indicateurs évalués sont conformes !</div></div>}
         </>}
 
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}>
             <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Vue par responsable</h2>
-            <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Membres ayant au moins un indicateur assigne</p>
+            <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Membres ayant au moins un indicateur assigné</p>
           </div>
           {sansResp.length > 0 && (
             <div className="no-print print-break-avoid" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
@@ -326,7 +339,7 @@ export default function App() {
               <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{sansResp.map(c => <button key={c.id} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #fcd34d", borderRadius: "6px", color: "#92400e", padding: "5px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>{c.num} — {c.titre.substring(0,38)}{c.titre.length>38?"...":""}</button>)}</div>
             </div>
           )}
-          {byResp.length === 0 && <div style={{ ...card, textAlign: "center", padding: "48px", color: "#9ca3af" }}>Aucun responsable assigne. Allez dans "Indicateurs" pour commencer.</div>}
+          {byResp.length === 0 && <div style={{ ...card, textAlign: "center", padding: "48px", color: "#9ca3af" }}>Aucun responsable assigné. Allez dans "Indicateurs" pour commencer.</div>}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
             {byResp.map(r => {
               const conformes = r.items.filter(c => c.statut==="conforme").length;
@@ -353,7 +366,7 @@ export default function App() {
                         <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
                         <div style={{ flex: 1, fontSize: "12px", color: "#374151" }}>{c.titre}</div>
                         <StatusBadge statut={c.statut} />
-                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "5px", color: "#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>Editer</button>
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "5px", color: "#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>Éditer</button>
                       </div>
                     ))}
                   </div>
