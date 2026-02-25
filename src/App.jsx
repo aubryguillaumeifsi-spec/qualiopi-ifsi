@@ -29,7 +29,8 @@ function ProgressBar({ value, max, color }) {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [criteres, setCriteres] = useState(null);
+  const [campaigns, setCampaigns] = useState(null);
+  const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [saveStatus, setSaveStatus] = useState("idle");
   const [activeTab, setActiveTab] = useState("dashboard");
   const [filterStatut, setFilterStatut] = useState("tous");
@@ -47,29 +48,46 @@ export default function App() {
       }
       setAuthChecked(true);
     });
-    
     return () => unsubscribe();
   }, []);
 
   async function loadData() {
     try {
       const snap = await getDoc(DOC_REF);
-      if (snap.exists() && snap.data().liste) {
-        setCriteres(snap.data().liste);
+      if (snap.exists()) {
+        const d = snap.data();
+        if (d.campaigns && d.campaigns.length > 0) {
+          // Format récent (V1.4)
+          setCampaigns(d.campaigns);
+          setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
+        } else if (d.liste) {
+          // Migration automatique de l'ancien format vers le système de campagnes
+          const mig = [{ id: Date.now().toString(), name: "Évaluation initiale", liste: d.liste, locked: false }];
+          setCampaigns(mig);
+          setActiveCampaignId(mig[0].id);
+        } else {
+          initDefault();
+        }
       } else {
-        setCriteres(DEFAULT_CRITERES);
+        initDefault();
       }
     } catch (e) {
       console.error("Erreur Firebase:", e);
-      setCriteres(DEFAULT_CRITERES);
+      initDefault();
     }
   }
 
-  async function saveCriteres(newCriteres) {
-    setCriteres(newCriteres);
+  function initDefault() {
+    const def = [{ id: Date.now().toString(), name: "Évaluation initiale", liste: DEFAULT_CRITERES, locked: false }];
+    setCampaigns(def);
+    setActiveCampaignId(def[0].id);
+  }
+
+  async function saveData(newCampaigns) {
+    setCampaigns(newCampaigns);
     setSaveStatus("saving");
     try {
-      await setDoc(DOC_REF, { liste: newCriteres, updatedAt: new Date().toISOString() });
+      await setDoc(DOC_REF, { campaigns: newCampaigns, updatedAt: new Date().toISOString() });
       setSaveStatus("saved");
       setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (e) {
@@ -80,15 +98,57 @@ export default function App() {
   }
 
   function handleLogout() { signOut(auth); }
-  function saveModal(updated) { saveCriteres(criteres.map(c => c.id === updated.id ? updated : c)); setModalCritere(null); }
+
+  function handleNewCampaign(e) {
+    if (e.target.value === "NEW") {
+      const name = prompt("Nom de la nouvelle certification (ex: Audit de Surveillance 2026) :");
+      if (name && name.trim() !== "") {
+        const latest = campaigns[campaigns.length - 1]; // On se base sur la dernière campagne
+        // Duplication avec remise à zéro des statuts
+        const duplicatedListe = latest.liste.map(c => ({
+          ...c,
+          statut: "non-evalue" // Tout repasse à "Non évalué"
+        }));
+        // Verrouillage des anciennes campagnes
+        const locked = campaigns.map(c => ({ ...c, locked: true }));
+        const newCamp = {
+          id: Date.now().toString(),
+          name: name.trim(),
+          liste: duplicatedListe,
+          locked: false
+        };
+        const newCampaigns = [...locked, newCamp];
+        saveData(newCampaigns);
+        setActiveCampaignId(newCamp.id);
+      } else {
+        // Annulation du prompt, on remet le selecteur sur la campagne actuelle
+        e.target.value = activeCampaignId;
+      }
+    } else {
+      setActiveCampaignId(e.target.value);
+    }
+  }
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
-  if (criteres === null) return (
+  if (campaigns === null || activeCampaignId === null) return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit,sans-serif" }}>
       <div style={{ textAlign: "center" }}><div style={{ fontSize: "32px", marginBottom: "12px" }}>⏳</div><div style={{ fontSize: "14px", color: "#6b7280" }}>Chargement des données...</div></div>
     </div>
   );
+
+  // Variables calculées pour la campagne active
+  const currentCampaign = campaigns.find(c => c.id === activeCampaignId);
+  const criteres = currentCampaign.liste;
+  const isArchive = currentCampaign.locked;
+
+  function saveModal(updated) {
+    if (isArchive) return; // Sécurité supplémentaire
+    const newListe = criteres.map(c => c.id === updated.id ? updated : c);
+    const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp);
+    saveData(newCampaigns);
+    setModalCritere(null);
+  }
 
   const today = new Date();
   const days = d => Math.round((new Date(d) - today) / 86400000);
@@ -117,9 +177,7 @@ export default function App() {
 
   const navBtn = active => ({ padding: "8px 18px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
-  
   const nb = col => ({ padding: "4px 10px", background: `${col}15`, color: col, borderRadius: "6px", fontSize: "12px", fontWeight: "800", textAlign: "center", border: `1px solid ${col}30`, flexShrink: 0, whiteSpace: "nowrap" });
-  
   const th = { textAlign: "left", padding: "10px 14px", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.8px", borderBottom: "2px solid #f1f5f9", background: "#fafafa" };
   const td = { padding: "11px 14px", fontSize: "13px", borderBottom: "1px solid #f8fafc", verticalAlign: "middle", color: "#374151" };
   const sel = { background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 10px", fontSize: "12px", cursor: "pointer" };
@@ -146,19 +204,32 @@ export default function App() {
         `}
       </style>
 
-      {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} />}
+      {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} />}
 
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0" }}>
+          
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <div style={{ width: "42px", height: "42px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", borderRadius: "10px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px" }}>🎓</div>
             <div>
               <div style={{ fontSize: "17px", fontWeight: "800", color: "#1e3a5f", display: "flex", alignItems: "center" }}>
                 Qualiopi Tracker — {NOM_ETABLISSEMENT}<SaveIndicator />
               </div>
-              <div style={{ fontSize: "11px", color: "#9ca3af" }}>Référentiel National Qualité · 32 indicateurs · {new Date().toLocaleDateString("fr-FR")}</div>
+              <div style={{ fontSize: "11px", color: "#9ca3af" }}>Référentiel National Qualité · 32 indicateurs</div>
+            </div>
+            
+            {/* NOUVEAU SÉLECTEUR DE CAMPAGNE (V1.4) */}
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "20px", borderLeft: "2px solid #f1f5f9", paddingLeft: "20px" }}>
+              <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ ...sel, fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", background: "#eff6ff", padding: "8px 14px", outline: "none" }}>
+                {campaigns.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} {c.locked ? "(Archive)" : ""}</option>
+                ))}
+                <option disabled>──────────</option>
+                <option value="NEW">➕ Nouvelle certification...</option>
+              </select>
             </div>
           </div>
+
           <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
             {[["dashboard","Tableau de bord"],["criteres","Indicateurs"],["axes","Axes prioritaires"],["responsables","Responsables"]].map(([t, l]) => (
               <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{l}</button>
@@ -171,12 +242,19 @@ export default function App() {
         </div>
       </div>
 
+      {/* BANDEAU D'ALERTE ARCHIVE */}
+      {isArchive && (
+        <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
+          <span>🔒</span> Mode Lecture Seule : Cette évaluation est une archive historique. Les modifications sont bloquées.
+        </div>
+      )}
+
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
 
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
             {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents moins 30j"]].map(([color,bg,border,num,label]) => (
-              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "12px", padding: "20px 22px" }}>
+              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "12px", padding: "20px 22px", opacity: isArchive ? 0.8 : 1 }}>
                 <div style={{ fontSize: "34px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div>
                 <div style={{ fontSize: "11px", color, opacity: 0.8, marginTop: "5px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>{label}</div>
               </div>
@@ -196,7 +274,6 @@ export default function App() {
                   ))}
                 </div>
               </div>
-              <div style={{ marginTop: "14px", background: "#f0f7ff", borderRadius: "8px", padding: "10px 14px", fontSize: "12px", color: "#1d4ed8", border: "1px solid #bfdbfe" }}>{stats.total - stats.nonEvalue} / {stats.total} indicateurs évalués</div>
             </div>
             <div className="print-break-avoid" style={card}>
               <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère</div>
@@ -215,13 +292,7 @@ export default function App() {
               })}
             </div>
           </div>
-          {sansResp.length > 0 && (
-            <div className="no-print" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
-              <div style={{ fontSize: "13px", fontWeight: "700", color: "#92400e", marginBottom: "4px" }}>{sansResp.length} indicateur(s) sans responsable assigné</div>
-              <div style={{ fontSize: "12px", color: "#6b7280" }}>Allez dans l'onglet "Indicateurs" pour assigner les responsables.</div>
-            </div>
-          )}
-          {urgents.length > 0 && (
+          {(!isArchive && urgents.length > 0) && (
             <div className="print-break-avoid" style={card}>
               <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Indicateurs urgents — moins de 30 jours</div>
               {urgents.map(c => (
@@ -261,8 +332,6 @@ export default function App() {
                       </td>
                       <td style={td}><div style={{ fontSize: "12px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div><div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div></td>
                       <td style={td}><StatusBadge statut={c.statut} /></td>
-                      
-                      {/* MODIFICATION ICI : Gestion de l'affichage des deux types de preuves */}
                       <td style={td}>
                         {c.preuves?.trim() ? (
                           <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Finalisées</span>
@@ -273,7 +342,12 @@ export default function App() {
                         )}
                       </td>
                       
-                      <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "6px", color: "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>Éditer</button></td>
+                      {/* BOUTON DYNAMIQUE SELON LE MODE ARCHIVE */}
+                      <td className="no-print" style={{ ...td, width: "80px" }}>
+                        <button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
+                          {isArchive ? "Consulter" : "Éditer"}
+                        </button>
+                      </td>
                     </tr>
                   );
                 })}
@@ -304,8 +378,6 @@ export default function App() {
                       <div style={{ flex: 1 }}>
                         <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "4px" }}>{c.titre}</div>
                         <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>{CRITERES_LABELS[c.critere].label}</div>
-                        
-                        {/* MODIFICATION ICI : Affichage intelligent des nouvelles cases dans les axes */}
                         {c.attendus && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Remarques Évaluateur : </span>{c.attendus}</div>}
                         {c.preuves && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>Preuves finalisées : </span>{c.preuves}</div>}
                         {c.preuves_encours && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#d97706" }}>Preuves en cours : </span>{c.preuves_encours}</div>}
@@ -315,8 +387,9 @@ export default function App() {
                         <StatusBadge statut={c.statut} />
                         <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div>
                         <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j dépassé` : `J-${days(c.delai)}`}</div>
-                        <div style={{ fontSize: "11px", color: "#6b7280", marginTop: "4px" }}>{c.responsables.length > 0 ? c.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Non assigné"}</div>
-                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isNC?"#fff5f5":"#fffbeb", border:`1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderRadius: "6px", color: isNC?"#dc2626":"#92400e", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Éditer</button>
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isArchive ? "#f1f5f9" : (isNC?"#fff5f5":"#fffbeb"), border:`1px solid ${isArchive ? "#d1d5db" : (isNC?"#fca5a5":"#fcd34d")}`, borderRadius: "6px", color: isArchive ? "#4b5563" : (isNC?"#dc2626":"#92400e"), padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>
+                          {isArchive ? "Consulter" : "Éditer"}
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -325,21 +398,12 @@ export default function App() {
               </div>
             );
           })}
-          {axes.length === 0 && <div style={{ ...card, textAlign: "center", padding: "60px" }}><div style={{ fontSize: "48px", marginBottom: "12px" }}>🎉</div><div style={{ fontSize: "16px", fontWeight: "700", color: "#1e3a5f" }}>Tous les indicateurs évalués sont conformes !</div></div>}
         </>}
 
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}>
             <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Vue par responsable</h2>
-            <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Membres ayant au moins un indicateur assigné</p>
           </div>
-          {sansResp.length > 0 && (
-            <div className="no-print print-break-avoid" style={{ ...card, marginBottom: "20px", borderLeft: "4px solid #f59e0b", background: "#fffbeb", border: "1px solid #fcd34d" }}>
-              <div style={{ fontWeight: "700", color: "#92400e", marginBottom: "8px" }}>{sansResp.length} indicateur(s) sans responsable</div>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>{sansResp.map(c => <button key={c.id} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #fcd34d", borderRadius: "6px", color: "#92400e", padding: "5px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>{c.num} — {c.titre.substring(0,38)}{c.titre.length>38?"...":""}</button>)}</div>
-            </div>
-          )}
-          {byResp.length === 0 && <div style={{ ...card, textAlign: "center", padding: "48px", color: "#9ca3af" }}>Aucun responsable assigné. Allez dans "Indicateurs" pour commencer.</div>}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
             {byResp.map(r => {
               const conformes = r.items.filter(c => c.statut==="conforme").length;
@@ -350,14 +414,6 @@ export default function App() {
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
                     <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>{r.nom.split(" ").map(n=>n[0]).join("").substring(0,2).toUpperCase()}</div>
                     <div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f" }}>{r.nom}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{r.role}</div></div>
-                    <div style={{ display: "flex", gap: "5px" }}>
-                      {[["#065f46","#d1fae5","#6ee7b7",conformes,"OK"],["#92400e","#fef3c7","#fcd34d",enCours,"EC"],["#991b1b","#fee2e2","#fca5a5",nonConformes,"KO"]].map(([col,bg,border,val,label]) => (
-                        <span key={label} style={{ background: bg, border:`1px solid ${border}`, padding: "4px 9px", borderRadius: "7px", textAlign: "center" }}>
-                          <span style={{ fontSize: "14px", fontWeight: "800", color: col, display: "block", lineHeight: 1 }}>{val}</span>
-                          <span style={{ fontSize: "9px", color: col, opacity: 0.7 }}>{label}</span>
-                        </span>
-                      ))}
-                    </div>
                   </div>
                   <ProgressBar value={conformes} max={r.items.length} color="#1d4ed8" />
                   <div style={{ marginTop: "12px" }}>
@@ -366,7 +422,9 @@ export default function App() {
                         <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
                         <div style={{ flex: 1, fontSize: "12px", color: "#374151" }}>{c.titre}</div>
                         <StatusBadge statut={c.statut} />
-                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#f1f5f9", border: "1px solid #e2e8f0", borderRadius: "5px", color: "#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>Éditer</button>
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "white", border: "1px solid #e2e8f0", borderRadius: "5px", color: isArchive ? "#4b5563" : "#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>
+                          {isArchive ? "Vue" : "Éditer"}
+                        </button>
                       </div>
                     ))}
                   </div>
