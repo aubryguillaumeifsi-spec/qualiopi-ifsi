@@ -95,6 +95,7 @@ export const STATUT_CONFIG = {
   "conforme":     { label: "Conforme",     color: "#065f46", bg: "#d1fae5", border: "#6ee7b7" },
   "en-cours":     { label: "En cours",     color: "#92400e", bg: "#fef3c7", border: "#fcd34d" },
   "non-conforme": { label: "Non conforme", color: "#991b1b", bg: "#fee2e2", border: "#fca5a5" },
+  "non-concerne": { label: "Non concerné", color: "#475569", bg: "#e2e8f0", border: "#cbd5e1" }, // <-- NOUVEAU STATUT
 };
 
 export const GUIDE_QUALIOPI = {
