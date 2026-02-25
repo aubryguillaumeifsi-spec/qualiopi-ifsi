@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from "react";
-import { CRITERES_LABELS, STATUT_CONFIG, TODAY, RESPONSABLES, GUIDE_QUALIOPI } from "../data";
+import { CRITERES_LABELS, STATUT_CONFIG, TODAY, RESPONSABLES, GUIDE_QUALIOPI, ROLE_COLORS } from "../data";
 
 function MultiSelect({ selected, onChange, disabled }) {
   const [open, setOpen] = useState(false);
@@ -13,7 +13,7 @@ function MultiSelect({ selected, onChange, disabled }) {
   
   function toggle(r) { onChange(selected.includes(r) ? selected.filter(x => x !== r) : [...selected, r]); }
   
-  const display = selected.length === 0 ? "Aucun responsable assigne" : selected.length === 1 ? selected[0].split("(")[0].trim() : `${selected.length} responsables`;
+  const display = selected.length === 0 ? "Aucun responsable assigné" : selected.length === 1 ? selected[0].split("(")[0].trim() : `${selected.length} responsables`;
   
   return (
     <div className="no-print" ref={ref} style={{ position: "relative" }}>
@@ -22,15 +22,18 @@ function MultiSelect({ selected, onChange, disabled }) {
       </button>
       {open && !disabled && (
         <div style={{ position: "absolute", top: "calc(100% + 4px)", left: 0, right: 0, background: "white", border: "1px solid #d1d5db", borderRadius: "10px", boxShadow: "0 8px 24px rgba(0,0,0,0.12)", zIndex: 300, maxHeight: "260px", overflowY: "auto" }}>
-          {selected.length > 0 && <div style={{ padding: "8px 12px", borderBottom: "1px solid #f3f4f6" }}><button onClick={() => onChange([])} style={{ fontSize: "11px", color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Tout deselectionner</button></div>}
+          {selected.length > 0 && <div style={{ padding: "8px 12px", borderBottom: "1px solid #f3f4f6" }}><button onClick={() => onChange([])} style={{ fontSize: "11px", color: "#ef4444", background: "none", border: "none", cursor: "pointer", padding: 0 }}>Tout désélectionner</button></div>}
           {RESPONSABLES.map(r => {
             const checked = selected.includes(r);
+            const role = r.match(/\(([^)]+)\)/)?.[1] || "Défaut";
+            const cCfg = ROLE_COLORS[role] || ROLE_COLORS["Défaut"];
+            
             return (
               <label key={r} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "9px 14px", cursor: "pointer", background: checked ? "#eff6ff" : "white", borderBottom: "1px solid #f9fafb" }}>
                 <input type="checkbox" checked={checked} onChange={() => toggle(r)} style={{ accentColor: "#1d4ed8", width: "15px", height: "15px", flexShrink: 0 }} />
                 <div>
                   <div style={{ fontSize: "13px", fontWeight: checked ? "600" : "400", color: "#1e3a5f" }}>{r.split("(")[0].trim()}</div>
-                  <div style={{ fontSize: "11px", color: "#6b7280" }}>{r.match(/\(([^)]+)\)/)?.[1] || ""}</div>
+                  <div style={{ fontSize: "11px", color: cCfg.text, fontWeight: "600" }}>{role}</div>
                 </div>
               </label>
             );
@@ -39,19 +42,22 @@ function MultiSelect({ selected, onChange, disabled }) {
       )}
       {selected.length > 0 && (
         <div style={{ display: "flex", flexWrap: "wrap", gap: "4px", marginTop: "6px" }}>
-          {selected.map(r => (
-            <span key={r} style={{ background: disabled ? "#f3f4f6" : "#eff6ff", color: disabled ? "#6b7280" : "#1d4ed8", border: `1px solid ${disabled ? "#d1d5db" : "#bfdbfe"}`, borderRadius: "20px", padding: "2px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px" }}>
-              {r.split("(")[0].trim()}
-              {!disabled && <button onClick={() => toggle(r)} style={{ background: "none", border: "none", cursor: "pointer", color: "#93c5fd", fontSize: "14px", lineHeight: 1, padding: 0 }}>x</button>}
-            </span>
-          ))}
+          {selected.map(r => {
+            const role = r.match(/\(([^)]+)\)/)?.[1] || "Défaut";
+            const cCfg = ROLE_COLORS[role] || ROLE_COLORS["Défaut"];
+            return (
+              <span key={r} style={{ background: disabled ? "#f3f4f6" : cCfg.bg, color: disabled ? "#6b7280" : cCfg.text, border: `1px solid ${disabled ? "#d1d5db" : cCfg.border}`, borderRadius: "20px", padding: "3px 10px", fontSize: "11px", display: "flex", alignItems: "center", gap: "6px", fontWeight: "600" }}>
+                {r.split("(")[0].trim()}
+                {!disabled && <button onClick={() => toggle(r)} style={{ background: "none", border: "none", cursor: "pointer", color: cCfg.text, opacity: 0.7, fontSize: "14px", lineHeight: 1, padding: 0 }}>x</button>}
+              </span>
+            );
+          })}
         </div>
       )}
     </div>
   );
 }
 
-// NOUVEAU : Récupération de la prop isAuditMode
 export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode }) {
   const [data, setData] = useState({ ...critere, responsables: [...(critere.responsables || [])] });
   const cfg = CRITERES_LABELS[critere.critere];
@@ -61,98 +67,31 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   
   return (
     <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={onClose}>
-      
-      <style>{`
-        @media print {
-          .no-print { display: none !important; }
-          .modal-overlay { 
-            position: absolute !important; 
-            top: 0 !important; left: 0 !important; 
-            background: white !important; 
-            align-items: flex-start !important; 
-            padding: 0 !important; 
-          }
-          .modal-content { 
-            box-shadow: none !important; 
-            border: none !important; 
-            width: 100% !important; 
-            max-width: 100% !important; 
-            max-height: none !important; 
-            overflow: visible !important; 
-            padding: 0 !important;
-          }
-          .print-label { display: block !important; margin-bottom: 4px; font-weight: bold; font-size: 14px; color: #1e3a5f; }
-          .print-value { display: block !important; margin-bottom: 16px; font-size: 13px; color: #374151; }
-          .print-grid { display: block !important; }
-          .print-col { margin-bottom: 24px !important; }
-        }
-      `}</style>
-
+      <style>{`@media print { .no-print { display: none !important; } .modal-overlay { position: absolute !important; top: 0 !important; left: 0 !important; background: white !important; align-items: flex-start !important; padding: 0 !important; } .modal-content { box-shadow: none !important; border: none !important; width: 100% !important; max-width: 100% !important; max-height: none !important; overflow: visible !important; padding: 0 !important; } .print-label { display: block !important; margin-bottom: 4px; font-weight: bold; font-size: 14px; color: #1e3a5f; } .print-value { display: block !important; margin-bottom: 16px; font-size: 13px; color: #374151; } .print-grid { display: block !important; } .print-col { margin-bottom: 24px !important; } }`}</style>
       <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "32px", width: "100%", maxWidth: "1000px", maxHeight: "90vh", overflowY: "auto", boxShadow: "0 25px 60px rgba(0,0,0,0.15)" }} onClick={e => e.stopPropagation()}>
-        
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "24px", paddingBottom: "16px", borderBottom: "1px solid #f1f5f9" }}>
           <span style={{ padding: "5px 12px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "14px", fontWeight: "800", textAlign: "center", border: `1px solid ${cfg.color}30`, whiteSpace: "nowrap" }}>{critere.num}</span>
-          <div style={{ flex: 1 }}>
-            <div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre}</div>
-            <div style={{ fontSize: "12px", color: "#6b7280", fontWeight: "600" }}>CRITÈRE {critere.critere} — {cfg.label}</div>
-          </div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre}</div><div style={{ fontSize: "12px", color: "#6b7280", fontWeight: "600" }}>CRITÈRE {critere.critere} — {cfg.label}</div></div>
           {isReadOnly && <span style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", marginRight: "10px" }}>🔒 ARCHIVE</span>}
           <button className="no-print" onClick={onClose} style={{ background: "none", border: "none", color: "#9ca3af", fontSize: "22px", cursor: "pointer", lineHeight: 1 }}>x</button>
         </div>
         
         <div className="print-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px", marginBottom: "24px" }}>
-          
-          {/* COLONNE GAUCHE */}
           <div className="print-col" style={{ background: "#f8fafc", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px" }}>
-              <span style={{ fontSize: "18px" }}>📖</span>
-              <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>Référentiel Officiel V9</h3>
-            </div>
-            
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Indicateur d'appréciation</div>
-              <div style={{ fontSize: "13px", color: "#1e3a5f", fontWeight: "600", fontStyle: "italic", lineHeight: "1.5" }}>"{guide.appreciation}"</div>
-            </div>
-
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Niveau attendu</div>
-              <div style={{ fontSize: "13px", color: "#374151", lineHeight: "1.5" }}>{guide.niveau}</div>
-            </div>
-
-            <div style={{ marginBottom: "16px" }}>
-              <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Exemples de preuves</div>
-              <div style={{ fontSize: "12px", color: "#4b5563", lineHeight: "1.5", background: "white", padding: "10px", border: "1px dashed #d1d5db", borderRadius: "6px" }}>{guide.preuves}</div>
-            </div>
-
-            {guide.obligations && (
-              <div style={{ marginBottom: "16px" }}>
-                <div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Obligations spécifiques</div>
-                <div style={{ fontSize: "12px", color: "#0e7490", background: "#ecfeff", border: "1px solid #a5f3fc", padding: "8px 10px", borderRadius: "6px", lineHeight: "1.5" }}>{guide.obligations}</div>
-              </div>
-            )}
-
-            <div style={{ marginTop: "20px", background: "#fef2f2", border: "1px solid #fca5a5", borderLeft: "4px solid #ef4444", padding: "12px", borderRadius: "6px" }}>
-              <div style={{ fontSize: "11px", color: "#991b1b", fontWeight: "800", textTransform: "uppercase", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}>
-                <span>⚠️</span> Règle de non-conformité
-              </div>
-              <div style={{ fontSize: "12px", color: "#7f1d1d", lineHeight: "1.4", fontWeight: "500" }}>{guide.nonConformite}</div>
-            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px" }}><span style={{ fontSize: "18px" }}>📖</span><h3 style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>Référentiel Officiel V9</h3></div>
+            <div style={{ marginBottom: "16px" }}><div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Indicateur d'appréciation</div><div style={{ fontSize: "13px", color: "#1e3a5f", fontWeight: "600", fontStyle: "italic", lineHeight: "1.5" }}>"{guide.appreciation}"</div></div>
+            <div style={{ marginBottom: "16px" }}><div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Niveau attendu</div><div style={{ fontSize: "13px", color: "#374151", lineHeight: "1.5" }}>{guide.niveau}</div></div>
+            <div style={{ marginBottom: "16px" }}><div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Exemples de preuves</div><div style={{ fontSize: "12px", color: "#4b5563", lineHeight: "1.5", background: "white", padding: "10px", border: "1px dashed #d1d5db", borderRadius: "6px" }}>{guide.preuves}</div></div>
+            {guide.obligations && (<div style={{ marginBottom: "16px" }}><div style={{ fontSize: "11px", color: "#6b7280", fontWeight: "700", textTransform: "uppercase", marginBottom: "4px" }}>Obligations spécifiques</div><div style={{ fontSize: "12px", color: "#0e7490", background: "#ecfeff", border: "1px solid #a5f3fc", padding: "8px 10px", borderRadius: "6px", lineHeight: "1.5" }}>{guide.obligations}</div></div>)}
+            <div style={{ marginTop: "20px", background: "#fef2f2", border: "1px solid #fca5a5", borderLeft: "4px solid #ef4444", padding: "12px", borderRadius: "6px" }}><div style={{ fontSize: "11px", color: "#991b1b", fontWeight: "800", textTransform: "uppercase", marginBottom: "4px", display: "flex", alignItems: "center", gap: "6px" }}><span>⚠️</span> Règle de non-conformité</div><div style={{ fontSize: "12px", color: "#7f1d1d", lineHeight: "1.4", fontWeight: "500" }}>{guide.nonConformite}</div></div>
           </div>
 
-          {/* COLONNE DROITE */}
           <div className="print-col">
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px" }}>
-              <span style={{ fontSize: "18px" }}>✍️</span>
-              <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>Notre Réponse IFSI</h3>
-            </div>
-
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "16px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px" }}><span style={{ fontSize: "18px" }}>✍️</span><h3 style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", margin: 0, textTransform: "uppercase", letterSpacing: "0.5px" }}>Notre Réponse IFSI</h3></div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "16px" }}>
               <div>
                 <label style={lbl}>Statut actuel</label>
-                <select className="no-print" disabled={isReadOnly || isAuditMode} value={data.statut} onChange={e => setData({ ...data, statut: e.target.value })}
-                  style={{ ...inp, background: STATUT_CONFIG[data.statut].bg, color: STATUT_CONFIG[data.statut].color, fontWeight: "600", border: `1.5px solid ${STATUT_CONFIG[data.statut].border}` }}>
-                  {Object.entries(STATUT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                </select>
+                <select className="no-print" disabled={isReadOnly || isAuditMode} value={data.statut} onChange={e => setData({ ...data, statut: e.target.value })} style={{ ...inp, background: STATUT_CONFIG[data.statut].bg, color: STATUT_CONFIG[data.statut].color, fontWeight: "600", border: `1.5px solid ${STATUT_CONFIG[data.statut].border}` }}>{Object.entries(STATUT_CONFIG).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}</select>
                 <div className="print-value" style={{ display: "none" }}>{STATUT_CONFIG[data.statut].label}</div>
               </div>
               <div>
@@ -161,72 +100,25 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                 <div className="print-value" style={{ display: "none" }}>{new Date(data.delai).toLocaleDateString("fr-FR")}</div>
               </div>
             </div>
-            
-            <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>Responsable(s) assigné(s)</label>
-              <MultiSelect disabled={isReadOnly || isAuditMode} selected={data.responsables} onChange={val => setData({ ...data, responsables: val })} />
-              <div className="print-value" style={{ display: "none" }}>
-                {data.responsables.length > 0 ? data.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable assigné"}
-              </div>
-            </div>
-            
-            <div style={{ marginBottom: "16px" }}>
-              <label style={lbl}>{isAuditMode ? "Preuves (Liens, Emplacements)" : "✅ Preuves FINALISÉES (Liens, Emplacements)"}</label>
-              <textarea className="no-print" readOnly={isReadOnly || isAuditMode} value={data.preuves || ""} onChange={e => setData({ ...data, preuves: e.target.value })} rows={5}
-                placeholder="Ex: Livret d'accueil p.12, Lien Sharepoint..."
-                style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: (isReadOnly || isAuditMode) ? "#d1d5db" : "#6ee7b7", background: (isReadOnly || isAuditMode) ? "#f9fafb" : "#f0fdf4" }} />
-              <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#f0fdf4", padding: "10px", borderLeft: "3px solid #10b981", borderRadius: "4px" }}>{data.preuves || "—"}</div>
-            </div>
-
-            {/* MASQUAGE DES DONNÉES SENSIBLES SI MODE AUDIT */}
+            <div style={{ marginBottom: "16px" }}><label style={lbl}>Responsable(s) assigné(s)</label><MultiSelect disabled={isReadOnly || isAuditMode} selected={data.responsables} onChange={val => setData({ ...data, responsables: val })} /><div className="print-value" style={{ display: "none" }}>{data.responsables.length > 0 ? data.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable assigné"}</div></div>
+            <div style={{ marginBottom: "16px" }}><label style={lbl}>{isAuditMode ? "Preuves (Liens, Emplacements)" : "✅ Preuves FINALISÉES (Liens, Emplacements)"}</label><textarea className="no-print" readOnly={isReadOnly || isAuditMode} value={data.preuves || ""} onChange={e => setData({ ...data, preuves: e.target.value })} rows={5} placeholder="Ex: Livret d'accueil p.12, Lien Sharepoint..." style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: (isReadOnly || isAuditMode) ? "#d1d5db" : "#6ee7b7", background: (isReadOnly || isAuditMode) ? "#f9fafb" : "#f0fdf4" }} /><div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#f0fdf4", padding: "10px", borderLeft: "3px solid #10b981", borderRadius: "4px" }}>{data.preuves || "—"}</div></div>
             {!isAuditMode && (
               <>
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={lbl}>⏳ Preuves EN COURS d'élaboration</label>
-                  <textarea className="no-print" readOnly={isReadOnly} value={data.preuves_encours || ""} onChange={e => setData({ ...data, preuves_encours: e.target.value })} rows={3}
-                    placeholder="Ex: Trame d'entretien en cours de rédaction, en attente signature..."
-                    style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: isReadOnly ? "#d1d5db" : "#fcd34d", background: isReadOnly ? "#f9fafb" : "#fffbeb" }} />
-                  <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#fffbeb", padding: "10px", borderLeft: "3px solid #f59e0b", borderRadius: "4px" }}>{data.preuves_encours || "—"}</div>
-                </div>
-
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={lbl}>Commentaires / Attendus demandés par l'évaluateur</label>
-                  <textarea className="no-print" readOnly={isReadOnly} value={data.attendus || ""} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3}
-                    placeholder="Ex: L'auditeur a demandé à ce qu'on précise la date sur la feuille d'émargement..."
-                    style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: isReadOnly ? "#f9fafb" : "#f8fafc", borderColor: "#e2e8f0" }} />
-                  <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.attendus || "—"}</div>
-                </div>
-                
-                <div style={{ marginBottom: "28px" }}>
-                  <label style={lbl}>Notes internes IFSI (Points de vigilance)</label>
-                  <textarea className="no-print" readOnly={isReadOnly} value={data.notes || ""} onChange={e => setData({ ...data, notes: e.target.value })} rows={2}
-                    placeholder="Ex: Attention à bien valider ce document en Copil..."
-                    style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} />
-                  <div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", fontStyle: "italic", color: "#6b7280" }}>{data.notes || "—"}</div>
-                </div>
+                <div style={{ marginBottom: "16px" }}><label style={lbl}>⏳ Preuves EN COURS d'élaboration</label><textarea className="no-print" readOnly={isReadOnly} value={data.preuves_encours || ""} onChange={e => setData({ ...data, preuves_encours: e.target.value })} rows={3} placeholder="Ex: Trame d'entretien en cours de rédaction, en attente signature..." style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", borderColor: isReadOnly ? "#d1d5db" : "#fcd34d", background: isReadOnly ? "#f9fafb" : "#fffbeb" }} /><div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", background: "#fffbeb", padding: "10px", borderLeft: "3px solid #f59e0b", borderRadius: "4px" }}>{data.preuves_encours || "—"}</div></div>
+                <div style={{ marginBottom: "16px" }}><label style={lbl}>Commentaires / Attendus demandés par l'évaluateur</label><textarea className="no-print" readOnly={isReadOnly} value={data.attendus || ""} onChange={e => setData({ ...data, attendus: e.target.value })} rows={3} placeholder="Ex: L'auditeur a demandé à ce qu'on précise la date sur la feuille d'émargement..." style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6", background: isReadOnly ? "#f9fafb" : "#f8fafc", borderColor: "#e2e8f0" }} /><div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap" }}>{data.attendus || "—"}</div></div>
+                <div style={{ marginBottom: "28px" }}><label style={lbl}>Notes internes IFSI (Points de vigilance)</label><textarea className="no-print" readOnly={isReadOnly} value={data.notes || ""} onChange={e => setData({ ...data, notes: e.target.value })} rows={2} placeholder="Ex: Attention à bien valider ce document en Copil..." style={{ ...inp, width: "100%", boxSizing: "border-box", resize: "vertical", lineHeight: "1.6" }} /><div className="print-value" style={{ display: "none", whiteSpace: "pre-wrap", fontStyle: "italic", color: "#6b7280" }}>{data.notes || "—"}</div></div>
               </>
             )}
           </div>
         </div>
         
-        {/* BARRE DES BOUTONS */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
-          <button className="no-print" onClick={() => window.print()} style={{ padding: "8px 16px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", color: "#1d4ed8", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}>
-            <span>📄</span> Imprimer cette fiche
-          </button>
-          
+          <button className="no-print" onClick={() => window.print()} style={{ padding: "8px 16px", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "8px", color: "#1d4ed8", cursor: "pointer", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px" }}><span>📄</span> Imprimer cette fiche</button>
           <div className="no-print" style={{ display: "flex", gap: "10px" }}>
-            <button onClick={onClose} style={{ padding: "10px 22px", background: "white", border: "1px solid #d1d5db", borderRadius: "8px", color: "#374151", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>
-              {(isReadOnly || isAuditMode) ? "Fermer" : "Annuler"}
-            </button>
-            {(!isReadOnly && !isAuditMode) && (
-              <button onClick={() => onSave(data)} style={{ padding: "10px 28px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>
-                Enregistrer
-              </button>
-            )}
+            <button onClick={onClose} style={{ padding: "10px 22px", background: "white", border: "1px solid #d1d5db", borderRadius: "8px", color: "#374151", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>{(isReadOnly || isAuditMode) ? "Fermer" : "Annuler"}</button>
+            {(!isReadOnly && !isAuditMode) && <button onClick={() => onSave(data)} style={{ padding: "10px 28px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: "pointer", fontSize: "13px" }}>Enregistrer</button>}
           </div>
         </div>
-        
       </div>
     </div>
   );
