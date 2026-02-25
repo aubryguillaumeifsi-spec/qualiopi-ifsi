@@ -1,29 +1,48 @@
 export const NOM_ETABLISSEMENT = "IFSI du CHAM";
 export const TODAY = new Date().toISOString().split("T")[0];
 
+// Liste officielle de l'équipe
 export const RESPONSABLES = [
-  "RETARDATO Clementine (Directrice des soins)",
-  "TZOTZIS Christelle (Coordinatrice pedagogique)",
-  "AUBRY Guillaume (Formateur 1A)",
-  "BRASSINE Deborah (Formatrice 3A)",
-  "CHARLES Valerie (Formatrice 2A)",
-  "LEROY Sandra (Formatrice 1A)",
-  "HEGO Coralie (Formatrice 2A)",
-  "KERBIDI Julie (Formatrice 1A)",
-  "LAFONT Laura (Formatrice 1A)",
-  "MARTIN Audrey (Formatrice 1A - Ref. ABS)",
-  "LA GUMINA Samantha (Formatrice 3A)",
-  "MONTAINT Sophie (Formatrice 3A)",
-  "SONVEAU Marie-Cecile (Formatrice 3A)",
-  "JOUBAUD Virginie (Formatrice 2A)",
-  "KRYLYSCHIN Virginie (Formatrice 2A)",
+  "RETARDATO Clémentine (Directrice des soins)",
+  "TZOTZIS Christelle (Coordinatrice pédagogique)",
+  "AUBRY Guillaume (1ere année)",
+  "KERBIDI Julie (1ere année)",
+  "LAFONT Laura (1ere année)",
+  "LEROY Sandra (1ere année)",
+  "MARTIN Audrey (1ere année - Référente ABS)",
+  "CHARLES Valérie (2eme année)",
+  "HEGO Coralie (2eme année)",
+  "JOUBAUD Virginie (2eme année)",
+  "KRYLYSCHIN Virginie (2eme année)",
+  "BRASSINE Déborah (3eme année)",
+  "LA GUMINA Samantha (3eme année)",
+  "MONTAINT Sophie (3eme année)",
+  "SONVEAU Marie-Cécile (3eme année)",
+  "PENIN Angélique (Formatrice AS)",
+  "ROUSSEAU Caroline (Formatrice AS)",
+  "FROMONT Aurélie (Formatrice AS)",
   "CARRE Joris (Documentaliste)",
-  "QUAAK Jan (Referent TICE)",
-  "HURTER Nathalie (Secretaire)",
-  "MAITREHUT Irene (Secretaire)",
-  "MELITO SAIHI Melanie (Secretaire)",
-  "RATTEZ Eva (Secretaire)",
+  "QUAAK Jan (Référent TICE)",
+  "HURTER Nathalie (Secrétariat)",
+  "MAITREHUT Irène (Secrétariat)",
+  "MELITO SAIHI Mélanie (Secrétariat)",
+  "RATTEZ Eva (Secrétariat)"
 ];
+
+// Configuration des couleurs par métiers (utilisées dans les badges et l'export Excel)
+export const ROLE_COLORS = {
+  "Directrice des soins": { bg: "#eff6ff", text: "#1d4ed8", border: "#bfdbfe" }, // Bleu
+  "Coordinatrice pédagogique": { bg: "#fff7ed", text: "#c2410c", border: "#fed7aa" }, // Orange
+  "1ere année": { bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" }, // Vert Emeraude
+  "1ere année - Référente ABS": { bg: "#ecfdf5", text: "#047857", border: "#a7f3d0" }, // Vert Emeraude
+  "2eme année": { bg: "#f0fdf4", text: "#15803d", border: "#bbf7d0" }, // Vert pomme
+  "3eme année": { bg: "#dcfce7", text: "#166534", border: "#86efac" }, // Vert plus foncé
+  "Formatrice AS": { bg: "#fdf4ff", text: "#a21caf", border: "#f5d0fe" }, // Fuchsia
+  "Documentaliste": { bg: "#fefce8", text: "#a16207", border: "#fef08a" }, // Jaune moutarde
+  "Référent TICE": { bg: "#f0f9ff", text: "#0369a1", border: "#bae6fd" }, // Bleu cyan
+  "Secrétariat": { bg: "#f5f3ff", text: "#6d28d9", border: "#ddd6fe" }, // Violet
+  "Défaut": { bg: "#f3f4f6", text: "#4b5563", border: "#e5e7eb" } // Gris par défaut
+};
 
 export const DEFAULT_CRITERES = [
   { id: 1, num: "Indicateur 1", critere: 1, titre: "Information sur les prestations", responsables: [], delai: TODAY, statut: "non-evalue", notes: "", attendus: "", preuves: "" },
@@ -123,7 +142,7 @@ export const GUIDE_QUALIOPI = {
   7: {
     appreciation: "Lorsque le prestataire met en œuvre des prestations conduisant à une certification professionnelle, il s'assure de l'adéquation du ou des contenus de la prestation aux exigences de la certification visée.",
     niveau: "Démontrer l'adéquation du contenu aux compétences ciblées et aux épreuves d'évaluation de la certification.",
-    preuves: "Présentation de l'offre de formation en cohérence avec le référentiel de la certification, habilitation du prestataire, tableau croisé du contenu et du référentiel.",
+    preuves: "Présentation de l'offre de formation en cohérence avec le référentiel de la certification, habilitation du prestataire, tableau croisé du contenu et référentiel.",
     obligations: null,
     nonConformite: "Dans l'échantillon audité, le non-respect (même partiel) de cet indicateur entraîne une non-conformité majeure."
   },
