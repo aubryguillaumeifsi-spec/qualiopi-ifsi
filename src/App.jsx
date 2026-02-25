@@ -161,47 +161,57 @@ export default function App() {
     setModalCritere(null);
   }
 
-  // NOUVELLE FONCTION : Export CSV
-  function exportToCSV() {
+  // NOUVELLE FONCTION : EXPORT EXCEL PROPRE (.xlsx)
+  function exportToExcel() {
     if (!criteres) return;
-    
-    // Entêtes des colonnes
+    if (typeof window.XLSX === "undefined") {
+      alert("La fonction d'export est en cours de chargement. Veuillez patienter une seconde.");
+      return;
+    }
+
+    // 1. Création des entêtes
     const headers = ["Indicateur", "Critère Qualiopi", "Titre", "Statut", "Échéance", "Responsables", "Preuves finalisées", "Preuves en cours", "Remarques Évaluateur", "Notes internes"];
     
-    // Formatage des lignes
-    const rows = criteres.map(c => {
-      // Fonction pour nettoyer les textes (retirer les sauts de ligne qui cassent le CSV et gérer les guillemets)
-      const escapeCell = (text) => `"${(text || "").toString().replace(/"/g, '""').replace(/\n/g, ' - ')}"`;
-      
-      return [
-        c.num,
-        `Critère ${c.critere}`,
-        escapeCell(c.titre),
-        STATUT_CONFIG[c.statut]?.label || c.statut,
-        new Date(c.delai).toLocaleDateString("fr-FR"),
-        escapeCell((c.responsables || []).map(r => r.split("(")[0].trim()).join(", ")),
-        escapeCell(c.preuves),
-        escapeCell(c.preuves_encours),
-        escapeCell(c.attendus),
-        escapeCell(c.notes)
-      ].join(";"); // Séparateur point-virgule adapté à Excel français
-    });
+    // 2. Création des lignes de données (sans les balises d'échappement CSV)
+    const dataRows = criteres.map(c => [
+      c.num,
+      `Critère ${c.critere}`,
+      c.titre,
+      STATUT_CONFIG[c.statut]?.label || c.statut,
+      new Date(c.delai).toLocaleDateString("fr-FR"),
+      (c.responsables || []).map(r => r.split("(")[0].trim()).join(", "),
+      c.preuves || "",
+      c.preuves_encours || "",
+      c.attendus || "",
+      c.notes || ""
+    ]);
+
+    // 3. Combiner Entêtes et Lignes
+    const worksheetData = [headers, ...dataRows];
+    const ws = window.XLSX.utils.aoa_to_sheet(worksheetData);
+
+    // 4. LA MAGIE : Définir la largeur des colonnes (en caractères)
+    ws['!cols'] = [
+      { wch: 12 },  // Indicateur
+      { wch: 16 },  // Critère
+      { wch: 45 },  // Titre (plus large)
+      { wch: 15 },  // Statut
+      { wch: 12 },  // Échéance
+      { wch: 25 },  // Responsables
+      { wch: 50 },  // Preuves finalisées
+      { wch: 50 },  // Preuves en cours
+      { wch: 40 },  // Remarques
+      { wch: 40 }   // Notes internes
+    ];
+
+    // 5. Création du fichier et téléchargement
+    const wb = window.XLSX.utils.book_new();
+    window.XLSX.utils.book_append_sheet(wb, ws, "Suivi Qualiopi");
     
-    // \uFEFF est la magie (le BOM) qui force Excel à lire les accents (UTF-8)
-    const csvString = "\uFEFF" + headers.join(";") + "\n" + rows.join("\n");
-    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    
-    // Nettoyage du nom de la campagne pour le nom du fichier
     const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const fileName = `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`;
     
-    // Déclenchement du téléchargement
-    const link = document.createElement("a");
-    link.href = url;
-    link.setAttribute("download", `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.csv`);
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    window.XLSX.writeFile(wb, fileName);
   }
 
   const today = new Date();
@@ -304,9 +314,8 @@ export default function App() {
               <span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span>
             </button>
 
-            {/* LES DEUX BOUTONS D'EXPORT SONT ICI */}
             <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}>
-              <button onClick={exportToCSV} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", alignItems: "center", gap: "6px" }}>
+              <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", alignItems: "center", gap: "6px" }}>
                 <span>📊</span> Excel
               </button>
               <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
