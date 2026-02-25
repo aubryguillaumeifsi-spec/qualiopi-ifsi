@@ -207,7 +207,7 @@ export default function App() {
           @media print {
             .no-print { display: none !important; }
             body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            @page { size: landscape; margin: 10mm; }
+            @page { size: portrait; margin: 10mm; }
             * { box-shadow: none !important; }
             .print-break-avoid { page-break-inside: avoid; }
           }
