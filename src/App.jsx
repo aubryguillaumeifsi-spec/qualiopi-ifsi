@@ -161,57 +161,86 @@ export default function App() {
     setModalCritere(null);
   }
 
-  // NOUVELLE FONCTION : EXPORT EXCEL PROPRE (.xlsx)
-  function exportToExcel() {
+  // NOUVELLE FONCTION MAGIQUE : EXPORT EXCELJS (BEAU DESIGN)
+  async function exportToExcel() {
     if (!criteres) return;
-    if (typeof window.XLSX === "undefined") {
-      alert("La fonction d'export est en cours de chargement. Veuillez patienter une seconde.");
+    if (typeof window.ExcelJS === "undefined") {
+      alert("Le moteur de génération Excel est en cours de chargement. Merci de patienter une seconde.");
       return;
     }
 
-    // 1. Création des entêtes
-    const headers = ["Indicateur", "Critère Qualiopi", "Titre", "Statut", "Échéance", "Responsables", "Preuves finalisées", "Preuves en cours", "Remarques Évaluateur", "Notes internes"];
-    
-    // 2. Création des lignes de données (sans les balises d'échappement CSV)
-    const dataRows = criteres.map(c => [
-      c.num,
-      `Critère ${c.critere}`,
-      c.titre,
-      STATUT_CONFIG[c.statut]?.label || c.statut,
-      new Date(c.delai).toLocaleDateString("fr-FR"),
-      (c.responsables || []).map(r => r.split("(")[0].trim()).join(", "),
-      c.preuves || "",
-      c.preuves_encours || "",
-      c.attendus || "",
-      c.notes || ""
-    ]);
+    // 1. Création du classeur
+    const workbook = new window.ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
 
-    // 3. Combiner Entêtes et Lignes
-    const worksheetData = [headers, ...dataRows];
-    const ws = window.XLSX.utils.aoa_to_sheet(worksheetData);
-
-    // 4. LA MAGIE : Définir la largeur des colonnes (en caractères)
-    ws['!cols'] = [
-      { wch: 12 },  // Indicateur
-      { wch: 16 },  // Critère
-      { wch: 45 },  // Titre (plus large)
-      { wch: 15 },  // Statut
-      { wch: 12 },  // Échéance
-      { wch: 25 },  // Responsables
-      { wch: 50 },  // Preuves finalisées
-      { wch: 50 },  // Preuves en cours
-      { wch: 40 },  // Remarques
-      { wch: 40 }   // Notes internes
+    // 2. Définition des colonnes et de leur largeur
+    worksheet.columns = [
+      { header: 'Indicateur', key: 'num', width: 14 },
+      { header: 'Critère Qualiopi', key: 'critere', width: 18 },
+      { header: 'Titre de l\'Indicateur', key: 'titre', width: 45 },
+      { header: 'Statut', key: 'statut', width: 18 },
+      { header: 'Échéance', key: 'delai', width: 14 },
+      { header: 'Responsable(s)', key: 'resp', width: 25 },
+      { header: 'Preuves finalisées', key: 'preuves', width: 50 },
+      { header: 'Preuves en cours', key: 'preuves_encours', width: 50 },
+      { header: 'Remarques Évaluateur', key: 'attendus', width: 45 },
+      { header: 'Notes internes', key: 'notes', width: 45 }
     ];
 
-    // 5. Création du fichier et téléchargement
-    const wb = window.XLSX.utils.book_new();
-    window.XLSX.utils.book_append_sheet(wb, ws, "Suivi Qualiopi");
+    // 3. Remplissage des données
+    criteres.forEach(c => {
+      worksheet.addRow({
+        num: c.num,
+        critere: `Critère ${c.critere}`,
+        titre: c.titre,
+        statut: STATUT_CONFIG[c.statut]?.label || c.statut,
+        delai: new Date(c.delai).toLocaleDateString("fr-FR"),
+        resp: (c.responsables || []).map(r => r.split("(")[0].trim()).join("\n"),
+        preuves: c.preuves || "",
+        preuves_encours: c.preuves_encours || "",
+        attendus: c.attendus || "",
+        notes: c.notes || ""
+      });
+    });
+
+    // 4. DESIGN : Styliser l'entête (Ligne 1)
+    const headerRow = worksheet.getRow(1);
+    headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; // Texte blanc
+    headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; // Fond Bleu
+    headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+
+    // Figer la première ligne pour le scroll
+    worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+
+    // 5. DESIGN : Ajouter des bordures partout et activer le retour à la ligne
+    worksheet.eachRow((row, rowNumber) => {
+      row.eachCell((cell) => {
+        // Bordures grises légères
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          left: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } },
+          right: { style: 'thin', color: { argb: 'FFD1D5DB' } }
+        };
+        // Retour à la ligne automatique pour toutes les lignes sous l'entête
+        if (rowNumber > 1) {
+          cell.alignment = { vertical: 'top', wrapText: true };
+        }
+      });
+    });
+
+    // 6. Génération du fichier binaire et téléchargement
+    const buffer = await workbook.xlsx.writeBuffer();
+    const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
     
     const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
-    const fileName = `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`;
-    
-    window.XLSX.writeFile(wb, fileName);
+    const link = document.createElement("a");
+    link.href = url;
+    link.setAttribute("download", `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   const today = new Date();
