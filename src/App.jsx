@@ -225,4 +225,232 @@ export default function App() {
             <div>
               <div style={{ fontSize: "17px", fontWeight: "800", color: "#1e3a5f", display: "flex", alignItems: "center", flexWrap: "wrap" }}>
                 Qualiopi Tracker 
-                <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f
+                <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", marginLeft: "8px", border: "1px solid #e2e8f0", letterSpacing: "0.5px" }}>V1.4</span>
+                <span style={{ margin: "0 8px", color: "#d1d5db" }}>—</span> 
+                {NOM_ETABLISSEMENT}
+                <SaveIndicator />
+              </div>
+              <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Référentiel National Qualité · 32 indicateurs</div>
+            </div>
+            
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px", borderLeft: "2px solid #f1f5f9", paddingLeft: "16px" }}>
+              <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ ...sel, fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", background: "#eff6ff", padding: "8px 14px", outline: "none" }}>
+                {campaigns.map(c => (
+                  <option key={c.id} value={c.id}>{c.name} {c.locked ? "(Archive)" : ""}</option>
+                ))}
+                <option disabled>──────────</option>
+                <option value="NEW">➕ Nouvelle certification...</option>
+              </select>
+              
+              {campaigns.length > 1 && (
+                <button onClick={handleDeleteCampaign} className="no-print" title="Supprimer définitivement cette évaluation" style={{ background: "white", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "14px", color: "#ef4444", padding: "6px 8px", display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.2s" }} onMouseOver={e => e.currentTarget.style.background = '#fef2f2'} onMouseOut={e => e.currentTarget.style.background = 'white'}>
+                  🗑️
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
+            {[["dashboard","Tableau de bord"],["criteres","Indicateurs"],["axes","Axes prioritaires"],["responsables","Responsables"]].map(([t, l]) => (
+              <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{l}</button>
+            ))}
+            <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", marginLeft: "16px", border: "1px solid #bfdbfe", display: "flex", alignItems: "center", gap: "6px" }}>
+              <span>📄</span> Exporter PDF
+            </button>
+            <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Déconnexion</button>
+          </div>
+        </div>
+      </div>
+
+      {isArchive && (
+        <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
+          <span>🔒</span> Mode Lecture Seule : Cette évaluation est une archive historique. Les modifications sont bloquées.
+        </div>
+      )}
+
+      <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
+
+        {activeTab === "dashboard" && <>
+          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "14px", marginBottom: "24px" }}>
+            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents moins 30j"]].map(([color,bg,border,num,label]) => (
+              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "12px", padding: "20px 22px", opacity: isArchive ? 0.8 : 1 }}>
+                <div style={{ fontSize: "34px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div>
+                <div style={{ fontSize: "11px", color, opacity: 0.8, marginTop: "5px", textTransform: "uppercase", letterSpacing: "0.5px", fontWeight: "600" }}>{label}</div>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+            <div className="print-break-avoid" style={card}>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité global</div>
+              <div style={{ display: "flex", alignItems: "center", gap: "20px" }}>
+                <GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" />
+                <div style={{ flex: 1 }}>
+                  {[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (
+                    <div key={l} style={{ marginBottom: "10px" }}>
+                      <div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div>
+                      <ProgressBar value={v} max={stats.total} color={col} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="print-break-avoid" style={card}>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère</div>
+              {Object.entries(CRITERES_LABELS).map(([num, cfg]) => {
+                const cr = criteres.filter(c => c.critere === parseInt(num));
+                const ok = cr.filter(c => c.statut === "conforme").length;
+                return (
+                  <div key={num} style={{ marginBottom: "11px" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}>
+                      <span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span>
+                      <span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span>
+                    </div>
+                    <ProgressBar value={ok} max={cr.length} color={cfg.color} />
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {(!isArchive && urgents.length > 0) && (
+            <div className="print-break-avoid" style={card}>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Indicateurs urgents — moins de 30 jours</div>
+              {urgents.map(c => (
+                <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", borderRadius: "8px", background: c.statut==="non-conforme"?"#fff5f5":"#fffbeb", border:`1px solid ${c.statut==="non-conforme"?"#fca5a5":"#fcd34d"}`, marginBottom: "8px" }}>
+                  <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
+                  <div style={{ flex: 1 }}><div style={{ fontWeight: "600", fontSize: "13px" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#6b7280", marginTop: "2px" }}>{c.responsables.length > 0 ? c.responsables.map(r => r.split("(")[0].trim()).join(", ") : "Aucun responsable"}</div></div>
+                  <StatusBadge statut={c.statut} />
+                  <span style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", minWidth: "70px", textAlign: "right" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j dépassé` : `J-${days(c.delai)}`}</span>
+                  <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", color: "#1d4ed8", padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>Éditer</button>
+                </div>
+              ))}
+            </div>
+          )}
+        </>}
+
+        {activeTab === "criteres" && <>
+          <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}>
+            <input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} />
+            <select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select>
+            <select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select>
+            <span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span>
+          </div>
+          <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead><tr>{["N°","Indicateur","Responsable(s)","Échéance","Statut","Preuves"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
+              <tbody>
+                {filtered.map(c => {
+                  const col = CRITERES_LABELS[c.critere].color, d = days(c.delai);
+                  return (
+                    <tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}>
+                      <td style={{ ...td, width: "110px" }}><span style={nb(col)}>{c.num}</span></td>
+                      <td style={{ ...td, maxWidth: "280px" }}><div style={{ fontWeight: "600", color: "#1e3a5f", marginBottom: "2px" }}>{c.titre}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{CRITERES_LABELS[c.critere].label}</div></td>
+                      <td style={{ ...td, maxWidth: "200px" }}>
+                        {c.responsables.length === 0
+                          ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span>
+                          : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{c.responsables.slice(0,2).map(r => <span key={r} style={{ fontSize: "10px", color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "4px", padding: "2px 6px" }}>{r.split("(")[0].trim()}</span>)}{c.responsables.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{c.responsables.length-2}</span>}</div>}
+                      </td>
+                      <td style={td}><div style={{ fontSize: "12px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div><div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div></td>
+                      <td style={td}><StatusBadge statut={c.statut} /></td>
+                      <td style={td}>
+                        {c.preuves?.trim() ? (
+                          <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Finalisées</span>
+                        ) : c.preuves_encours?.trim() ? (
+                          <span style={{ fontSize: "10px", color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "5px", border: "1px solid #fcd34d" }}>En cours</span>
+                        ) : (
+                          <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vides</span>
+                        )}
+                      </td>
+                      <td className="no-print" style={{ ...td, width: "80px" }}>
+                        <button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>
+                          {isArchive ? "Consulter" : "Éditer"}
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </>}
+
+        {activeTab === "axes" && <>
+          <div style={{ marginBottom: "22px" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2>
+            <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>{stats.nonConforme} non conforme(s) · {stats.enCours} en cours</p>
+          </div>
+          {["non-conforme","en-cours"].map(st => {
+            const items = axes.filter(c => c.statut === st);
+            if (items.length === 0) return null;
+            const isNC = st === "non-conforme";
+            return (
+              <div key={st}>
+                <div className="print-break-avoid" style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase", letterSpacing: "1px", display: "flex", alignItems: "center", gap: "6px" }}>
+                  <span style={{ display: "inline-block", width: "8px", height: "8px", borderRadius: "50%", background: isNC?"#dc2626":"#d97706" }} />
+                  {isNC ? "Non conformes — Action immédiate" : "En cours — À finaliser"}
+                </div>
+                {items.map(c => (
+                  <div key={c.id} className="print-break-avoid" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px" }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", gap: "12px" }}>
+                      <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "4px" }}>{c.titre}</div>
+                        <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>{CRITERES_LABELS[c.critere].label}</div>
+                        {c.attendus && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Remarques Évaluateur : </span>{c.attendus}</div>}
+                        {c.preuves && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>Preuves finalisées : </span>{c.preuves}</div>}
+                        {c.preuves_encours && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#d97706" }}>Preuves en cours : </span>{c.preuves_encours}</div>}
+                        {(!c.preuves && !c.preuves_encours) && <div style={{ fontSize: "11px", color: "#9ca3af", fontStyle: "italic" }}>Aucune preuve renseignée</div>}
+                      </div>
+                      <div style={{ textAlign: "right", minWidth: "140px", flexShrink: 0 }}>
+                        <StatusBadge statut={c.statut} />
+                        <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div>
+                        <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{days(c.delai) < 0 ? `${Math.abs(days(c.delai))}j dépassé` : `J-${days(c.delai)}`}</div>
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isArchive ? "#f1f5f9" : (isNC?"#fff5f5":"#fffbeb"), border:`1px solid ${isArchive ? "#d1d5db" : (isNC?"#fca5a5":"#fcd34d")}`, borderRadius: "6px", color: isArchive ? "#4b5563" : (isNC?"#dc2626":"#92400e"), padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>
+                          {isArchive ? "Consulter" : "Éditer"}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                <div style={{ height: "16px" }} />
+              </div>
+            );
+          })}
+        </>}
+
+        {activeTab === "responsables" && <>
+          <div style={{ marginBottom: "22px" }}>
+            <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Vue par responsable</h2>
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
+            {byResp.map(r => {
+              const conformes = r.items.filter(c => c.statut==="conforme").length;
+              const nonConformes = r.items.filter(c => c.statut==="non-conforme").length;
+              const enCours = r.items.filter(c => c.statut==="en-cours").length;
+              return (
+                <div key={r.name} className="print-break-avoid" style={card}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
+                    <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "white", flexShrink: 0 }}>{r.nom.split(" ").map(n=>n[0]).join("").substring(0,2).toUpperCase()}</div>
+                    <div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f" }}>{r.nom}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{r.role}</div></div>
+                  </div>
+                  <ProgressBar value={conformes} max={r.items.length} color="#1d4ed8" />
+                  <div style={{ marginTop: "12px" }}>
+                    {r.items.sort((a,b) => ({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3}[a.statut])-({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3}[b.statut])).map(c => (
+                      <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 0", borderBottom: "1px solid #f8fafc" }}>
+                        <span style={nb(CRITERES_LABELS[c.critere].color)}>{c.num}</span>
+                        <div style={{ flex: 1, fontSize: "12px", color: "#374151" }}>{c.titre}</div>
+                        <StatusBadge statut={c.statut} />
+                        <button className="no-print" onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "white", border: "1px solid #e2e8f0", borderRadius: "5px", color: isArchive ? "#4b5563" : "#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>
+                          {isArchive ? "Vue" : "Éditer"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </>}
+      </div>
+    </div>
+  );
+}
