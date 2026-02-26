@@ -1,4 +1,4 @@
-export const NOM_ETABLISSEMENT = "IFSI du CHAM";
+export const NOM_ETABLISSEMENT = "IFPS du CHAM";
 export const TODAY = new Date().toISOString().split("T")[0];
 // 👇 AJOUTE CETTE LIGNE (Tu pourras modifier la date, le format est AAAA-MM-JJ) 👇
 
