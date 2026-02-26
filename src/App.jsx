@@ -143,7 +143,6 @@ export default function App() {
     }
   }
 
-  // GESTION BLINDÉE DES DATES
   const today = new Date();
   const days = d => {
     if (!d) return NaN;
@@ -165,7 +164,6 @@ export default function App() {
   else if (daysToAudit <= 30) { bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` }; } 
   else if (daysToAudit <= 90) { bannerConfig = { bg: "#fff7ed", border: "#fed7aa", color: "#c2410c", icon: "⏳", text: `L'audit approche : plus que ${daysToAudit} jour(s)` }; }
 
-  // CALCUL SÉCURISÉ DES STATISTIQUES
   const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
   const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; 
 
@@ -183,7 +181,6 @@ export default function App() {
     return !isNaN(d) && d <= 30 && c.statut !== "conforme" && c.statut !== "non-evalue" && c.statut !== "non-concerne";
   });
   
-  // FILTRE BLINDÉ POUR LA BARRE DE RECHERCHE
   const filtered = criteres.filter(c => {
     if (filterStatut !== "tous" && c.statut !== filterStatut) return false;
     if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false;
@@ -311,12 +308,12 @@ export default function App() {
               {Object.entries(STATUT_CONFIG).map(([stKey, stVal]) => {
                 const items = criteres.filter(c => c.statut === stKey);
                 return (
-                  <div key={stKey} className="kanban-col" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, stKey)} style={{ flex: "0 0 320px", background: "#f8fafc", border: `1px solid ${stVal.border}`, borderRadius: "12px", padding: "16px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "65vh", backgroundColor: stVal.bg }}>
+                  <div key={stKey} className="kanban-col" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, stKey)} style={{ flex: "1 1 220px", minWidth: "220px", background: "#f8fafc", border: `1px solid ${stVal.border}`, borderRadius: "12px", padding: "12px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "65vh", backgroundColor: stVal.bg }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `3px solid ${stVal.color}`, paddingBottom: "10px", marginBottom: "4px" }}><span style={{ fontWeight: "800", color: stVal.color, textTransform: "uppercase", fontSize: "13px", letterSpacing: "0.5px" }}>{stVal.label}</span><span style={{ background: "white", color: stVal.color, padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "800", border: `1px solid ${stVal.border}` }}>{items.length}</span></div>
                     {items.map(c => {
                       const d = days(c.delai);
                       const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
-                      const resps = Array.isArray(c.responsables) ? c.responsables : []; // ULTRA SÉCURISÉ
+                      const resps = Array.isArray(c.responsables) ? c.responsables : []; 
                       
                       return (
                         <div key={c.id} className="kanban-card" draggable={!isArchive} onDragStart={(e) => handleDragStart(e, c.id)} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px", cursor: isArchive ? "pointer" : "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", opacity: stKey === "non-concerne" ? 0.6 : 1 }}>
@@ -347,7 +344,7 @@ export default function App() {
               <tbody>{filtered.map(c => { 
                 const cConf = CRITERES_LABELS[c.critere] || { label: "Critère Inconnu", color: "#9ca3af" };
                 const d = days(c.delai); 
-                const resps = Array.isArray(c.responsables) ? c.responsables : []; // ULTRA SÉCURISÉ
+                const resps = Array.isArray(c.responsables) ? c.responsables : []; 
                 
                 return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td><td style={{ ...td, maxWidth: "280px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{cConf.label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); const rRole = rSafe.match(/\(([^)]+)\)/)?.[1] || "Défaut"; const rCfg = ROLE_COLORS[rRole] || ROLE_COLORS["Défaut"]; return <span key={rSafe} style={{ fontSize: "10px", color: rCfg.text, background: rCfg.bg, border: `1px solid ${rCfg.border}`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{resps.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td><td style={td}>{(c.preuves||"").trim() ? <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 8px", borderRadius: "5px", border: "1px solid #6ee7b7" }}>Finalisées</span> : (c.preuves_encours||"").trim() ? <span style={{ fontSize: "10px", color: "#92400e", background: "#fef3c7", padding: "2px 8px", borderRadius: "5px", border: "1px solid #fcd34d" }}>En cours</span> : <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vides</span>}</td><td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>{isArchive ? "Consulter" : "Éditer"}</button></td></tr>);})}</tbody>
             </table>
