@@ -105,7 +105,10 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       if (!apiKey) throw new Error("Clé API Gemini introuvable dans Vercel.");
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      
+      // Utilisation de la version 2.5 par défaut, ou celle définie dans Vercel
+      const modelName = import.meta.env.VITE_GEMINI_MODEL || "gemini-2.5-flash";
+      const model = genAI.getGenerativeModel({ model: modelName });
 
       const fileRef = ref(storage, fileToAnalyze.path);
       const arrayBuffer = await getBytes(fileRef);
@@ -118,19 +121,32 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         reader.readAsDataURL(blob);
       });
 
-      const prompt = `Tu es un auditeur Qualiopi expert, exigeant mais constructif. Tu travailles pour un IFSI.
-      Voici un document de preuve fourni pour valider l'indicateur Qualiopi n°${critere.num} ("${critere.titre}").
+      const prompt = `Tu agis en tant qu'auditeur Qualiopi intraitable et expert, spécialisé dans les instituts de formation en santé (IFSI/IFAS). 
+      Tu dois analyser le document joint pour valider l'indicateur Qualiopi n°${critere.num} ("${critere.titre}").
       
-      Voici ce que dit le référentiel officiel pour cet indicateur :
-      - Attendu : ${guide.niveau}
-      - Preuves possibles : ${guide.preuves}
-      - Règle de non-conformité : ${guide.nonConformite}
+      RAPPEL DU RÉFÉRENTIEL NATIONAL QUALITÉ (RNQ) POUR CET INDICATEUR :
+      - Niveau attendu : ${guide.niveau}
+      - Exemples de preuves acceptées : ${guide.preuves}
+      - Règle stricte de non-conformité : ${guide.nonConformite}
 
-      Analyse ce document PDF attentivement.
-      1. Ce document te semble-t-il pertinent et correspond-il aux attentes de cet indicateur précis ?
-      2. Si oui, valide-le. Si non, que manque-t-il exactement pour qu'il soit conforme ?
-      
-      Fais un retour très structuré, court et précis, en utilisant des tirets. Ne dis pas bonjour, va droit au but.`;
+      MISSION :
+      Analyse le document fourni avec une grande rigueur. Ton rôle n'est pas d'être complaisant, mais de protéger l'IFSI d'une non-conformité lors du véritable audit.
+
+      Rédige ton rapport d'analyse en respectant STRICTEMENT cette structure (ne dis pas bonjour, pas d'intro, utilise le Markdown pour le formatage) :
+
+      **VERDICT PRÉLIMINAIRE :** [Choisis UNE option parmi : 🟢 CONFORME / 🟠 PARTIELLEMENT CONFORME / 🔴 NON CONFORME / ❌ HORS SUJET]
+
+      **🔍 Analyse des preuves :**
+      - [Ce que le document démontre clairement par rapport au niveau attendu]
+      - [Ce qui est pertinent]
+
+      **⚠️ Écarts et risques (le cas échéant) :**
+      - [Ce qui manque cruellement par rapport à la règle de non-conformité]
+      - [Les ambiguïtés ou manques de précision (dates, signatures, etc.)]
+
+      **🎯 Action corrective recommandée :**
+      - [Action 1 concrète à réaliser par l'équipe pour blinder la preuve]
+      - [Action 2...]`;
 
       const result = await model.generateContent([
         prompt,
