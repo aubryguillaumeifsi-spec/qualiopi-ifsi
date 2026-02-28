@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore, doc } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getStorage } from "firebase/storage"; // <-- AJOUT POUR LE STOCKAGE
 
 const firebaseConfig = {
   apiKey: "AIzaSyDY6ZTEOi-g0_98QHHzSJFNgPC0DMTdaus",
@@ -15,4 +16,5 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
+export const storage = getStorage(app); // <-- AJOUT POUR LE STOCKAGE
 export const DOC_REF = doc(db, "qualiopi", "criteres");
