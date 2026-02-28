@@ -1,7 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getBytes } from "firebase/storage";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { storage } from "../firebase";
-import { CRITERES_LABELS, STATUT_CONFIG, RESPONSABLES, GUIDE_QUALIOPI, ROLE_COLORS } from "../data";
+import { CRITERES_LABELS, STATUT_CONFIG, TODAY, RESPONSABLES, GUIDE_QUALIOPI, ROLE_COLORS } from "../data";
 
 function MultiSelect({ selected, onChange, disabled }) {
   const [open, setOpen] = useState(false);
@@ -38,9 +39,12 @@ function MultiSelect({ selected, onChange, disabled }) {
 }
 
 export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode }) {
-  // On s'assure que "fichiers" est toujours un tableau
   const [data, setData] = useState({ ...critere, responsables: [...(critere.responsables || [])], fichiers: [...(critere.fichiers || [])] });
   const [uploading, setUploading] = useState(false);
+  
+  // États dédiés à l'IA Gemini
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [aiReport, setAiReport] = useState("");
   
   const cfg = CRITERES_LABELS[critere.critere] || { color: "#9ca3af" };
   const lbl = { display: "block", fontSize: "11px", color: "#6b7280", textTransform: "uppercase", letterSpacing: "0.8px", fontWeight: "700", marginBottom: "7px" };
@@ -48,14 +52,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const guide = GUIDE_QUALIOPI[critere.id];
   const TODAY = new Date().toISOString().split("T")[0];
 
-  // NOUVEAU : Fonction d'upload
   async function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
     try {
       const fileRef = ref(storage, `preuves/${critere.id}_${Date.now()}_${file.name}`);
-      const uploadTask = await uploadBytesResumable(fileRef, file);
+      await uploadBytesResumable(fileRef, file);
       const url = await getDownloadURL(fileRef);
       const newFile = { name: file.name, url: url, path: fileRef.fullPath, archive: false };
       setData({ ...data, fichiers: [...data.fichiers, newFile] });
@@ -63,7 +66,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setUploading(false);
   }
 
-  // NOUVEAU : Fonction de suppression
   async function handleDeleteFile(fileToDelete) {
     if (!window.confirm(`Supprimer définitivement le document "${fileToDelete.name}" ?`)) return;
     try {
@@ -73,6 +75,69 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       }
       setData({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) });
     } catch (error) { alert("Erreur suppression : " + error.message); }
+  }
+
+  // --- LA FONCTION MAGIQUE DE SCAN IA ---
+  async function handleAIAnalysis() {
+    const actFile = data.fichiers.filter(f => !f.archive);
+    if (actFile.length === 0) return alert("Veuillez d'abord joindre un document PDF à analyser !");
+    
+    const fileToAnalyze = actFile[0];
+    if (!fileToAnalyze.name.toLowerCase().endsWith('.pdf')) {
+      return alert("Pour le moment, l'IA Gemini ne peut analyser que les fichiers PDF. Veuillez utiliser un PDF.");
+    }
+
+    setIsAnalyzing(true);
+    setAiReport("");
+    
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("Clé API Gemini introuvable dans Vercel.");
+
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+      // 1. On télécharge silencieusement le PDF depuis Firebase
+      const fileRef = ref(storage, fileToAnalyze.path);
+      const arrayBuffer = await getBytes(fileRef);
+
+      // 2. On le convertit en Base64 pour l'IA
+      const base64String = await new Promise((resolve, reject) => {
+        const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+        const reader = new FileReader();
+        reader.onloadend = () => resolve(reader.result.split(',')[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+
+      // 3. L'ordre de mission
+      const prompt = `Tu es un auditeur Qualiopi expert, exigeant mais constructif. Tu travailles pour un IFSI.
+      Voici un document de preuve fourni pour valider l'indicateur Qualiopi n°${critere.num} ("${critere.titre}").
+      
+      Voici ce que dit le référentiel officiel pour cet indicateur :
+      - Attendu : ${guide.niveau}
+      - Preuves possibles : ${guide.preuves}
+      - Règle de non-conformité : ${guide.nonConformite}
+
+      Analyse ce document PDF attentivement.
+      1. Ce document te semble-t-il pertinent et correspond-il aux attentes de cet indicateur précis ?
+      2. Si oui, valide-le. Si non, que manque-t-il exactement pour qu'il soit conforme ?
+      
+      Fais un retour très structuré, court et précis, en utilisant des tirets. Ne dis pas bonjour, va droit au but.`;
+
+      // 4. On envoie au cerveau de Gemini
+      const result = await model.generateContent([
+        prompt,
+        { inlineData: { data: base64String, mimeType: "application/pdf" } }
+      ]);
+
+      setAiReport(result.response.text());
+
+    } catch (error) {
+      console.error("Erreur IA:", error);
+      alert("Erreur lors de l'analyse : " + error.message);
+    }
+    setIsAnalyzing(false);
   }
 
   const actFile = data.fichiers.filter(f => !f.archive);
@@ -119,7 +184,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
             
             <div style={{ marginBottom: "16px" }}><label style={lbl}>Responsable(s) assigné(s)</label><MultiSelect disabled={isReadOnly || isAuditMode} selected={data.responsables} onChange={val => setData({ ...data, responsables: val })} /></div>
             
-            {/* ZONE DE DOCUMENTS - LA NOUVELLE FONCTIONNALITÉ */}
             <div style={{ marginBottom: "16px", background: "#f0fdf4", border: "1px solid #6ee7b7", borderRadius: "8px", padding: "12px" }}>
               <label style={{...lbl, color: "#065f46"}}>✅ Documents / Preuves Finalisées</label>
               
@@ -136,14 +200,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
               
               {(!isReadOnly && !isAuditMode) && (
                 <div style={{ position: "relative", marginTop: actFile.length > 0 ? "10px" : "0" }}>
-                  <input type="file" id={`file-${critere.id}`} style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
+                  <input type="file" accept="application/pdf" id={`file-${critere.id}`} style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
                   <label htmlFor={`file-${critere.id}`} style={{ display: "inline-block", background: "white", border: "1px dashed #059669", color: "#059669", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: uploading ? "wait" : "pointer", opacity: uploading ? 0.6 : 1 }}>
-                    {uploading ? "⏳ Envoi en cours..." : "📎 Joindre un document PDF/Word..."}
+                    {uploading ? "⏳ Envoi en cours..." : "📎 Joindre un document PDF..."}
                   </label>
                 </div>
               )}
 
-              {/* ARCHIVES / ANCIENNES PREUVES */}
               {archFile.length > 0 && (
                 <div style={{ marginTop: "16px", paddingTop: "12px", borderTop: "1px dashed #a7f3d0" }}>
                   <div style={{ fontSize: "11px", color: "#b45309", fontWeight: "700", marginBottom: "8px", textTransform: "uppercase" }}>⚠️ Documents du précédent Audit (À vérifier)</div>
@@ -159,6 +222,20 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                 </div>
               )}
             </div>
+
+            {/* LE BLOC IA APPARAÎT ICI SI L'ANALYSE EST FAITE */}
+            {aiReport && (
+              <div className="no-print" style={{ marginBottom: "16px", background: "#faf5ff", border: "1px solid #d8b4fe", borderRadius: "8px", padding: "16px" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
+                  <span style={{ fontSize: "18px" }}>✨</span>
+                  <h4 style={{ margin: 0, color: "#6b21a8", fontSize: "14px", fontWeight: "800" }}>Rapport du Pré-Auditeur IA</h4>
+                </div>
+                <div style={{ fontSize: "13px", color: "#4c1d95", lineHeight: "1.6", whiteSpace: "pre-wrap", fontFamily: "sans-serif" }}>
+                  {aiReport}
+                </div>
+                <button onClick={() => setAiReport("")} style={{ marginTop: "12px", background: "none", border: "none", color: "#9333ea", cursor: "pointer", fontSize: "11px", fontWeight: "700", textDecoration: "underline", padding: 0 }}>Masquer ce rapport</button>
+              </div>
+            )}
 
             <div style={{ marginBottom: "16px" }}>
               <label style={lbl}>{isAuditMode ? "Liens externes (Sharepoint, Sites)" : "✅ Liens Sharepoint / Remarques de validation"}</label>
@@ -177,12 +254,14 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
           
-          {/* BOUTON IA (Désactivé pour l'instant, prépare le terrain) */}
-          {(!isReadOnly && !isAuditMode && actFile.length > 0) ? (
-            <button className="no-print" onClick={() => alert("🤖 Bientôt ! Vous pourrez bientôt cliquer ici pour que Gemini lise vos documents et vous dise s'ils sont conformes au critère Qualiopi.")} style={{ padding: "8px 16px", background: "linear-gradient(135deg, #a855f7, #6366f1)", border: "none", borderRadius: "8px", color: "white", cursor: "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px" }}>
-              <span>✨</span> Analyser les preuves avec l'IA
-            </button>
-          ) : <div></div>}
+          {/* LE VRAI BOUTON D'ACTIVATION DE L'IA */}
+          <div style={{ display: "flex", gap: "10px" }}>
+            {(!isReadOnly && !isAuditMode && actFile.length > 0) ? (
+              <button className="no-print" onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ padding: "8px 16px", background: "linear-gradient(135deg, #a855f7, #6366f1)", border: "none", borderRadius: "8px", color: "white", cursor: isAnalyzing ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", opacity: isAnalyzing ? 0.7 : 1 }}>
+                <span>✨</span> {isAnalyzing ? "L'IA lit votre document..." : "Auditer ce PDF avec l'IA"}
+              </button>
+            ) : <div />}
+          </div>
 
           <div className="no-print" style={{ display: "flex", gap: "10px" }}>
             <button onClick={onClose} style={{ padding: "10px 22px", background: "white", border: "1px solid #d1d5db", borderRadius: "8px", color: "#374151", cursor: "pointer", fontSize: "13px", fontWeight: "600" }}>{(isReadOnly || isAuditMode) ? "Fermer" : "Annuler"}</button>
