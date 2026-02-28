@@ -65,7 +65,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setUploading(false);
   }
 
-  // CORRECTION ICI : La corbeille est maintenant plus intelligente
   async function handleDeleteFile(fileToDelete) {
     if (!window.confirm(`Supprimer définitivement le document "${fileToDelete.name}" ?`)) return;
     try {
@@ -76,21 +75,30 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     } catch (error) { 
       console.warn("Fichier introuvable sur le serveur, mais on le supprime de l'affichage.");
     }
-    // Quoi qu'il arrive, on l'enlève de la liste visuelle !
     setData({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) });
   }
 
   async function handleAIAnalysis() {
     const actFile = data.fichiers.filter(f => !f.archive);
-    if (actFile.length === 0) return alert("Veuillez d'abord joindre un document PDF à analyser !");
+    if (actFile.length === 0) return alert("Veuillez d'abord joindre un document à analyser !");
     
-    const fileToAnalyze = actFile[0];
-    if (!fileToAnalyze.name.toLowerCase().endsWith('.pdf')) {
-      return alert("Pour le moment, l'IA Gemini ne peut analyser que les fichiers PDF. Veuillez utiliser un PDF.");
+    const fileToAnalyze = actFile[actFile.length - 1]; // On analyse le dernier ajouté
+    
+    // Détermination du format
+    const ext = fileToAnalyze.name.split('.').pop().toLowerCase();
+    let docMimeType = 'application/pdf';
+    
+    if (['jpg', 'jpeg'].includes(ext)) docMimeType = 'image/jpeg';
+    else if (ext === 'png') docMimeType = 'image/png';
+    else if (ext === 'webp') docMimeType = 'image/webp';
+    else if (ext !== 'pdf') {
+      setAiReport(`⚠️ Format non supporté pour "${fileToAnalyze.name}". L'IA Gemini intégrée peut lire les fichiers PDF et les Images (JPG, PNG, WEBP). Veuillez convertir votre document Word ou Excel en PDF avant de l'analyser.`);
+      return;
     }
 
     setIsAnalyzing(true);
-    setAiReport("");
+    // On affiche l'état d'avancement directement dans la boîte du rapport
+    setAiReport("⏳ L'IA Gemini est en train de lire et d'analyser le document. Cela peut prendre quelques secondes...");
     
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
@@ -103,7 +111,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const arrayBuffer = await getBytes(fileRef);
 
       const base64String = await new Promise((resolve, reject) => {
-        const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
+        const blob = new Blob([arrayBuffer], { type: docMimeType });
         const reader = new FileReader();
         reader.onloadend = () => resolve(reader.result.split(',')[1]);
         reader.onerror = reject;
@@ -126,14 +134,14 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
       const result = await model.generateContent([
         prompt,
-        { inlineData: { data: base64String, mimeType: "application/pdf" } }
+        { inlineData: { data: base64String, mimeType: docMimeType } }
       ]);
 
       setAiReport(result.response.text());
 
     } catch (error) {
       console.error("Erreur IA:", error);
-      alert("Erreur lors de l'analyse : " + error.message);
+      setAiReport(`❌ Erreur lors de l'analyse.\n\nDétail de l'erreur : ${error.message}\n\nAstuces :\n- Si l'erreur est "fetch failed", vérifiez que votre bloqueur de publicité ne bloque pas l'IA.\n- Si l'erreur mentionne "API_KEY", c'est que Vercel n'a pas appliqué la clé secrète.`);
     }
     setIsAnalyzing(false);
   }
@@ -148,7 +156,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "24px", paddingBottom: "16px", borderBottom: "1px solid #f1f5f9" }}>
           <span style={{ padding: "5px 12px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "14px", fontWeight: "800", textAlign: "center", border: `1px solid ${cfg.color}30`, whiteSpace: "nowrap" }}>{critere.num || "-"}</span>
-          <div style={{ flex: 1 }}><div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre || "-"}</div><div style={{ fontSize: "12px", color: "#6b7280", fontWeight: "600" }}>CRITÈRE {critere.critere} — {cfg.label}</div></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre || "-"}</div><div style={{ fontSize: "12px", color: "#6b7280", fontWeight: "600" }}>{cfg.label}</div></div>
           {isReadOnly && <span style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", marginRight: "10px" }}>🔒 ARCHIVE</span>}
           <button className="no-print" onClick={onClose} style={{ background: "none", border: "none", color: "#9ca3af", fontSize: "22px", cursor: "pointer", lineHeight: 1 }}>x</button>
         </div>
@@ -198,9 +206,10 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
               
               {(!isReadOnly && !isAuditMode) && (
                 <div style={{ position: "relative", marginTop: actFile.length > 0 ? "10px" : "0" }}>
-                  <input type="file" accept="application/pdf" id={`file-${critere.id}`} style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
+                  {/* MODIFICATION ICI : On accepte aussi les images pour l'upload */}
+                  <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" id={`file-${critere.id}`} style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
                   <label htmlFor={`file-${critere.id}`} style={{ display: "inline-block", background: "white", border: "1px dashed #059669", color: "#059669", padding: "6px 14px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", cursor: uploading ? "wait" : "pointer", opacity: uploading ? 0.6 : 1 }}>
-                    {uploading ? "⏳ Envoi en cours..." : "📎 Joindre un document PDF..."}
+                    {uploading ? "⏳ Envoi en cours..." : "📎 Joindre un document (PDF ou Image)..."}
                   </label>
                 </div>
               )}
@@ -221,6 +230,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
               )}
             </div>
 
+            {/* LE BLOC IA (Rapport ou Erreur s'affiche ici) */}
             {aiReport && (
               <div className="no-print" style={{ marginBottom: "16px", background: "#faf5ff", border: "1px solid #d8b4fe", borderRadius: "8px", padding: "16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
@@ -230,7 +240,9 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                 <div style={{ fontSize: "13px", color: "#4c1d95", lineHeight: "1.6", whiteSpace: "pre-wrap", fontFamily: "sans-serif" }}>
                   {aiReport}
                 </div>
-                <button onClick={() => setAiReport("")} style={{ marginTop: "12px", background: "none", border: "none", color: "#9333ea", cursor: "pointer", fontSize: "11px", fontWeight: "700", textDecoration: "underline", padding: 0 }}>Masquer ce rapport</button>
+                {!isAnalyzing && (
+                  <button onClick={() => setAiReport("")} style={{ marginTop: "12px", background: "none", border: "none", color: "#9333ea", cursor: "pointer", fontSize: "11px", fontWeight: "700", textDecoration: "underline", padding: 0 }}>Masquer ce rapport</button>
+                )}
               </div>
             )}
 
@@ -254,7 +266,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
           <div style={{ display: "flex", gap: "10px" }}>
             {(!isReadOnly && !isAuditMode && actFile.length > 0) ? (
               <button className="no-print" onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ padding: "8px 16px", background: "linear-gradient(135deg, #a855f7, #6366f1)", border: "none", borderRadius: "8px", color: "white", cursor: isAnalyzing ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", opacity: isAnalyzing ? 0.7 : 1 }}>
-                <span>✨</span> {isAnalyzing ? "L'IA lit votre document..." : "Auditer ce PDF avec l'IA"}
+                <span>✨</span> {isAnalyzing ? "L'IA lit votre document..." : "Auditer la preuve avec l'IA"}
               </button>
             ) : <div />}
           </div>
