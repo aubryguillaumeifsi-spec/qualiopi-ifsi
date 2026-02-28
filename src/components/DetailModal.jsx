@@ -42,7 +42,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const [data, setData] = useState({ ...critere, responsables: [...(critere.responsables || [])], fichiers: [...(critere.fichiers || [])] });
   const [uploading, setUploading] = useState(false);
   
-  // États dédiés à l'IA Gemini
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiReport, setAiReport] = useState("");
   
@@ -58,7 +57,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setUploading(true);
     try {
       const fileRef = ref(storage, `preuves/${critere.id}_${Date.now()}_${file.name}`);
-      await uploadBytesResumable(fileRef, file);
+      const uploadTask = await uploadBytesResumable(fileRef, file);
       const url = await getDownloadURL(fileRef);
       const newFile = { name: file.name, url: url, path: fileRef.fullPath, archive: false };
       setData({ ...data, fichiers: [...data.fichiers, newFile] });
@@ -66,6 +65,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setUploading(false);
   }
 
+  // CORRECTION ICI : La corbeille est maintenant plus intelligente
   async function handleDeleteFile(fileToDelete) {
     if (!window.confirm(`Supprimer définitivement le document "${fileToDelete.name}" ?`)) return;
     try {
@@ -73,11 +73,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         const fileRef = ref(storage, fileToDelete.path);
         await deleteObject(fileRef);
       }
-      setData({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) });
-    } catch (error) { alert("Erreur suppression : " + error.message); }
+    } catch (error) { 
+      console.warn("Fichier introuvable sur le serveur, mais on le supprime de l'affichage.");
+    }
+    // Quoi qu'il arrive, on l'enlève de la liste visuelle !
+    setData({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) });
   }
 
-  // --- LA FONCTION MAGIQUE DE SCAN IA ---
   async function handleAIAnalysis() {
     const actFile = data.fichiers.filter(f => !f.archive);
     if (actFile.length === 0) return alert("Veuillez d'abord joindre un document PDF à analyser !");
@@ -97,11 +99,9 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const genAI = new GoogleGenerativeAI(apiKey);
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
-      // 1. On télécharge silencieusement le PDF depuis Firebase
       const fileRef = ref(storage, fileToAnalyze.path);
       const arrayBuffer = await getBytes(fileRef);
 
-      // 2. On le convertit en Base64 pour l'IA
       const base64String = await new Promise((resolve, reject) => {
         const blob = new Blob([arrayBuffer], { type: 'application/pdf' });
         const reader = new FileReader();
@@ -110,7 +110,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         reader.readAsDataURL(blob);
       });
 
-      // 3. L'ordre de mission
       const prompt = `Tu es un auditeur Qualiopi expert, exigeant mais constructif. Tu travailles pour un IFSI.
       Voici un document de preuve fourni pour valider l'indicateur Qualiopi n°${critere.num} ("${critere.titre}").
       
@@ -125,7 +124,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       
       Fais un retour très structuré, court et précis, en utilisant des tirets. Ne dis pas bonjour, va droit au but.`;
 
-      // 4. On envoie au cerveau de Gemini
       const result = await model.generateContent([
         prompt,
         { inlineData: { data: base64String, mimeType: "application/pdf" } }
@@ -150,7 +148,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         
         <div style={{ display: "flex", alignItems: "flex-start", gap: "12px", marginBottom: "24px", paddingBottom: "16px", borderBottom: "1px solid #f1f5f9" }}>
           <span style={{ padding: "5px 12px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "14px", fontWeight: "800", textAlign: "center", border: `1px solid ${cfg.color}30`, whiteSpace: "nowrap" }}>{critere.num || "-"}</span>
-          <div style={{ flex: 1 }}><div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre || "-"}</div><div style={{ fontSize: "12px", color: "#6b7280", fontWeight: "600" }}>{cfg.label}</div></div>
+          <div style={{ flex: 1 }}><div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", marginBottom: "3px" }}>{critere.titre || "-"}</div><div style={{ fontSize: "12px", color: "#6b7280", fontWeight: "600" }}>CRITÈRE {critere.critere} — {cfg.label}</div></div>
           {isReadOnly && <span style={{ background: "#fef2f2", color: "#991b1b", border: "1px solid #fca5a5", padding: "4px 10px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", marginRight: "10px" }}>🔒 ARCHIVE</span>}
           <button className="no-print" onClick={onClose} style={{ background: "none", border: "none", color: "#9ca3af", fontSize: "22px", cursor: "pointer", lineHeight: 1 }}>x</button>
         </div>
@@ -223,7 +221,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
               )}
             </div>
 
-            {/* LE BLOC IA APPARAÎT ICI SI L'ANALYSE EST FAITE */}
             {aiReport && (
               <div className="no-print" style={{ marginBottom: "16px", background: "#faf5ff", border: "1px solid #d8b4fe", borderRadius: "8px", padding: "16px" }}>
                 <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
@@ -254,7 +251,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #e2e8f0", paddingTop: "20px" }}>
           
-          {/* LE VRAI BOUTON D'ACTIVATION DE L'IA */}
           <div style={{ display: "flex", gap: "10px" }}>
             {(!isReadOnly && !isAuditMode && actFile.length > 0) ? (
               <button className="no-print" onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ padding: "8px 16px", background: "linear-gradient(135deg, #a855f7, #6366f1)", border: "none", borderRadius: "8px", color: "white", cursor: isAnalyzing ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", opacity: isAnalyzing ? 0.7 : 1 }}>
