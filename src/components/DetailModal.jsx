@@ -105,7 +105,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       if (!apiKey) throw new Error("Clé API Gemini introuvable dans Vercel.");
 
       const genAI = new GoogleGenerativeAI(apiKey);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const fileRef = ref(storage, fileToAnalyze.path);
       const arrayBuffer = await getBytes(fileRef);
