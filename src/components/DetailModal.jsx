@@ -40,6 +40,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     responsables: [...(critere.responsables || [])], 
     fichiers: [...(critere.fichiers || [])],
     preuves: critere.preuves || "", 
+    chemin_reseau: critere.chemin_reseau || "", // <-- NOUVEAU : Le chemin vers le lecteur Z
     preuves_encours: critere.preuves_encours || "", 
     attendus: critere.attendus || "", 
     notes: critere.notes || "" 
@@ -164,6 +165,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setIsAnalyzing(false);
   }
 
+  // Fonction pour copier le chemin réseau dans le presse-papier
+  const copyToClipboard = () => {
+    if (!data.chemin_reseau) return;
+    navigator.clipboard.writeText(data.chemin_reseau);
+    alert("Chemin copié ! Vous pouvez maintenant le coller (Ctrl+V) dans votre explorateur de fichiers Windows.");
+  };
+
   const chantierFiles = data.fichiers.filter(f => !f.validated);
   const validatedFiles = data.fichiers.filter(f => f.validated);
 
@@ -220,26 +228,53 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
             <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "20px", borderRadius: "12px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
               <label style={{ ...lbl, color: "#166534", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>🏛️ Preuves Validées (Présentées à l'Audit)</label>
               
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: (data.preuves || !isAuditMode) ? "16px" : "0" }}>
-                {validatedFiles.length === 0 && <span style={{ fontSize: "12px", color: "#059669", fontStyle: "italic" }}>Aucun fichier validé pour l'instant.</span>}
-                {validatedFiles.map(f => (
-                  <div key={f.url} style={{ background: "white", padding: "6px 12px", borderRadius: "8px", border: "1px solid #6ee7b7", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-                    <a href={f.url} target="_blank" rel="noreferrer" style={{ color: "#059669", textDecoration: "none", fontWeight: "700" }}>📄 {f.name}</a>
-                    {(!isAuditMode && !isReadOnly) && (
-                      <button onClick={() => toggleValidation(f.url)} title="Repasser en chantier" style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#991b1b", cursor: "pointer", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>Retirer</button>
-                    )}
-                  </div>
-                ))}
+              {/* Le champ du chemin réseau Filer Z:\ */}
+              <div style={{ marginBottom: "16px", padding: "12px", background: "white", borderRadius: "8px", border: "1px dashed #34d399" }}>
+                <label style={{ fontSize: "11px", color: "#059669", fontWeight: "700", marginBottom: "6px", display: "block" }}>🔗 Chemin d'accès sécurisé (Lecteur Réseau IFSI)</label>
+                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                  <input 
+                    type="text"
+                    readOnly={isAuditMode || isReadOnly}
+                    value={data.chemin_reseau}
+                    onChange={e => setData({...data, chemin_reseau: e.target.value})}
+                    placeholder="Ex: Z:\QUALIOPI_2026\Indicateur_1\mon_fichier.pdf"
+                    style={{ ...inp, flex: 1, borderColor: "#a7f3d0", color: "#064e3b", fontFamily: "monospace", fontSize: "12px" }}
+                  />
+                  <button 
+                    onClick={copyToClipboard}
+                    disabled={!data.chemin_reseau}
+                    style={{ background: data.chemin_reseau ? "#10b981" : "#d1d5db", color: "white", border: "none", padding: "10px 16px", borderRadius: "8px", cursor: data.chemin_reseau ? "pointer" : "not-allowed", fontWeight: "bold", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px" }}
+                    title="Copier pour ouvrir dans l'explorateur Windows"
+                  >
+                    📋 Copier
+                  </button>
+                </div>
+                {!isAuditMode && <p style={{ fontSize: "10px", color: "#64748b", margin: "6px 0 0 0", fontStyle: "italic" }}>En mode audit, il suffira de cliquer sur Copier et de coller le chemin dans le dossier jaune de Windows.</p>}
               </div>
 
+              {/* Fichiers Validés (Ancien système cloud gardé pour compatibilité) */}
+              {validatedFiles.length > 0 && (
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
+                  {validatedFiles.map(f => (
+                    <div key={f.url} style={{ background: "white", padding: "6px 12px", borderRadius: "8px", border: "1px solid #6ee7b7", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+                      <a href={f.url} target="_blank" rel="noreferrer" style={{ color: "#059669", textDecoration: "none", fontWeight: "700" }}>📄 {f.name}</a>
+                      {(!isAuditMode && !isReadOnly) && (
+                        <button onClick={() => toggleValidation(f.url)} title="Repasser en chantier" style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#991b1b", cursor: "pointer", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>Retirer</button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Texte de preuve classique */}
               {(data.preuves || (!isAuditMode && !isReadOnly)) && (
-                <div style={{ marginTop: validatedFiles.length > 0 ? "10px" : "0" }}>
-                  <label style={{ fontSize: "11px", color: "#059669", fontWeight: "700", marginBottom: "6px", display: "block" }}>Justifications textuelles / Liens Sharepoint :</label>
+                <div>
+                  <label style={{ fontSize: "11px", color: "#059669", fontWeight: "700", marginBottom: "6px", display: "block" }}>Justifications textuelles (ou liens web publics) :</label>
                   <textarea 
                     readOnly={isAuditMode || isReadOnly} 
                     value={data.preuves} 
                     onChange={e => setData({...data, preuves: e.target.value})} 
-                    placeholder="Inscrire ici les preuves textuelles (ex: validé en CSE le...), ou coller un lien vers l'intranet..." 
+                    placeholder="Inscrire ici les preuves textuelles (ex: validé en CSE le...), ou coller un lien vers un site internet..." 
                     style={{ ...inp, height: "70px", resize: "vertical", background: (isAuditMode || isReadOnly) ? "transparent" : "white", border: (isAuditMode || isReadOnly) ? "none" : "1px solid #6ee7b7", padding: (isAuditMode || isReadOnly) ? "0" : "12px", color: "#166534" }} 
                   />
                 </div>
@@ -279,7 +314,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
                   {!isReadOnly && (
                     <>
-                      {/* --- NOUVEAU BANDEAU RGPD ICI --- */}
+                      {/* Bandeau RGPD */}
                       <div style={{ background: "#fef2f2", borderLeft: "4px solid #ef4444", borderTop: "1px solid #fee2e2", borderRight: "1px solid #fee2e2", borderBottom: "1px solid #fee2e2", padding: "10px 14px", marginBottom: "16px", borderRadius: "0 8px 8px 0", fontSize: "12px", color: "#991b1b" }}>
                         <strong style={{ display: "block", marginBottom: "4px" }}>⚠️ Avertissement RGPD (Confidentialité)</strong>
                         Merci de ne téléverser <b>aucune donnée personnelle</b> (noms, dossiers étudiants/formateurs). Veuillez anonymiser vos documents (biffage) ou utiliser des trames vierges avant l'envoi.
