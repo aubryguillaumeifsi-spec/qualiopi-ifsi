@@ -32,8 +32,10 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     ...critere, 
     responsables: [...(critere.responsables || [])], 
     fichiers: [...(critere.fichiers || [])],
-    preuves_encours: critere.preuves_encours || "",
-    attendus: critere.attendus || ""
+    preuves: critere.preuves || "", // Zone Coffre-fort (Texte)
+    preuves_encours: critere.preuves_encours || "", // Zone Chantier (Texte)
+    attendus: critere.attendus || "",
+    notes: critere.notes || ""
   });
   const [uploading, setUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -44,7 +46,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const lbl = { display: "block", fontSize: "11px", color: "#6b7280", textTransform: "uppercase", fontWeight: "700", marginBottom: "5px" };
   const inp = { background: (isReadOnly || isAuditMode) ? "#f9fafb" : "white", border: "1px solid #d1d5db", borderRadius: "8px", padding: "10px", fontSize: "13px", width: "100%", outline: "none" };
 
-  // --- LOGIQUE FICHIERS ---
   async function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -53,8 +54,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const fileRef = ref(storage, `preuves/${critere.id}_${Date.now()}_${file.name}`);
       await uploadBytesResumable(fileRef, file);
       const url = await getDownloadURL(fileRef);
-      // Par défaut, un nouveau fichier arrive en mode "chantier" (archive: true pour nous servir de marqueur temporaire ou un nouveau champ)
-      // Utilisons une propriété 'validated' pour trier
       const newFile = { name: file.name, url: url, path: fileRef.fullPath, validated: false };
       setData({ ...data, fichiers: [...data.fichiers, newFile] });
     } catch (error) { alert("Erreur : " + error.message); }
@@ -74,20 +73,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setData({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) });
   }
 
-  // --- LOGIQUE IA ---
   async function handleAIAnalysis() {
     const chantierFiles = data.fichiers.filter(f => !f.validated);
     if (chantierFiles.length === 0) return alert("Aucun document dans la zone chantier !");
-    
     const file = chantierFiles[chantierFiles.length - 1];
     const ext = file.name.split('.').pop().toLowerCase();
     let mime = (ext === 'pdf') ? 'application/pdf' : (['jpg','jpeg','png','webp'].includes(ext)) ? `image/${ext === 'jpg' ? 'jpeg' : ext}` : null;
-
-    if (!mime) {
-      setAiReport(`⚠️ Format ${ext.toUpperCase()} non supporté. Convertissez en PDF.`);
-      return;
-    }
-
+    if (!mime) return alert(`Format ${ext.toUpperCase()} non supporté.`);
     setIsAnalyzing(true);
     setAiReport("⏳ Analyse IA en cours...");
     try {
@@ -95,11 +87,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
       const arrayBuffer = await getBytes(ref(storage, file.path));
       const base64 = btoa(new Uint8Array(arrayBuffer).reduce((d, b) => d + String.fromCharCode(b), ''));
-
-      const prompt = `Auditeur Qualiopi IFSI. Analyse ce document pour l'Indicateur ${critere.num}. 
-      Attendu: ${guide.niveau}. Preuves: ${guide.preuves}.
-      Dis-moi si c'est pertinent et ce qu'il manque.`;
-
+      const prompt = `Auditeur Qualiopi. Analyse l'indicateur ${critere.num}. Attendu: ${guide.niveau}. Preuves: ${guide.preuves}.`;
       const result = await model.generateContent([prompt, { inlineData: { data: base64, mimeType: mime } }]);
       setAiReport(result.response.text());
     } catch (e) { setAiReport("❌ Erreur: " + e.message); }
@@ -113,89 +101,95 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={onClose}>
       <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "24px", width: "100%", maxWidth: "1100px", maxHeight: "95vh", overflowY: "auto" }} onClick={e => e.stopPropagation()}>
         
-        {/* Header */}
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px", borderBottom: "1px solid #eee", paddingBottom: "10px" }}>
-          <div>
-            <h2 style={{ margin: 0, fontSize: "18px", color: cfg.color }}>{critere.num} : {critere.titre}</h2>
-            <span style={{ fontSize: "12px", color: "#666" }}>{cfg.label}</span>
-          </div>
+          <div><h2 style={{ margin: 0, fontSize: "18px", color: cfg.color }}>{critere.num} : {critere.titre}</h2></div>
           <button onClick={onClose} style={{ border: "none", background: "none", fontSize: "20px", cursor: "pointer" }}>×</button>
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px" }}>
-          
-          {/* Colonne Gauche : Référentiel */}
           <div style={{ background: "#f8fafc", padding: "15px", borderRadius: "12px", fontSize: "13px" }}>
-            <h3 style={{ ...lbl, color: "#1e3a5f", borderBottom: "1px solid #ddd" }}>📘 Référentiel Officiel</h3>
+            <h3 style={{ ...lbl, color: "#1e3a5f" }}>📘 Référentiel</h3>
             <p><strong>Attendu :</strong> {guide.niveau}</p>
-            <p><strong>Preuves suggérées :</strong> {guide.preuves}</p>
-            <div style={{ background: "#fee2e2", padding: "10px", borderRadius: "6px", color: "#991b1b", marginTop: "10px" }}>
-              <strong>⚠️ Non-conformité :</strong> {guide.nonConformite}
-            </div>
+            <p><strong>Preuves :</strong> {guide.preuves}</p>
+            {!isAuditMode && (
+               <div style={{ background: "#fee2e2", padding: "10px", borderRadius: "6px", color: "#991b1b", marginTop: "10px" }}>
+                 <strong>⚠️ Non-conformité :</strong> {guide.nonConformite}
+               </div>
+            )}
           </div>
 
-          {/* Colonne Droite : Travail */}
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "15px" }}>
-              <div><label style={lbl}>Statut</label><select value={data.statut} onChange={e => setData({...data, statut: e.target.value})} style={inp}>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
-              <div><label style={lbl}>Responsables</label><MultiSelect selected={data.responsables} onChange={v => setData({...data, responsables: v})} /></div>
+              <div><label style={lbl}>Statut</label><select disabled={isAuditMode} value={data.statut} onChange={e => setData({...data, statut: e.target.value})} style={inp}>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select></div>
+              <div><label style={lbl}>Responsables</label><MultiSelect disabled={isAuditMode} selected={data.responsables} onChange={v => setData({...data, responsables: v})} /></div>
             </div>
 
-            {/* --- ZONE 1 : CHANTIER (EN COURS) --- */}
-            <div style={{ background: "#fffbeb", border: "1px solid #fef3c7", padding: "15px", borderRadius: "12px", marginBottom: "15px" }}>
-              <label style={{ ...lbl, color: "#92400e" }}>🚧 Zone Chantier (Preuves en cours & Analyse IA)</label>
-              <textarea value={data.preuves_encours} onChange={e => setData({...data, preuves_encours: e.target.value})} placeholder="Notes sur le travail en cours..." style={{ ...inp, height: "60px", marginBottom: "10px", borderColor: "#fcd34d" }} />
-              
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "10px" }}>
-                {chantierFiles.map(f => (
-                  <div key={f.url} style={{ background: "white", padding: "5px 10px", borderRadius: "6px", border: "1px solid #fcd34d", fontSize: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
-                    <span>{f.name}</span>
-                    <button onClick={() => toggleValidation(f.url)} style={{ background: "#d1fae5", border: "none", color: "#065f46", cursor: "pointer", padding: "2px 5px", borderRadius: "4px", fontWeight: "bold" }}>Valider ✅</button>
-                    <button onClick={() => handleDeleteFile(f)} style={{ color: "red", border: "none", background: "none", cursor: "pointer" }}>🗑️</button>
-                  </div>
-                ))}
-              </div>
-              
-              <div style={{ display: "flex", gap: "10px" }}>
-                <input type="file" id="file-chantier" style={{ display: "none" }} onChange={handleFileUpload} />
-                <label htmlFor="file-chantier" style={{ background: "white", border: "1px dashed #d97706", padding: "5px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>📎 Ajouter au chantier</label>
-                {chantierFiles.length > 0 && <button onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ background: "#7c3aed", color: "white", border: "none", padding: "5px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>✨ Analyser avec l'IA</button>}
-              </div>
-
-              {aiReport && (
-                <div style={{ marginTop: "10px", background: "#faf5ff", padding: "10px", borderRadius: "8px", border: "1px solid #d8b4fe", fontSize: "12px", whiteSpace: "pre-wrap" }}>
-                  <strong>Rapport IA :</strong><br/>{aiReport}
-                </div>
-              )}
-            </div>
-
-            {/* --- ZONE 2 : COFFRE-FORT (VALIDÉ) --- */}
+            {/* --- ZONE 1 : COFFRE-FORT (OFFICIEL) --- */}
             <div style={{ background: "#f0fdf4", border: "1px solid #dcfce7", padding: "15px", borderRadius: "12px", marginBottom: "15px" }}>
-              <label style={{ ...lbl, color: "#166534" }}>🏛️ Preuves Validées (Audit)</label>
-              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px" }}>
-                {validatedFiles.length === 0 && <span style={{ fontSize: "12px", color: "#888" }}>Aucun fichier validé pour l'instant.</span>}
+              <label style={{ ...lbl, color: "#166534" }}>🏛️ Preuves Validées (Zone Audit)</label>
+              
+              {/* Fichiers Validés */}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: data.preuves ? "10px" : "0" }}>
                 {validatedFiles.map(f => (
                   <div key={f.url} style={{ background: "white", padding: "5px 10px", borderRadius: "6px", border: "1px solid #86efac", fontSize: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
                     <a href={f.url} target="_blank" rel="noreferrer" style={{ color: "#166534", textDecoration: "none", fontWeight: "bold" }}>📄 {f.name}</a>
-                    <button onClick={() => toggleValidation(f.url)} style={{ background: "#fee2e2", border: "none", color: "#991b1b", cursor: "pointer", padding: "2px 5px", borderRadius: "4px" }}>Annuler</button>
+                    {!isAuditMode && <button onClick={() => toggleValidation(f.url)} style={{ background: "#fee2e2", border: "none", color: "#991b1b", cursor: "pointer", padding: "2px 5px", borderRadius: "4px" }}>Annuler</button>}
                   </div>
                 ))}
               </div>
+
+              {/* Texte de preuve (pour les preuves sans fichiers) */}
+              {(data.preuves || !isAuditMode) && (
+                <textarea 
+                  readOnly={isAuditMode} 
+                  value={data.preuves} 
+                  onChange={e => setData({...data, preuves: e.target.value})} 
+                  placeholder="Inscrire ici les preuves textuelles ou liens web validés..." 
+                  style={{ ...inp, height: "60px", background: isAuditMode ? "transparent" : "white", border: isAuditMode ? "none" : "1px solid #86efac", padding: isAuditMode ? "0" : "10px" }} 
+                />
+              )}
             </div>
 
-            {/* --- ZONE 3 : REMARQUES AUDITEUR --- */}
-            <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "15px", borderRadius: "12px" }}>
-              <label style={lbl}>📝 Remarques de l'évaluateur (Audit précédent/en cours)</label>
-              <textarea value={data.attendus} onChange={e => setData({...data, attendus: e.target.value})} placeholder="Inscrire ici les retours de l'auditeur..." style={{ ...inp, height: "60px" }} />
-            </div>
+            {/* --- ZONE 2 : CHANTIER & NOTES (MASQUÉ EN MODE AUDIT) --- */}
+            {!isAuditMode && (
+              <>
+                <div style={{ background: "#fffbeb", border: "1px solid #fef3c7", padding: "15px", borderRadius: "12px", marginBottom: "15px" }}>
+                  <label style={{ ...lbl, color: "#92400e" }}>🚧 Chantier (En cours / IA)</label>
+                  <textarea value={data.preuves_encours} onChange={e => setData({...data, preuves_encours: e.target.value})} placeholder="Notes de chantier..." style={{ ...inp, height: "50px", marginBottom: "10px" }} />
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: "8px", marginBottom: "10px" }}>
+                    {chantierFiles.map(f => (
+                      <div key={f.url} style={{ background: "white", padding: "5px 10px", borderRadius: "6px", border: "1px solid #fcd34d", fontSize: "12px", display: "flex", alignItems: "center", gap: "8px" }}>
+                        <span>{f.name}</span>
+                        <button onClick={() => toggleValidation(f.url)} style={{ background: "#d1fae5", border: "none", color: "#065f46", cursor: "pointer", padding: "2px 5px", borderRadius: "4px" }}>Valider ✅</button>
+                        <button onClick={() => handleDeleteFile(f)} style={{ color: "red", border: "none", background: "none", cursor: "pointer" }}>🗑️</button>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ display: "flex", gap: "10px" }}>
+                    <input type="file" id="file-chantier" style={{ display: "none" }} onChange={handleFileUpload} />
+                    <label htmlFor="file-chantier" style={{ background: "white", border: "1px dashed #d97706", padding: "5px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>📎 Ajouter</label>
+                    {chantierFiles.length > 0 && <button onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ background: "#7c3aed", color: "white", border: "none", padding: "5px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "12px" }}>✨ IA</button>}
+                  </div>
+                  {aiReport && <div style={{ marginTop: "10px", background: "white", padding: "10px", borderRadius: "8px", fontSize: "12px", border: "1px solid #d8b4fe", whiteSpace: "pre-wrap" }}>{aiReport}</div>}
+                </div>
 
+                <div style={{ background: "#f8fafc", border: "1px solid #e2e8f0", padding: "15px", borderRadius: "12px", marginBottom: "15px" }}>
+                  <label style={lbl}>📝 Historique / Remarques de l'évaluateur</label>
+                  <textarea value={data.attendus} onChange={e => setData({...data, attendus: e.target.value})} placeholder="Retours des précédents audits..." style={{ ...inp, height: "50px" }} />
+                </div>
+
+                <div style={{ background: "#f9fafb", border: "1px solid #d1d5db", padding: "15px", borderRadius: "12px" }}>
+                  <label style={lbl}>🕵️ Notes personnelles (Privé)</label>
+                  <textarea value={data.notes} onChange={e => setData({...data, notes: e.target.value})} placeholder="Rappels internes..." style={{ ...inp, height: "40px", borderStyle: "dashed" }} />
+                </div>
+              </>
+            )}
           </div>
         </div>
 
-        {/* Footer Actions */}
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px", paddingTop: "15px", borderTop: "1px solid #eee" }}>
-          <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: "8px", border: "1px solid #ccc", cursor: "pointer" }}>Annuler</button>
-          <button onClick={() => onSave(data)} style={{ padding: "8px 30px", borderRadius: "8px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", border: "none", fontWeight: "bold", cursor: "pointer" }}>Enregistrer</button>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: "10px", marginTop: "20px" }}>
+          <button onClick={onClose} style={{ padding: "8px 20px", borderRadius: "8px", border: "1px solid #ccc", cursor: "pointer" }}>Fermer</button>
+          {!isAuditMode && <button onClick={() => onSave(data)} style={{ padding: "8px 30px", borderRadius: "8px", background: "#1d4ed8", color: "white", border: "none", fontWeight: "bold", cursor: "pointer" }}>Enregistrer</button>}
         </div>
       </div>
     </div>
