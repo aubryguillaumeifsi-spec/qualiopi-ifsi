@@ -4,18 +4,21 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  // On récupère la clé depuis le fichier .env (en local) ou Vercel (en ligne)
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
-  authDomain: "qualiopi-tracker-v2.firebaseapp.com",
-  projectId: "qualiopi-tracker-v2",
-  storageBucket: "qualiopi-tracker-v2.firebasestorage.app",
-  messagingSenderId: "561921109114",
-  appId: "1:561921109114:web:0e1e0296b5b918a0ea1fc3"
+  authDomain: import.meta.env.VITE_FIREBASE_AUTH_DOMAIN,
+  projectId: import.meta.env.VITE_FIREBASE_PROJECT_ID,
+  storageBucket: import.meta.env.VITE_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: import.meta.env.VITE_FIREBASE_MESSAGING_SENDER_ID,
+  appId: import.meta.env.VITE_FIREBASE_APP_ID
 };
 
-// Initialisation
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 export const auth = getAuth(app);
-export const storage = getStorage(app); 
-export const DOC_REF = doc(db, "qualiopi", "criteres");
+export const storage = getStorage(app);
+
+// NOUVELLE LOGIQUE : Fonction pour cibler le bon établissement
+// On passe d'un document fixe à une collection "etablissements"
+export const getEtablissementRef = (etablissementId) => {
+  return doc(db, "etablissements", etablissementId || "demo_ifps_cham");
+};
