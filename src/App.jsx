@@ -27,7 +27,6 @@ function ProgressBar({ value, max, color }) {
   return <div style={{ background: "#f1f5f9", borderRadius: "4px", height: "7px", overflow: "hidden" }}><div style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color, height: "100%", borderRadius: "4px", transition: "width 0.8s ease" }} /></div>;
 }
 
-// --- COMPOSANT PRINCIPAL ---
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -42,7 +41,6 @@ export default function App() {
   const [modalCritere, setModalCritere] = useState(null);
   const [isAuditMode, setIsAuditMode] = useState(false);
 
-  // 1. Surveillance de l'état de connexion
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -57,12 +55,11 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // 2. Chargement des données selon l'établissement de l'utilisateur
   async function loadUserDataAndContent(user) {
     try {
-      // Récupérer le profil utilisateur (pour avoir l'etablissementId)
+      // 1. Récupération du profil utilisateur
       const userDoc = await getDoc(doc(db, "users", user.uid));
-      let etablissementId = "demo_ifps_cham"; // Valeur par défaut
+      let etablissementId = "demo_ifps_cham";
       
       if (userDoc.exists()) {
         const userData = userDoc.data();
@@ -70,17 +67,33 @@ export default function App() {
         etablissementId = userData.etablissementId || etablissementId;
       }
 
-      // Charger les données de l'établissement
+      // 2. Ciblage de l'établissement
       const etabRef = getEtablissementRef(etablissementId);
-      const snap = await getDoc(etabRef);
+      let snap = await getDoc(etabRef);
 
-      if (snap.exists()) {
+      // --- LOGIQUE DE MIGRATION AUTOMATIQUE ---
+      // Si le tiroir établissement existe mais n'a pas de données, on tente de copier l'ancien "qualiopi/data"
+      if (!snap.exists() || !snap.data().campaigns) {
+        const oldSnap = await getDoc(doc(db, "qualiopi", "data")); 
+        if (oldSnap.exists()) {
+          const oldData = oldSnap.data();
+          await setDoc(etabRef, { 
+            campaigns: oldData.campaigns, 
+            updatedAt: new Date().toISOString(),
+            nom: "IFPS du CHAM (Migré)" 
+          }, { merge: true });
+          snap = await getDoc(etabRef);
+        }
+      }
+
+      // 3. Initialisation de l'interface
+      if (snap.exists() && snap.data().campaigns) {
         const d = snap.data();
-        if (d.campaigns && d.campaigns.length > 0) {
-          setCampaigns(d.campaigns); 
-          setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
-        } else { initDefault(); }
-      } else { initDefault(); }
+        setCampaigns(d.campaigns); 
+        setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
+      } else {
+        initDefault();
+      }
     } catch (e) {
       console.error("Erreur de chargement:", e);
       initDefault();
@@ -97,7 +110,7 @@ export default function App() {
     setCampaigns(newCampaigns); setSaveStatus("saving");
     try {
       const etabRef = getEtablissementRef(userProfile.etablissementId);
-      await setDoc(etabRef, { campaigns: newCampaigns, updatedAt: new Date().toISOString() });
+      await setDoc(etabRef, { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
       setSaveStatus("saved"); setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (e) {
       setSaveStatus("error"); setTimeout(() => setSaveStatus("idle"), 3000);
@@ -106,31 +119,9 @@ export default function App() {
 
   const handleLogout = () => signOut(auth);
 
-  // --- LOGIQUE MÉTIER ---
-  function handleNewCampaign(e) {
-    if (e.target.value === "NEW") {
-      const name = prompt("Nom de la nouvelle certification :");
-      if (name && name.trim() !== "") {
-        const auditDate = prompt("Date prévue (AAAA-MM-JJ) :", "2027-01-01");
-        const latest = campaigns[campaigns.length - 1]; 
-        const duplicatedListe = latest.liste.map(c => ({
-          ...c, 
-          statut: c.statut === "non-concerne" ? "non-concerne" : "en-cours",
-          fichiers: (c.fichiers || []).map(f => ({ ...f, archive: true })),
-          preuves: "",
-          preuves_encours: c.preuves ? `[Preuves précédentes]\n${c.preuves}` : c.preuves_encours 
-        }));
-        const locked = campaigns.map(c => ({ ...c, locked: true }));
-        const newCamp = { id: Date.now().toString(), name: name.trim(), auditDate, liste: duplicatedListe, locked: false };
-        saveData([...locked, newCamp]);
-        setActiveCampaignId(newCamp.id);
-      }
-    } else { setActiveCampaignId(e.target.value); }
-  }
-
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
-  if (!campaigns || !activeCampaignId) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>⏳ Chargement de QualiForma...</div>;
+  if (!campaigns || !activeCampaignId) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>⏳ Chargement de QualiForma...</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
   const criteres = currentCampaign.liste || [];
@@ -151,7 +142,6 @@ export default function App() {
     return true;
   });
 
-  // --- STYLE ---
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563" });
 
   return (
@@ -164,15 +154,11 @@ export default function App() {
 
       <header style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "14px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-          <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M11 2C6 2 2 6 2 11s4 9 9 9 9-4 9-9-4-9-9-9zm0 16c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z" fill="#1d4ed8"/><path d="M10.5 14.5l-3-3 1.4-1.4 1.6 1.6 4.6-4.6 1.4 1.4-6 6z" fill="#1d4ed8"/></svg>
+          <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs><path fillRule="evenodd" clipRule="evenodd" d="M11 2C6 2 2 6 2 11s4 9 9 9 9-4 9-9-4-9-9-9zm0 16c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z" fill="url(#g)"/><path d="M10.5 14.5l-3-3 1.4-1.4 1.6 1.6 4.6-4.6 1.4 1.4-6 6z" fill="url(#g)"/></svg>
           <h1 style={{ fontSize: "18px", fontWeight: "800", margin: 0 }}>QualiForma <span style={{fontSize:"10px", color:"#94a3b8"}}>V2.0</span></h1>
-          <select value={activeCampaignId} onChange={handleNewCampaign} style={{ marginLeft: "20px", padding: "6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>
-            {campaigns.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            <option value="NEW">+ Nouvelle évaluation</option>
-          </select>
         </div>
         <nav style={{ display: "flex", gap: "8px" }}>
-          {["dashboard", "criteres", "kanban"].map(t => <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{t.toUpperCase()}</button>)}
+          {["dashboard", "criteres"].map(t => <button key={t} style={navBtn(activeTab === t)} onClick={() => setActiveTab(t)}>{t.toUpperCase()}</button>)}
           <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444" }}>Déconnexion</button>
         </nav>
       </header>
@@ -180,10 +166,9 @@ export default function App() {
       <main style={{ maxWidth: "1200px", margin: "0 auto", padding: "32px" }}>
         {activeTab === "dashboard" && (
           <div style={{ display: "grid", gap: "24px" }}>
-            {/* Barre de progression globale */}
             <div style={{ background: "white", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "12px" }}>
-                <span style={{ fontWeight: "800" }}>Progression Globale</span>
+                <span style={{ fontWeight: "800" }}>Progression {userProfile?.etablissementId === 'demo_ifps_cham' ? 'CHAM' : ''}</span>
                 <span style={{ color: "#1d4ed8", fontWeight: "800" }}>{Math.round((stats.conforme / stats.total) * 100)}%</span>
               </div>
               <div style={{ display: "flex", height: "12px", borderRadius: "6px", overflow: "hidden", background: "#f1f5f9" }}>
@@ -193,7 +178,6 @@ export default function App() {
               </div>
             </div>
             
-            {/* Grille de stats */}
             <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "16px" }}>
               {[["Conformes", stats.conforme, "#10b981"], ["En cours", stats.enCours, "#f59e0b"], ["À faire", stats.nonEvalue, "#94a3b8"], ["Non conformes", stats.nonConforme, "#ef4444"]].map(([lbl, val, col]) => (
                 <div key={lbl} style={{ background: "white", padding: "20px", borderRadius: "12px", border: `1px solid ${col}40`, borderTop: `4px solid ${col}` }}>
