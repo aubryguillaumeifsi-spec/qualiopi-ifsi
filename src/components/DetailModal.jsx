@@ -39,10 +39,10 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     ...critere, 
     responsables: [...(critere.responsables || [])], 
     fichiers: [...(critere.fichiers || [])],
-    preuves: critere.preuves || "", // Zone Coffre-fort (Texte officiel)
-    preuves_encours: critere.preuves_encours || "", // Zone Chantier (Texte de travail)
-    attendus: critere.attendus || "", // Remarques auditeur
-    notes: critere.notes || "" // Notes privées
+    preuves: critere.preuves || "", 
+    preuves_encours: critere.preuves_encours || "", 
+    attendus: critere.attendus || "", 
+    notes: critere.notes || "" 
   });
   
   const [uploading, setUploading] = useState(false);
@@ -62,6 +62,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const fileRef = ref(storage, `preuves/${critere.id}_${Date.now()}_${file.name}`);
       await uploadBytesResumable(fileRef, file);
       const url = await getDownloadURL(fileRef);
+      // Fichier non validé par défaut -> va dans le Chantier
       const newFile = { name: file.name, url: url, path: fileRef.fullPath, validated: false };
       setData({ ...data, fichiers: [...data.fichiers, newFile] });
     } catch (error) { 
@@ -92,13 +93,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     if (chantierFiles.length === 0) return alert("Aucun document dans la zone chantier !");
     
     setIsAnalyzing(true);
-    setAiReport(`⏳ Lecture et analyse globale de ${chantierFiles.length} document(s) par l'IA...`);
+    setAiReport(`⏳ Lecture et analyse détaillée de ${chantierFiles.length} document(s) par l'IA...`);
     
     try {
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-      // 1. On prépare le texte d'introduction pour l'IA
+      // Le prompt structuré pour forcer l'analyse individuelle puis globale
       const promptText = `Tu es un auditeur Qualiopi expert pour un IFSI. 
       Je te fournis ${chantierFiles.length} document(s) de preuve pour l'Indicateur ${critere.num} ("${critere.titre}").
       
@@ -106,18 +107,23 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       - Attendu : ${guide.niveau}
       - Preuves suggérées : ${guide.preuves}
       
-      Fais une analyse globale de l'ensemble de ces documents.
-      Réponds de façon structurée :
-      - BILAN GLOBAL : (La somme de ces documents permet-elle de valider l'indicateur ?)
-      - POINTS FORTS : (Ce qui est bien couvert par les documents)
-      - ÉCARTS / MANQUES : (Ce qu'il manque à l'ensemble pour être 100% conforme)
-      
-      Précise quel document apporte quelle preuve si nécessaire. Sois concis, utilise des tirets et un ton professionnel.`;
+      Je souhaite que tu analyses chaque document individuellement, puis que tu fasses un bilan global.
+      Réponds EXACTEMENT selon cette structure :
 
-      // On initialise le tableau des éléments à envoyer à l'IA avec le texte
+      ### ANALYSE INDIVIDUELLE
+      (Pour chaque document, cite son numéro et son nom)
+      - PERTINENCE : (Ce document est-il pertinent ?)
+      - APPORT : (Que prouve-t-il concrètement ?)
+      - LIMITES : (Que manque-t-il à ce document précis ?)
+
+      ### BILAN GLOBAL DE L'INDICATEUR
+      - VERDICT : (La somme de ces preuves permet-elle de valider totalement le critère ?)
+      - RECOMMANDATION : (Que manque-t-il au global pour être 100% conforme ?)
+      
+      Sois direct, très professionnel, et utilise des tirets pour faciliter la lecture.`;
+
       const contentsArray = [promptText];
 
-      // 2. On boucle sur TOUS les fichiers du chantier
       for (let i = 0; i < chantierFiles.length; i++) {
         const file = chantierFiles[i];
         const ext = file.name.split('.').pop().toLowerCase();
@@ -130,13 +136,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         
         if (!mime) {
           console.warn(`Format ignoré par l'IA : ${file.name}`);
-          continue; // On passe au fichier suivant si le format n'est pas géré
+          continue; 
         }
 
         const fileRef = ref(storage, file.path);
         const arrayBuffer = await getBytes(fileRef);
         
-        // Conversion robuste en Base64 pour supporter les gros fichiers
+        // Conversion robuste en Base64
         const uint8Array = new Uint8Array(arrayBuffer);
         let binary = '';
         const len = uint8Array.byteLength;
@@ -145,12 +151,10 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         }
         const base64 = btoa(binary);
 
-        // On ajoute le nom du fichier et son contenu à la suite du prompt
         contentsArray.push(`\n--- Document ${i + 1} : ${file.name} ---`);
         contentsArray.push({ inlineData: { data: base64, mimeType: mime } });
       }
 
-      // 3. On envoie tout le paquet d'un seul coup à Gemini
       const result = await model.generateContent(contentsArray);
       const response = await result.response;
       setAiReport(response.text());
@@ -287,7 +291,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                       
                       {chantierFiles.length > 0 && (
                         <button onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ background: "linear-gradient(135deg, #a855f7, #6366f1)", color: "white", border: "none", padding: "9px 16px", borderRadius: "8px", cursor: isAnalyzing ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", opacity: isAnalyzing ? 0.7 : 1 }}>
-                          ✨ {isAnalyzing ? "Analyse globale en cours..." : "Auditer tout le chantier avec l'IA"}
+                          ✨ {isAnalyzing ? "Analyse en cours..." : "Auditer tout le chantier avec l'IA"}
                         </button>
                       )}
                     </div>
