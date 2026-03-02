@@ -35,17 +35,19 @@ function MultiSelect({ selected, onChange, disabled }) {
 }
 
 export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode }) {
-  // On s'assure que chemins_reseau est bien un tableau (rétrocompatibilité avec le test précédent)
-  const initialChemins = Array.isArray(critere.chemins_reseau) 
-    ? critere.chemins_reseau 
-    : (critere.chemin_reseau ? [critere.chemin_reseau] : []);
+  
+  // Rétrocompatibilité : si c'était des anciens chemins simples, on les convertit en objets {nom, chemin}
+  const rawChemins = Array.isArray(critere.chemins_reseau) ? critere.chemins_reseau : (critere.chemin_reseau ? [critere.chemin_reseau] : []);
+  const initialChemins = rawChemins.map(c => 
+    typeof c === 'string' ? { nom: c.split('\\').pop() || "Document sans nom", chemin: c } : c
+  );
 
   const [data, setData] = useState({ 
     ...critere, 
     responsables: [...(critere.responsables || [])], 
     fichiers: [...(critere.fichiers || [])],
     preuves: critere.preuves || "", 
-    chemins_reseau: initialChemins, // Le tableau des chemins
+    chemins_reseau: initialChemins, 
     preuves_encours: critere.preuves_encours || "", 
     attendus: critere.attendus || "", 
     notes: critere.notes || "" 
@@ -54,7 +56,10 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const [uploading, setUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiReport, setAiReport] = useState("");
-  const [newChemin, setNewChemin] = useState(""); // État local pour le champ d'ajout de chemin
+  
+  // États pour le nouveau formulaire de lien
+  const [newCheminNom, setNewCheminNom] = useState("");
+  const [newCheminVal, setNewCheminVal] = useState("");
   
   const cfg = CRITERES_LABELS[critere.critere] || { color: "#9ca3af" };
   const guide = GUIDE_QUALIOPI[critere.id];
@@ -89,7 +94,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     try { 
       if (fileToDelete.path) await deleteObject(ref(storage, fileToDelete.path)); 
     } catch (e) {
-      console.warn("Fichier introuvable sur le serveur, mais on le supprime de l'affichage.");
+      console.warn("Fichier introuvable sur le serveur.");
     }
     setData({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) });
   }
@@ -106,7 +111,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
       const promptText = `Tu es un auditeur Qualiopi expert pour un IFSI. 
-      Je te fournis ${chantierFiles.length} document(s) de preuve pour l'Indicateur ${critere.num} ("${critere.titre}").
+      Je te fournis ${chantierFiles.length} document(s) de preuve pour l'Indicateur ${critere.num}.
       
       Référentiel :
       - Attendu : ${guide.niveau}
@@ -123,9 +128,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
       ### BILAN GLOBAL DE L'INDICATEUR
       - VERDICT : (La somme de ces preuves permet-elle de valider totalement le critère ?)
-      - RECOMMANDATION : (Que manque-t-il au global pour être 100% conforme ?)
-      
-      Sois direct, très professionnel, et utilise des tirets pour faciliter la lecture.`;
+      - RECOMMANDATION : (Que manque-t-il au global pour être 100% conforme ?)`;
 
       const contentsArray = [promptText];
 
@@ -139,10 +142,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         else if (ext === 'png') mime = 'image/png';
         else if (ext === 'webp') mime = 'image/webp';
         
-        if (!mime) {
-          console.warn(`Format ignoré par l'IA : ${file.name}`);
-          continue; 
-        }
+        if (!mime) continue; 
 
         const fileRef = ref(storage, file.path);
         const arrayBuffer = await getBytes(fileRef);
@@ -165,22 +165,28 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
     } catch (e) {
       console.error("Erreur IA:", e);
-      setAiReport(`❌ Erreur technique : ${e.message}\nVérifiez que votre clé API est valide ou que les fichiers existent bien.`);
+      setAiReport(`❌ Erreur technique : ${e.message}`);
     }
     setIsAnalyzing(false);
   }
 
-  // --- NOUVELLES FONCTIONS POUR LES CHEMINS MULTIPLES ---
-  const copyToClipboard = (texte) => {
-    if (!texte) return;
-    navigator.clipboard.writeText(texte);
-    alert("Chemin copié ! (Ctrl+V dans l'explorateur Windows)");
+  // --- FONCTIONS CHEMINS INTELLIGENTS ---
+  const copyToClipboard = (chemin) => {
+    if (!chemin) return;
+    navigator.clipboard.writeText(chemin);
+    alert("Magie ! ✨ Le chemin caché est copié.\n\nFaites Ctrl+V dans votre explorateur Windows pour ouvrir le fichier.");
   };
 
   const addChemin = () => {
-    if (newChemin.trim() !== "") {
-      setData({ ...data, chemins_reseau: [...data.chemins_reseau, newChemin.trim()] });
-      setNewChemin(""); // On vide le champ après l'ajout
+    if (newCheminVal.trim() !== "") {
+      // Si on n'a pas mis de nom, on invente un nom par défaut avec la fin du chemin
+      const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Document joint";
+      setData({ 
+        ...data, 
+        chemins_reseau: [...data.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim() }] 
+      });
+      setNewCheminNom("");
+      setNewCheminVal("");
     }
   };
 
@@ -247,60 +253,64 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
             <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "20px", borderRadius: "12px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
               <label style={{ ...lbl, color: "#166534", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>🏛️ Preuves Validées (Présentées à l'Audit)</label>
               
-              {/* Le champ des chemins réseau (MULTI-FICHIERS) */}
-              <div style={{ marginBottom: "16px", padding: "12px", background: "white", borderRadius: "8px", border: "1px dashed #34d399" }}>
-                <label style={{ fontSize: "11px", color: "#059669", fontWeight: "700", marginBottom: "8px", display: "block" }}>🔗 Chemins d'accès sécurisés (Lecteur Réseau IFSI)</label>
+              {/* Le champ des chemins réseau (NOMS CACHÉS) */}
+              <div style={{ marginBottom: "16px", padding: "16px", background: "white", borderRadius: "8px", border: "1px dashed #34d399" }}>
+                <label style={{ fontSize: "12px", color: "#059669", fontWeight: "700", marginBottom: "12px", display: "block" }}>🔗 Documents sur le Réseau Local</label>
                 
-                {/* Liste des chemins ajoutés */}
-                {data.chemins_reseau.map((chemin, index) => (
-                  <div key={index} style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "8px" }}>
-                    <input 
-                      type="text"
-                      readOnly
-                      value={chemin}
-                      style={{ ...inp, flex: 1, borderColor: "#a7f3d0", color: "#064e3b", fontFamily: "monospace", fontSize: "12px", background: "#f0fdf4" }}
-                    />
+                {/* Liste des documents ajoutés */}
+                {data.chemins_reseau.map((item, index) => (
+                  <div key={index} style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px", background: "#f8fafc", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                    <span title={`Chemin réel : ${item.chemin}`} style={{ flex: 1, fontSize: "14px", color: "#1e3a5f", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                      📄 {item.nom}
+                    </span>
                     <button 
-                      onClick={() => copyToClipboard(chemin)}
-                      style={{ background: "#10b981", color: "white", border: "none", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}
-                      title="Copier pour ouvrir dans l'explorateur Windows"
+                      onClick={() => copyToClipboard(item.chemin)}
+                      style={{ background: "#10b981", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)" }}
                     >
                       📋 Copier
                     </button>
                     {!isAuditMode && !isReadOnly && (
                       <button 
                         onClick={() => removeChemin(index)}
-                        style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5", padding: "8px 12px", borderRadius: "8px", cursor: "pointer", fontWeight: "bold", fontSize: "12px" }}
-                        title="Retirer ce chemin"
+                        style={{ background: "transparent", color: "#ef4444", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px" }}
+                        title="Retirer ce document"
                       >
-                        🗑️
+                        ✖️
                       </button>
                     )}
                   </div>
                 ))}
 
-                {/* Champ pour ajouter un nouveau chemin */}
+                {/* Champ pour ajouter un nouveau document (Masqué à l'audit) */}
                 {!isAuditMode && !isReadOnly && (
-                  <div style={{ display: "flex", gap: "8px", alignItems: "center", marginTop: data.chemins_reseau.length > 0 ? "12px" : "0", paddingTop: data.chemins_reseau.length > 0 ? "12px" : "0", borderTop: data.chemins_reseau.length > 0 ? "1px dashed #a7f3d0" : "none" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: data.chemins_reseau.length > 0 ? "16px" : "0", paddingTop: data.chemins_reseau.length > 0 ? "16px" : "0", borderTop: data.chemins_reseau.length > 0 ? "1px solid #e2e8f0" : "none" }}>
+                    <p style={{ margin: "0 0 4px 0", fontSize: "11px", color: "#64748b", fontWeight: "600" }}>Ajouter un document réseau :</p>
                     <input 
                       type="text"
-                      value={newChemin}
-                      onChange={e => setNewChemin(e.target.value)}
-                      placeholder="Coller un nouveau chemin réseau (Ex: Z:\QUALIOPI\doc2.pdf)"
-                      style={{ ...inp, flex: 1, borderColor: "#d1d5db", fontSize: "12px" }}
-                      onKeyDown={(e) => { if(e.key === 'Enter') addChemin(); }}
+                      value={newCheminNom}
+                      onChange={e => setNewCheminNom(e.target.value)}
+                      placeholder="Nom affiché (Ex: Tableau de bord 2026)"
+                      style={{ ...inp, borderColor: "#cbd5e1", fontSize: "13px" }}
                     />
-                    <button 
-                      onClick={addChemin}
-                      disabled={!newChemin.trim()}
-                      style={{ background: newChemin.trim() ? "#3b82f6" : "#9ca3af", color: "white", border: "none", padding: "8px 16px", borderRadius: "8px", cursor: newChemin.trim() ? "pointer" : "not-allowed", fontWeight: "bold", fontSize: "12px", whiteSpace: "nowrap" }}
-                    >
-                      ➕ Ajouter
-                    </button>
+                    <div style={{ display: "flex", gap: "8px" }}>
+                      <input 
+                        type="text"
+                        value={newCheminVal}
+                        onChange={e => setNewCheminVal(e.target.value)}
+                        placeholder="Chemin secret (Ex: Z:\QUALIOPI\tab26.xlsx)"
+                        style={{ ...inp, flex: 1, borderColor: "#cbd5e1", fontSize: "13px", fontFamily: "monospace" }}
+                        onKeyDown={(e) => { if(e.key === 'Enter') addChemin(); }}
+                      />
+                      <button 
+                        onClick={addChemin}
+                        disabled={!newCheminVal.trim()}
+                        style={{ background: newCheminVal.trim() ? "#3b82f6" : "#cbd5e1", color: "white", border: "none", padding: "0 20px", borderRadius: "8px", cursor: newCheminVal.trim() ? "pointer" : "not-allowed", fontWeight: "bold", fontSize: "13px", whiteSpace: "nowrap" }}
+                      >
+                        Ajouter
+                      </button>
+                    </div>
                   </div>
                 )}
-                
-                {!isAuditMode && <p style={{ fontSize: "10px", color: "#64748b", margin: "8px 0 0 0", fontStyle: "italic" }}>En mode audit, il suffira de cliquer sur Copier et de coller le chemin dans le dossier jaune de Windows.</p>}
               </div>
 
               {/* Fichiers Validés (Ancien système cloud gardé pour compatibilité) */}
@@ -325,7 +335,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                     readOnly={isAuditMode || isReadOnly} 
                     value={data.preuves} 
                     onChange={e => setData({...data, preuves: e.target.value})} 
-                    placeholder="Inscrire ici les preuves textuelles (ex: validé en CSE le...), ou coller un lien vers un site internet public..." 
+                    placeholder="Inscrire ici les preuves textuelles, ou coller un lien vers un site internet public..." 
                     style={{ ...inp, height: "70px", resize: "vertical", background: (isAuditMode || isReadOnly) ? "transparent" : "white", border: (isAuditMode || isReadOnly) ? "none" : "1px solid #6ee7b7", padding: (isAuditMode || isReadOnly) ? "0" : "12px", color: "#166534" }} 
                   />
                 </div>
@@ -374,7 +384,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                       <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                         <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" id="file-chantier" style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
                         <label htmlFor="file-chantier" style={{ background: "white", border: "1px dashed #d97706", color: "#d97706", padding: "8px 16px", borderRadius: "8px", cursor: uploading ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", opacity: uploading ? 0.6 : 1 }}>
-                          {uploading ? "⏳ Upload..." : "📎 Importer un PDF ou une Image"}
+                          {uploading ? "⏳ Upload..." : "📎 Importer un PDF ou Image"}
                         </label>
                         
                         {chantierFiles.length > 0 && (
