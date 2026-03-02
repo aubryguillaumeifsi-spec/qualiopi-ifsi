@@ -30,7 +30,8 @@ export default function App() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsLoggedIn(true);
-        await loadUserDataAndContent(user);
+        // On attend un tout petit peu pour laisser la connexion s'établir
+        setTimeout(() => loadUserDataAndContent(user), 500);
       } else {
         setIsLoggedIn(false);
         setUserProfile(null);
@@ -42,73 +43,70 @@ export default function App() {
 
   async function loadUserDataAndContent(user) {
     try {
-      console.log("Tentative de connexion pour UID:", user.uid);
+      console.log("Tentative de chargement pour UID:", user.uid);
       
       // 1. Récupération du profil utilisateur
-      const userDoc = await getDoc(doc(db, "users", user.uid));
+      const userDocRef = doc(db, "users", user.uid);
+      const userSnap = await getDoc(userDocRef);
+      
       let etablissementId = "demo_ifps_cham";
       
-      if (userDoc.exists()) {
-        const userData = userDoc.data();
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
         setUserProfile(userData);
         etablissementId = userData.etablissementId || etablissementId;
-        console.log("Etablissement trouvé:", etablissementId);
+        console.log("Profil trouvé. Etablissement:", etablissementId);
       } else {
-        console.warn("Profil utilisateur non trouvé dans la collection 'users'");
+        console.warn("Document utilisateur absent dans Firestore. Utilisation du mode démo.");
       }
 
-      // 2. Récupération du tiroir de l'établissement
+      // 2. Récupération des données Qualiopi
       const etabRef = getEtablissementRef(etablissementId);
       let snap = await getDoc(etabRef);
 
-      // --- LOGIQUE DE MIGRATION FORCEE ---
-      // Si le tiroir est vide ou contient une liste par défaut (32 à évaluer), on tente la migration
-      const isNewOrEmpty = !snap.exists() || !snap.data()?.campaigns || snap.data()?.campaigns[0]?.liste[0]?.statut === "non-evalue";
-
-      if (isNewOrEmpty) {
-        console.log("Analyse de l'ancienne collection 'qualiopi'...");
-        // On teste le document 'criteres' (le plus probable selon tes infos)
+      // --- LOGIQUE DE MIGRATION ---
+      if (!snap.exists() || !snap.data()?.campaigns) {
+        console.log("Nouveau tiroir détecté. Recherche de l'ancienne collection qualiopi...");
         const oldSnap = await getDoc(doc(db, "qualiopi", "criteres")); 
         
         if (oldSnap.exists()) {
-          console.log("Anciennes données trouvées ! Migration en cours...");
           const oldData = oldSnap.data();
-          
           const migratedCampaign = [{
             id: oldData.id || Date.now().toString(),
             name: oldData.name || "Migration QualiForma",
             auditDate: oldData.auditDate || "2026-10-15",
             liste: oldData.liste || [],
-            locked: false,
-            updatedAt: new Date().toISOString()
+            locked: false
           }];
 
           await setDoc(etabRef, { 
             campaigns: migratedCampaign, 
             updatedAt: new Date().toISOString(),
-            nom: "IFPS du CHAM (Migré)" 
+            nom: "IFPS du CHAM" 
           }, { merge: true });
           
-          snap = await getDoc(etabRef); // On recharge les données migrées
-        } else {
-          console.error("Impossible de trouver le document 'qualiopi/criteres'. Vérifiez le nom dans Firebase.");
+          snap = await getDoc(etabRef);
         }
       }
 
-      // 3. Initialisation des données
+      // 3. Affichage
       if (snap.exists() && snap.data()?.campaigns) {
-        const d = snap.data();
-        setCampaigns(d.campaigns); 
-        setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
+        setCampaigns(snap.data().campaigns); 
+        setActiveCampaignId(snap.data().campaigns[snap.data().campaigns.length - 1].id);
       } else {
-        console.log("Aucune donnée à migrer, chargement de la structure par défaut.");
         initDefault();
       }
       setAuthChecked(true);
     } catch (e) {
-      console.error("Erreur critique loadUserDataAndContent:", e);
-      initDefault();
-      setAuthChecked(true);
+      console.error("Erreur technique:", e);
+      // Si on a l'erreur "Offline", on réessaie une fois après 2 secondes
+      if (e.message.includes("offline")) {
+        console.log("Tentative de reconnexion dans 2s...");
+        setTimeout(() => loadUserDataAndContent(user), 2000);
+      } else {
+        initDefault();
+        setAuthChecked(true);
+      }
     }
   }
 
@@ -133,11 +131,10 @@ export default function App() {
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
-  if (!campaigns || !activeCampaignId) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center" }}>⏳ Chargement de QualiForma...</div>;
+  if (!campaigns || !activeCampaignId) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: "#64748b" }}>⏳ Initialisation de la connexion sécurisée...</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
   const criteres = currentCampaign.liste || [];
-  const isArchive = currentCampaign.locked || false;
 
   const stats = {
     total: criteres.filter(c => c.statut !== "non-concerne").length || 1,
@@ -162,11 +159,11 @@ export default function App() {
         const newListe = criteres.map(c => c.id === upd.id ? upd : c);
         saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp));
         setModalCritere(null);
-      }} isReadOnly={isArchive} isAuditMode={isAuditMode} />}
+      }} isReadOnly={currentCampaign.locked} isAuditMode={isAuditMode} />}
 
       <header style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", height: "70px", display: "flex", justifyContent: "space-between", alignItems: "center", position: "sticky", top: 0, zIndex: 10 }}>
         <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
-           <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs><path d="M11 2C6 2 2 6 2 11s4 9 9 9 9-4 9-9-4-9-9-9zm0 16c-3.9 0-7-3.1-7-7s3.1-7 7-7 7 3.1 7 7-3.1 7-7 7z" fill="url(#g)"/><path d="M10.5 14.5l-3-3 1.4-1.4 1.6 1.6 4.6-4.6 1.4 1.4-6 6z" fill="url(#g)"/></svg>
+           <svg width="32" height="32" viewBox="0 0 24 24" fill="none"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs><circle cx="11" cy="11" r="9" stroke="url(#g)" strokeWidth="2"/><path d="M11 7v4l3 2" stroke="url(#g)" strokeWidth="2" strokeLinecap="round"/></svg>
            <h1 style={{ fontSize: "18px", fontWeight: "800" }}>QualiForma</h1>
         </div>
         <nav style={{ display: "flex", gap: "5px", background: "#f1f5f9", padding: "4px", borderRadius: "10px" }}>
@@ -174,8 +171,8 @@ export default function App() {
         </nav>
         <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
            <div style={{ textAlign: "right", fontSize: "11px", color: "#64748b" }}>
-              <div style={{ fontWeight: "800", color: "#1e3a5f" }}>{userProfile?.role === 'superadmin' ? '🛡️ Admin' : '👤 Utilisateur'}</div>
-              <div>{userProfile?.etablissementId}</div>
+              <div style={{ fontWeight: "800", color: "#1e3a5f" }}>{userProfile?.role?.toUpperCase() || 'INVITÉ'}</div>
+              <div>{userProfile?.etablissementId || 'Démo'}</div>
            </div>
            <button onClick={handleLogout} style={{ background: "#fee2e2", color: "#ef4444", border: "none", padding: "8px 15px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>Déconnexion</button>
         </div>
@@ -185,15 +182,10 @@ export default function App() {
         {activeTab === "dashboard" && (
           <div style={{ display: "grid", gap: "30px" }}>
             <div style={{ background: "white", padding: "30px", borderRadius: "16px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
-                <div>
-                  <h2 style={{ fontSize: "20px", fontWeight: "800", margin: 0 }}>Tableau de bord</h2>
-                  <p style={{ fontSize: "13px", color: "#64748b", margin: "5px 0 0" }}>Pilotage Qualiopi - {currentCampaign.name}</p>
-                </div>
-                <div style={{ textAlign: "right" }}>
-                  <div style={{ fontSize: "24px", fontWeight: "900", color: "#1d4ed8" }}>{Math.round((stats.conforme / stats.total) * 100)}%</div>
-                  <div style={{ fontSize: "11px", fontWeight: "700", color: "#94a3b8", textTransform: "uppercase" }}>Taux de réussite</div>
-                </div>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", margin: 0 }}>Tableau de bord - {currentCampaign.name}</h2>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "20px", marginBottom: "10px" }}>
+                <span style={{ fontSize: "14px", fontWeight: "700", color: "#64748b" }}>Progression Globale</span>
+                <span style={{ fontSize: "24px", fontWeight: "900", color: "#1d4ed8" }}>{Math.round((stats.conforme / stats.total) * 100)}%</span>
               </div>
               <div style={{ height: "12px", background: "#f1f5f9", borderRadius: "6px", overflow: "hidden", display: "flex" }}>
                 <div style={{ width: `${(stats.conforme / stats.total) * 100}%`, background: "#10b981", transition: "width 1s ease" }} />
@@ -215,12 +207,12 @@ export default function App() {
 
         {activeTab === "criteres" && (
           <div style={{ background: "white", borderRadius: "16px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
-             <div style={{ padding: "20px", borderBottom: "1px solid #f1f5f9", display: "flex", gap: "10px" }}>
-               <input placeholder="Rechercher un indicateur..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ flex: 1, padding: "10px 15px", borderRadius: "10px", border: "1px solid #e2e8f0", outline: "none", fontSize: "14px" }} />
+             <div style={{ padding: "20px", borderBottom: "1px solid #f1f5f9" }}>
+               <input placeholder="Filtrer les indicateurs..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ width: "100%", padding: "12px 15px", borderRadius: "10px", border: "1px solid #e2e8f0", outline: "none", fontSize: "14px" }} />
              </div>
              <table style={{ width: "100%", borderCollapse: "collapse" }}>
-               <thead>
-                 <tr style={{ background: "#f8fafc", textAlign: "left" }}>
+               <thead style={{ background: "#f8fafc", textAlign: "left" }}>
+                 <tr>
                    <th style={{ padding: "15px 20px", fontSize: "11px", color: "#94a3b8", textTransform: "uppercase" }}>Indicateur</th>
                    <th style={{ padding: "15px 20px", fontSize: "11px", color: "#94a3b8", textTransform: "uppercase" }}>Statut</th>
                    <th style={{ padding: "15px 20px", fontSize: "11px", color: "#94a3b8", textTransform: "uppercase", textAlign: "center" }}>Action</th>
@@ -231,7 +223,7 @@ export default function App() {
                    <tr key={c.id} style={{ borderTop: "1px solid #f1f5f9" }}>
                      <td style={{ padding: "20px" }}>
                        <div style={{ display: "flex", gap: "15px", alignItems: "center" }}>
-                         <span style={{ minWidth: "35px", height: "35px", background: "#eff6ff", color: "#1d4ed8", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "13px" }}>{c.num || c.id}</span>
+                         <span style={{ minWidth: "35px", height: "35px", background: "#eff6ff", color: "#1d4ed8", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "800", fontSize: "13px" }}>{c.num}</span>
                          <span style={{ fontSize: "14px", fontWeight: "600", color: "#334155" }}>{c.titre}</span>
                        </div>
                      </td>
