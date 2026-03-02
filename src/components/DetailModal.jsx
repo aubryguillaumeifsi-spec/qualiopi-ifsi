@@ -36,11 +36,12 @@ function MultiSelect({ selected, onChange, disabled }) {
 
 export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode }) {
   
-  // Rétrocompatibilité : si c'était des anciens chemins simples, on les convertit en objets {nom, chemin}
+  // Rétrocompatibilité et ajout de l'état "validated" pour les chemins réseau
   const rawChemins = Array.isArray(critere.chemins_reseau) ? critere.chemins_reseau : (critere.chemin_reseau ? [critere.chemin_reseau] : []);
-  const initialChemins = rawChemins.map(c => 
-    typeof c === 'string' ? { nom: c.split('\\').pop() || "Document sans nom", chemin: c } : c
-  );
+  const initialChemins = rawChemins.map(c => {
+    if (typeof c === 'string') return { nom: c.split('\\').pop() || "Document", chemin: c, validated: true };
+    return { ...c, validated: c.validated !== false }; // Par défaut, les anciens étaient validés
+  });
 
   const [data, setData] = useState({ 
     ...critere, 
@@ -57,7 +58,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [aiReport, setAiReport] = useState("");
   
-  // États pour le nouveau formulaire de lien
   const [newCheminNom, setNewCheminNom] = useState("");
   const [newCheminVal, setNewCheminVal] = useState("");
   
@@ -101,7 +101,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
   async function handleAIAnalysis() {
     const chantierFiles = data.fichiers.filter(f => !f.validated);
-    if (chantierFiles.length === 0) return alert("Aucun document dans la zone chantier !");
+    if (chantierFiles.length === 0) return alert("Aucun document à scanner dans la zone chantier ! (L'IA ne lit pas les chemins réseau)");
     
     setIsAnalyzing(true);
     setAiReport(`⏳ Lecture et analyse détaillée de ${chantierFiles.length} document(s) par l'IA...`);
@@ -170,7 +170,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setIsAnalyzing(false);
   }
 
-  // --- FONCTIONS CHEMINS INTELLIGENTS ---
   const copyToClipboard = (chemin) => {
     if (!chemin) return;
     navigator.clipboard.writeText(chemin);
@@ -179,26 +178,36 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
   const addChemin = () => {
     if (newCheminVal.trim() !== "") {
-      // Si on n'a pas mis de nom, on invente un nom par défaut avec la fin du chemin
-      const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Document joint";
+      const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Lien réseau";
       setData({ 
         ...data, 
-        chemins_reseau: [...data.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim() }] 
+        // Le nouveau chemin est ajouté, mais il n'est PAS validé par défaut (il va dans le chantier)
+        chemins_reseau: [...data.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim(), validated: false }] 
       });
       setNewCheminNom("");
       setNewCheminVal("");
     }
   };
 
-  const removeChemin = (indexToRemove) => {
+  const toggleCheminValidation = (index) => {
+    const updatedChemins = [...data.chemins_reseau];
+    updatedChemins[index].validated = !updatedChemins[index].validated;
+    setData({ ...data, chemins_reseau: updatedChemins });
+  };
+
+  const removeChemin = (index) => {
     setData({
       ...data,
-      chemins_reseau: data.chemins_reseau.filter((_, index) => index !== indexToRemove)
+      chemins_reseau: data.chemins_reseau.filter((_, i) => i !== index)
     });
   };
 
   const chantierFiles = data.fichiers.filter(f => !f.validated);
   const validatedFiles = data.fichiers.filter(f => f.validated);
+
+  // Vérifie s'il y a des chemins réseau validés ou en chantier
+  const hasValidatedChemins = data.chemins_reseau.some(c => c.validated);
+  const hasChantierChemins = data.chemins_reseau.some(c => !c.validated);
 
   return (
     <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={onClose}>
@@ -253,72 +262,47 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
             <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "20px", borderRadius: "12px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
               <label style={{ ...lbl, color: "#166534", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>🏛️ Preuves Validées (Présentées à l'Audit)</label>
               
-              {/* Le champ des chemins réseau (NOMS CACHÉS) */}
-              <div style={{ marginBottom: "16px", padding: "16px", background: "white", borderRadius: "8px", border: "1px dashed #34d399" }}>
-                <label style={{ fontSize: "12px", color: "#059669", fontWeight: "700", marginBottom: "12px", display: "block" }}>🔗 Documents sur le Réseau Local</label>
-                
-                {/* Liste des documents ajoutés */}
-                {data.chemins_reseau.map((item, index) => (
-                  <div key={index} style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px", background: "#f8fafc", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
-                    <span title={`Chemin réel : ${item.chemin}`} style={{ flex: 1, fontSize: "14px", color: "#1e3a5f", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
-                      📄 {item.nom}
-                    </span>
-                    <button 
-                      onClick={() => copyToClipboard(item.chemin)}
-                      style={{ background: "#10b981", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)" }}
-                    >
-                      📋 Copier
-                    </button>
-                    {!isAuditMode && !isReadOnly && (
-                      <button 
-                        onClick={() => removeChemin(index)}
-                        style={{ background: "transparent", color: "#ef4444", border: "none", cursor: "pointer", fontSize: "16px", padding: "4px" }}
-                        title="Retirer ce document"
-                      >
-                        ✖️
-                      </button>
-                    )}
-                  </div>
-                ))}
+              {/* Affichage des chemins réseau VALIDÉS */}
+              {(hasValidatedChemins || isAuditMode) && (
+                <div style={{ marginBottom: "16px", padding: "16px", background: "white", borderRadius: "8px", border: "1px dashed #34d399" }}>
+                  <label style={{ fontSize: "12px", color: "#059669", fontWeight: "700", marginBottom: "12px", display: "block" }}>🔗 Documents sur le Réseau Local</label>
+                  
+                  {!hasValidatedChemins && <span style={{ fontSize: "12px", color: "#059669", fontStyle: "italic" }}>Aucun document réseau validé.</span>}
+                  
+                  {data.chemins_reseau.map((item, index) => {
+                    if (!item.validated) return null; // On ne montre que les validés
+                    return (
+                      <div key={index} style={{ display: "flex", gap: "12px", alignItems: "center", marginBottom: "10px", background: "#f8fafc", padding: "10px 14px", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+                        <span title={`Chemin réel : ${item.chemin}`} style={{ flex: 1, fontSize: "14px", color: "#1e3a5f", fontWeight: "700", display: "flex", alignItems: "center", gap: "8px" }}>
+                          📄 {item.nom}
+                        </span>
+                        <button 
+                          onClick={() => copyToClipboard(item.chemin)}
+                          style={{ background: "#10b981", color: "white", border: "none", padding: "8px 16px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "12px", display: "flex", alignItems: "center", gap: "6px", boxShadow: "0 2px 4px rgba(16, 185, 129, 0.2)" }}
+                        >
+                          📋 Copier
+                        </button>
+                        {!isAuditMode && !isReadOnly && (
+                          <button 
+                            onClick={() => toggleCheminValidation(index)}
+                            style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5", padding: "8px 12px", borderRadius: "6px", cursor: "pointer", fontWeight: "bold", fontSize: "11px" }}
+                            title="Repasser en chantier"
+                          >
+                            Retirer
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
 
-                {/* Champ pour ajouter un nouveau document (Masqué à l'audit) */}
-                {!isAuditMode && !isReadOnly && (
-                  <div style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: data.chemins_reseau.length > 0 ? "16px" : "0", paddingTop: data.chemins_reseau.length > 0 ? "16px" : "0", borderTop: data.chemins_reseau.length > 0 ? "1px solid #e2e8f0" : "none" }}>
-                    <p style={{ margin: "0 0 4px 0", fontSize: "11px", color: "#64748b", fontWeight: "600" }}>Ajouter un document réseau :</p>
-                    <input 
-                      type="text"
-                      value={newCheminNom}
-                      onChange={e => setNewCheminNom(e.target.value)}
-                      placeholder="Nom affiché (Ex: Tableau de bord 2026)"
-                      style={{ ...inp, borderColor: "#cbd5e1", fontSize: "13px" }}
-                    />
-                    <div style={{ display: "flex", gap: "8px" }}>
-                      <input 
-                        type="text"
-                        value={newCheminVal}
-                        onChange={e => setNewCheminVal(e.target.value)}
-                        placeholder="Chemin secret (Ex: Z:\QUALIOPI\tab26.xlsx)"
-                        style={{ ...inp, flex: 1, borderColor: "#cbd5e1", fontSize: "13px", fontFamily: "monospace" }}
-                        onKeyDown={(e) => { if(e.key === 'Enter') addChemin(); }}
-                      />
-                      <button 
-                        onClick={addChemin}
-                        disabled={!newCheminVal.trim()}
-                        style={{ background: newCheminVal.trim() ? "#3b82f6" : "#cbd5e1", color: "white", border: "none", padding: "0 20px", borderRadius: "8px", cursor: newCheminVal.trim() ? "pointer" : "not-allowed", fontWeight: "bold", fontSize: "13px", whiteSpace: "nowrap" }}
-                      >
-                        Ajouter
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-
-              {/* Fichiers Validés (Ancien système cloud gardé pour compatibilité) */}
+              {/* Fichiers uploadés Validés (Ancien système cloud gardé pour compatibilité) */}
               {validatedFiles.length > 0 && (
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: "16px" }}>
                   {validatedFiles.map(f => (
                     <div key={f.url} style={{ background: "white", padding: "6px 12px", borderRadius: "8px", border: "1px solid #6ee7b7", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
-                      <a href={f.url} target="_blank" rel="noreferrer" style={{ color: "#059669", textDecoration: "none", fontWeight: "700" }}>📄 {f.name}</a>
+                      <a href={f.url} target="_blank" rel="noreferrer" style={{ color: "#059669", textDecoration: "none", fontWeight: "700" }}>☁️ {f.name}</a>
                       {(!isAuditMode && !isReadOnly) && (
                         <button onClick={() => toggleValidation(f.url)} title="Repasser en chantier" style={{ background: "#fee2e2", border: "1px solid #fca5a5", color: "#991b1b", cursor: "pointer", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>Retirer</button>
                       )}
@@ -359,10 +343,65 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                     style={{ ...inp, height: "60px", marginBottom: "16px", borderColor: "#fde68a", resize: "vertical" }} 
                   />
                   
+                  {/* --- NOUVEAU : Affichage des chemins réseaux EN CHANTIER --- */}
+                  {hasChantierChemins && (
+                    <div style={{ marginBottom: "16px" }}>
+                      <p style={{ margin: "0 0 8px 0", fontSize: "11px", color: "#92400e", fontWeight: "700" }}>🔗 Liens réseau en attente :</p>
+                      {data.chemins_reseau.map((item, index) => {
+                        if (item.validated) return null;
+                        return (
+                          <div key={index} style={{ background: "white", padding: "6px 12px", borderRadius: "8px", border: "1px dashed #fcd34d", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px", marginBottom: "6px" }}>
+                            <span title={item.chemin} style={{ color: "#92400e", fontWeight: "600", flex: 1 }}>🔗 {item.nom}</span>
+                            {!isReadOnly && (
+                              <>
+                                <button onClick={() => toggleCheminValidation(index)} style={{ background: "#d1fae5", border: "1px solid #6ee7b7", color: "#065f46", cursor: "pointer", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider ✅</button>
+                                <button onClick={() => removeChemin(index)} style={{ color: "#ef4444", border: "none", background: "none", cursor: "pointer", fontSize: "14px" }} title="Supprimer">🗑️</button>
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* --- Formulaire d'ajout de chemin déplacé ici ! --- */}
+                  {!isReadOnly && (
+                    <div style={{ marginBottom: "20px", padding: "12px", background: "#fef3c7", borderRadius: "8px", border: "1px solid #fde68a" }}>
+                      <p style={{ margin: "0 0 8px 0", fontSize: "11px", color: "#92400e", fontWeight: "700" }}>Ajouter un lien réseau :</p>
+                      <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                        <input 
+                          type="text"
+                          value={newCheminNom}
+                          onChange={e => setNewCheminNom(e.target.value)}
+                          placeholder="Nom affiché (Ex: Tableau de bord 2026)"
+                          style={{ ...inp, borderColor: "#fcd34d", fontSize: "12px" }}
+                        />
+                        <div style={{ display: "flex", gap: "8px" }}>
+                          <input 
+                            type="text"
+                            value={newCheminVal}
+                            onChange={e => setNewCheminVal(e.target.value)}
+                            placeholder="Chemin (Ex: Z:\QUALIOPI\tab26.xlsx)"
+                            style={{ ...inp, flex: 1, borderColor: "#fcd34d", fontSize: "12px", fontFamily: "monospace" }}
+                            onKeyDown={(e) => { if(e.key === 'Enter') addChemin(); }}
+                          />
+                          <button 
+                            onClick={addChemin}
+                            disabled={!newCheminVal.trim()}
+                            style={{ background: newCheminVal.trim() ? "#d97706" : "#fcd34d", color: "white", border: "none", padding: "0 16px", borderRadius: "8px", cursor: newCheminVal.trim() ? "pointer" : "not-allowed", fontWeight: "bold", fontSize: "12px" }}
+                          >
+                            ➕
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fichiers uploadés en chantier */}
                   <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: chantierFiles.length > 0 ? "16px" : "0" }}>
                     {chantierFiles.map(f => (
                       <div key={f.url} style={{ background: "white", padding: "6px 12px", borderRadius: "8px", border: "1px solid #fcd34d", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px" }}>
-                        <span style={{ color: "#92400e", fontWeight: "600" }}>{f.name}</span>
+                        <span style={{ color: "#92400e", fontWeight: "600" }}>☁️ {f.name}</span>
                         {!isReadOnly && (
                           <>
                             <button onClick={() => toggleValidation(f.url)} style={{ background: "#d1fae5", border: "1px solid #6ee7b7", color: "#065f46", cursor: "pointer", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider ✅</button>
@@ -378,13 +417,13 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                       {/* Bandeau RGPD */}
                       <div style={{ background: "#fef2f2", borderLeft: "4px solid #ef4444", borderTop: "1px solid #fee2e2", borderRight: "1px solid #fee2e2", borderBottom: "1px solid #fee2e2", padding: "10px 14px", marginBottom: "16px", borderRadius: "0 8px 8px 0", fontSize: "12px", color: "#991b1b" }}>
                         <strong style={{ display: "block", marginBottom: "4px" }}>⚠️ Avertissement RGPD (Confidentialité)</strong>
-                        Merci de ne téléverser <b>aucune donnée personnelle</b> (noms, dossiers étudiants/formateurs). Veuillez anonymiser vos documents (biffage) ou utiliser des trames vierges avant l'envoi.
+                        Ne téléversez pour l'IA <b>aucune donnée personnelle</b>. Utilisez uniquement des trames vierges ou biffées.
                       </div>
 
                       <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
                         <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" id="file-chantier" style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
                         <label htmlFor="file-chantier" style={{ background: "white", border: "1px dashed #d97706", color: "#d97706", padding: "8px 16px", borderRadius: "8px", cursor: uploading ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", opacity: uploading ? 0.6 : 1 }}>
-                          {uploading ? "⏳ Upload..." : "📎 Importer un PDF ou Image"}
+                          {uploading ? "⏳ Upload..." : "📎 Importer (PDF/Image) pour l'IA"}
                         </label>
                         
                         {chantierFiles.length > 0 && (
