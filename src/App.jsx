@@ -6,7 +6,6 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth, getEtablissementRef } from "./firebase";
 import { DEFAULT_CRITERES, STATUT_CONFIG } from "./data";
 
-// --- COMPOSANT BADGE ---
 function StatusBadge({ statut }) {
   const s = STATUT_CONFIG[statut] || STATUT_CONFIG["non-evalue"];
   return <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: "6px", padding: "3px 10px", fontSize: "11px", fontWeight: "700" }}>{s.label}</span>;
@@ -37,59 +36,79 @@ export default function App() {
 
   async function loadUserDataAndContent(user) {
     try {
-      // 1. Charger le profil
+      // 1. Charger le profil utilisateur
       const userSnap = await getDoc(doc(db, "users", user.uid));
-      let etablissementId = userSnap.exists() ? userSnap.data().etablissementId : "demo_ifps_cham";
-      if(userSnap.exists()) setUserProfile(userSnap.data());
+      let etablissementId = "demo_ifps_cham";
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        setUserProfile(userData);
+        etablissementId = userData.etablissementId || etablissementId;
+      }
 
-      // 2. Tenter de charger les données de l'établissement
-      const etabRef = getEtablissementRef(etablissementId);
+      // 2. Charger les données de l'établissement
+      const etabRef = doc(db, "etablissements", etablissementId);
       const snap = await getDoc(etabRef);
 
-      if (snap.exists() && snap.data().campaigns) {
-        setCampaigns(snap.data().campaigns);
-        setActiveCampaignId(snap.data().campaigns[snap.data().campaigns.length - 1].id);
-      } else {
-        // 3. MIGRATION MANUELLE SI VIDE : On cherche dans qualiopi / criteres
+      // On vérifie si on doit migrer (si le doc n'existe pas ou est vide)
+      if (!snap.exists() || !snap.data().campaigns) {
+        console.log("Migration en cours depuis qualiopi/criteres...");
         const oldSnap = await getDoc(doc(db, "qualiopi", "criteres"));
-        if (oldSnap.exists() && oldSnap.data().liste) {
+        
+        if (oldSnap.exists()) {
+          const oldData = oldSnap.data();
           const migrated = [{
             id: Date.now().toString(),
             name: "Données Importées",
-            auditDate: "2026-10-15",
-            liste: oldSnap.data().liste,
+            auditDate: oldData.auditDate || "2026-10-15",
+            liste: oldData.liste || DEFAULT_CRITERES,
             locked: false
           }];
-          await setDoc(etabRef, { campaigns: migrated, nom: "IFPS du CHAM" }, { merge: true });
+          
+          // On crée le nouveau document
+          await setDoc(etabRef, { 
+            campaigns: migrated, 
+            nom: "IFPS du CHAM",
+            updatedAt: new Date().toISOString() 
+          });
+          
           setCampaigns(migrated);
           setActiveCampaignId(migrated[0].id);
         } else {
-          initDefault();
+          // Si rien n'est trouvé, on initialise par défaut
+          initDefault(etabRef);
         }
+      } else {
+        // Les données existent déjà dans le nouveau format
+        const d = snap.data();
+        setCampaigns(d.campaigns);
+        setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
       }
     } catch (e) {
-      console.error("Erreur de chargement:", e);
-      initDefault();
+      console.error("Erreur chargement:", e);
     } finally {
       setAuthChecked(true);
     }
   }
 
-  function initDefault() {
+  async function initDefault(etabRef) {
     const def = [{ id: "1", name: "Évaluation initiale", auditDate: "2026-10-15", liste: DEFAULT_CRITERES, locked: false }];
+    await setDoc(etabRef, { campaigns: def, nom: "Nouvel établissement" });
     setCampaigns(def);
     setActiveCampaignId("1");
   }
 
   async function saveData(newCampaigns) {
+    if (!userProfile?.etablissementId) return;
     setCampaigns(newCampaigns);
-    const id = userProfile?.etablissementId || "demo_ifps_cham";
     try {
-      await setDoc(getEtablissementRef(id), { campaigns: newCampaigns }, { merge: true });
+      await setDoc(doc(db, "etablissements", userProfile.etablissementId), { 
+        campaigns: newCampaigns,
+        updatedAt: new Date().toISOString()
+      }, { merge: true });
     } catch (e) { console.error(e); }
   }
 
-  if (!authChecked) return <div style={{display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', fontFamily:'Outfit'}}>Connexion en cours...</div>;
+  if (!authChecked) return <div style={{display:'flex', height:'100vh', alignItems:'center', justifyContent:'center', fontFamily:'Outfit'}}>Connexion sécurisée...</div>;
   if (!isLoggedIn) return <LoginPage />;
   if (!campaigns) return null;
 
@@ -111,7 +130,7 @@ export default function App() {
       }} isReadOnly={currentCampaign.locked} />}
 
       <header style={{ background: "white", padding: "15px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0" }}>
-        <h1 style={{ fontSize: "18px", fontWeight: "800", color: "#1d4ed8", margin: 0 }}>QualiForma</h1>
+        <h1 style={{ fontSize: "18px", fontWeight: "800", color: "#1d4ed8" }}>QualiForma</h1>
         <nav style={{ display: "flex", gap: "10px" }}>
           <button onClick={() => setActiveTab("dashboard")} style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: activeTab === "dashboard" ? "#1d4ed8" : "#f1f5f9", color: activeTab === "dashboard" ? "white" : "#64748b", cursor: "pointer", fontWeight: "700" }}>Dashboard</button>
           <button onClick={() => setActiveTab("criteres")} style={{ padding: "8px 16px", borderRadius: "8px", border: "none", background: activeTab === "criteres" ? "#1d4ed8" : "#f1f5f9", color: activeTab === "criteres" ? "white" : "#64748b", cursor: "pointer", fontWeight: "700" }}>Critères</button>
@@ -124,7 +143,6 @@ export default function App() {
           <div style={{ background: "white", padding: "30px", borderRadius: "20px", border: "1px solid #e2e8f0" }}>
             <h2 style={{marginTop: 0}}>{currentCampaign.name}</h2>
             <div style={{ fontSize: "40px", fontWeight: "900", color: "#1d4ed8" }}>{Math.round((stats.conforme / stats.total) * 100)}%</div>
-            <p style={{color: '#64748b'}}>Taux de conformité global</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "15px", marginTop: "20px" }}>
               <div style={{background: '#f0fdf4', padding: '15px', borderRadius: '12px', color: '#166534'}}><b>{stats.conforme}</b> Conformes</div>
               <div style={{background: '#fffbeb', padding: '15px', borderRadius: '12px', color: '#92400e'}}><b>{stats.enCours}</b> En cours</div>
