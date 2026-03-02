@@ -4,7 +4,8 @@ import { getAuth } from "firebase/auth";
 import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
-  apiKey: "AIzaSyA_k-WmHFJD7vz3ZGmf-Uin3rue4T-CE6s",
+  // On récupère la clé depuis le fichier .env (en local) ou Vercel (en ligne)
+  apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
   authDomain: "qualiopi-tracker-v2.firebaseapp.com",
   projectId: "qualiopi-tracker-v2",
   storageBucket: "qualiopi-tracker-v2.firebasestorage.app",
