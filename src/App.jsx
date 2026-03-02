@@ -6,22 +6,9 @@ import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
 import { DEFAULT_CRITERES, STATUT_CONFIG } from "./data";
 
-// --- PETIT COMPOSANT DE STATUT ---
 function StatusBadge({ statut }) {
   const s = STATUT_CONFIG[statut] || STATUT_CONFIG["non-evalue"];
-  return (
-    <span style={{ 
-      background: s.bg, 
-      color: s.color, 
-      border: `1px solid ${s.border}`, 
-      borderRadius: "6px", 
-      padding: "3px 10px", 
-      fontSize: "11px", 
-      fontWeight: "700" 
-    }}>
-      {s.label}
-    </span>
-  );
+  return <span style={{ background: s.bg, color: s.color, border: `1px solid ${s.border}`, borderRadius: "6px", padding: "3px 10px", fontSize: "11px", fontWeight: "700" }}>{s.label}</span>;
 }
 
 export default function App() {
@@ -33,6 +20,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchTerm, setSearchTerm] = useState("");
   const [modalCritere, setModalCritere] = useState(null);
+  const [errorMessage, setErrorMessage] = useState(null);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -49,7 +37,7 @@ export default function App() {
 
   async function loadData(user) {
     try {
-      // 1. On récupère le profil de l'utilisateur
+      setErrorMessage(null);
       const userSnap = await getDoc(doc(db, "users", user.uid));
       let etablissementId = "demo_ifps_cham";
       
@@ -59,19 +47,15 @@ export default function App() {
         etablissementId = userData.etablissementId || etablissementId;
       }
 
-      // 2. On charge les données de l'établissement
       const etabRef = doc(db, "etablissements", etablissementId);
       const snap = await getDoc(etabRef);
 
       if (snap.exists() && snap.data().campaigns) {
-        // Cas normal : les données sont déjà là
         setCampaigns(snap.data().campaigns);
         setActiveCampaignId(snap.data().campaigns[snap.data().campaigns.length - 1].id);
       } else {
-        // Cas migration : on regarde si on peut récupérer l'ancien travail
         const oldSnap = await getDoc(doc(db, "qualiopi", "criteres"));
         let finalCamps = [];
-
         if (oldSnap.exists() && oldSnap.data().liste) {
           finalCamps = [{
             id: Date.now().toString(),
@@ -81,23 +65,18 @@ export default function App() {
             locked: false
           }];
         } else {
-          // Si rien, on met le contenu par défaut
-          finalCamps = [{ 
-            id: "1", 
-            name: "Évaluation initiale", 
-            auditDate: "2026-10-15", 
-            liste: DEFAULT_CRITERES, 
-            locked: false 
-          }];
+          finalCamps = [{ id: "1", name: "Évaluation initiale", auditDate: "2026-10-15", liste: DEFAULT_CRITERES, locked: false }];
         }
-
-        // On enregistre ce nouveau tiroir pour ne plus avoir à migrer
         await setDoc(etabRef, { campaigns: finalCamps, nom: "QualiForma Etablissement" });
         setCampaigns(finalCamps);
         setActiveCampaignId(finalCamps[0].id);
       }
     } catch (e) {
-      console.error("Erreur de chargement:", e);
+      console.error("Erreur bloquante attrapée:", e);
+      setErrorMessage("Firebase est inaccessible. Affichage du mode de secours.");
+      const def = [{ id: "error_1", name: "Mode Secours", auditDate: "2026-10-15", liste: DEFAULT_CRITERES, locked: false }];
+      setCampaigns(def);
+      setActiveCampaignId("error_1");
     } finally {
       setAuthChecked(true);
     }
@@ -112,9 +91,9 @@ export default function App() {
     } catch (e) { console.error(e); }
   }
 
-  if (!authChecked) return null;
+  if (!authChecked) return <div style={{padding:"50px", textAlign:"center", fontFamily:"Outfit"}}>Initialisation...</div>;
   if (!isLoggedIn) return <LoginPage />;
-  if (!campaigns) return null;
+  if (!campaigns) return <div style={{padding:"50px", textAlign:"center", fontFamily:"Outfit", color:"red"}}>Erreur d'affichage. Recharger la page.</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
   const criteres = currentCampaign.liste || [];
@@ -125,11 +104,6 @@ export default function App() {
     enCours: criteres.filter(c => c.statut === "en-cours").length,
     nonConforme: criteres.filter(c => c.statut === "non-conforme").length,
   };
-
-  const filteredCriteres = criteres.filter(c => 
-    c.titre.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    c.num.toString().includes(searchTerm)
-  );
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit, sans-serif" }}>
@@ -146,6 +120,12 @@ export default function App() {
         />
       )}
 
+      {errorMessage && (
+        <div style={{ background: "#ef4444", color: "white", padding: "10px", textAlign: "center", fontWeight: "bold" }}>
+          ⚠️ {errorMessage}
+        </div>
+      )}
+
       <header style={{ background: "white", padding: "15px 30px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0" }}>
         <h1 style={{ fontSize: "18px", fontWeight: "800", color: "#1d4ed8", margin: 0 }}>QualiForma</h1>
         <nav style={{ display: "flex", gap: "10px" }}>
@@ -160,7 +140,6 @@ export default function App() {
           <div style={{ background: "white", padding: "30px", borderRadius: "20px", border: "1px solid #e2e8f0" }}>
             <h2 style={{ marginTop: 0 }}>{currentCampaign.name}</h2>
             <div style={{ fontSize: "40px", fontWeight: "900", color: "#1d4ed8" }}>{Math.round((stats.conforme / stats.total) * 100)}%</div>
-            <p style={{ color: "#64748b" }}>Taux de conformité global</p>
             <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "15px", marginTop: "20px" }}>
               <div style={{ background: "#f0fdf4", padding: "15px", borderRadius: "12px", color: "#166534" }}><b>{stats.conforme}</b> Conformes</div>
               <div style={{ background: "#fffbeb", padding: "15px", borderRadius: "12px", color: "#92400e" }}><b>{stats.enCours}</b> En cours</div>
@@ -171,7 +150,7 @@ export default function App() {
           <div style={{ background: "white", borderRadius: "20px", border: "1px solid #e2e8f0", overflow: "hidden" }}>
             <div style={{ padding: "15px" }}>
               <input 
-                placeholder="Rechercher un indicateur..." 
+                placeholder="Rechercher..." 
                 value={searchTerm} 
                 onChange={e => setSearchTerm(e.target.value)} 
                 style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #e2e8f0" }} 
@@ -179,17 +158,12 @@ export default function App() {
             </div>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <tbody>
-                {filteredCriteres.map(c => (
+                {criteres.filter(c => c.titre.toLowerCase().includes(searchTerm.toLowerCase())).map(c => (
                   <tr key={c.id} style={{ borderTop: "1px solid #f1f5f9" }}>
                     <td style={{ padding: "15px" }}><b>{c.num}</b> {c.titre}</td>
                     <td style={{ padding: "15px" }}><StatusBadge statut={c.statut} /></td>
                     <td style={{ padding: "15px", textAlign: 'right' }}>
-                      <button 
-                        onClick={() => setModalCritere(c)} 
-                        style={{ padding: "6px 12px", background: "#1d4ed8", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }}
-                      >
-                        Modifier
-                      </button>
+                      <button onClick={() => setModalCritere(c)} style={{ padding: "6px 12px", background: "#1d4ed8", color: "white", border: "none", borderRadius: "6px", cursor: "pointer" }}>Modifier</button>
                     </td>
                   </tr>
                 ))}
