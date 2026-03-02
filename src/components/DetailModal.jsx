@@ -99,7 +99,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-      // Le prompt structuré pour forcer l'analyse individuelle puis globale
       const promptText = `Tu es un auditeur Qualiopi expert pour un IFSI. 
       Je te fournis ${chantierFiles.length} document(s) de preuve pour l'Indicateur ${critere.num} ("${critere.titre}").
       
@@ -142,7 +141,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
         const fileRef = ref(storage, file.path);
         const arrayBuffer = await getBytes(fileRef);
         
-        // Conversion robuste en Base64
         const uint8Array = new Uint8Array(arrayBuffer);
         let binary = '';
         const len = uint8Array.byteLength;
@@ -161,7 +159,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
     } catch (e) {
       console.error("Erreur IA:", e);
-      setAiReport(`❌ Erreur technique : ${e.message}\nVérifiez que votre clé API est valide.`);
+      setAiReport(`❌ Erreur technique : ${e.message}\nVérifiez que votre clé API est valide ou que les fichiers existent bien.`);
     }
     setIsAnalyzing(false);
   }
@@ -193,7 +191,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
             <p style={{ marginBottom: "12px" }}><strong style={{ color: "#475569", display: "block", marginBottom: "4px" }}>Niveau attendu :</strong> <span style={{ color: "#1e3a5f", lineHeight: "1.5" }}>{guide.niveau}</span></p>
             <p style={{ marginBottom: "12px" }}><strong style={{ color: "#475569", display: "block", marginBottom: "4px" }}>Preuves suggérées :</strong> <span style={{ color: "#475569", lineHeight: "1.5" }}>{guide.preuves}</span></p>
             
-            {/* On cache la règle de non-conformité à l'auditeur */}
             {!isAuditMode && (
                <div style={{ background: "#fef2f2", padding: "12px", borderRadius: "8px", color: "#991b1b", marginTop: "16px", border: "1px solid #fca5a5", borderLeft: "4px solid #ef4444" }}>
                  <strong style={{ display: "block", marginBottom: "4px" }}>⚠️ Règle de non-conformité :</strong> 
@@ -223,7 +220,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
             <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "20px", borderRadius: "12px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
               <label style={{ ...lbl, color: "#166534", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>🏛️ Preuves Validées (Présentées à l'Audit)</label>
               
-              {/* Fichiers Validés */}
               <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: (data.preuves || !isAuditMode) ? "16px" : "0" }}>
                 {validatedFiles.length === 0 && <span style={{ fontSize: "12px", color: "#059669", fontStyle: "italic" }}>Aucun fichier validé pour l'instant.</span>}
                 {validatedFiles.map(f => (
@@ -236,7 +232,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                 ))}
               </div>
 
-              {/* Texte de preuve (pour les justifications sans fichiers) */}
               {(data.preuves || (!isAuditMode && !isReadOnly)) && (
                 <div style={{ marginTop: validatedFiles.length > 0 ? "10px" : "0" }}>
                   <label style={{ fontSize: "11px", color: "#059669", fontWeight: "700", marginBottom: "6px", display: "block" }}>Justifications textuelles / Liens Sharepoint :</label>
@@ -283,18 +278,26 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                   </div>
 
                   {!isReadOnly && (
-                    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
-                      <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" id="file-chantier" style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
-                      <label htmlFor="file-chantier" style={{ background: "white", border: "1px dashed #d97706", color: "#d97706", padding: "8px 16px", borderRadius: "8px", cursor: uploading ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", opacity: uploading ? 0.6 : 1 }}>
-                        {uploading ? "⏳ Upload..." : "📎 Importer un PDF ou une Image"}
-                      </label>
-                      
-                      {chantierFiles.length > 0 && (
-                        <button onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ background: "linear-gradient(135deg, #a855f7, #6366f1)", color: "white", border: "none", padding: "9px 16px", borderRadius: "8px", cursor: isAnalyzing ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", opacity: isAnalyzing ? 0.7 : 1 }}>
-                          ✨ {isAnalyzing ? "Analyse en cours..." : "Auditer tout le chantier avec l'IA"}
-                        </button>
-                      )}
-                    </div>
+                    <>
+                      {/* --- NOUVEAU BANDEAU RGPD ICI --- */}
+                      <div style={{ background: "#fef2f2", borderLeft: "4px solid #ef4444", borderTop: "1px solid #fee2e2", borderRight: "1px solid #fee2e2", borderBottom: "1px solid #fee2e2", padding: "10px 14px", marginBottom: "16px", borderRadius: "0 8px 8px 0", fontSize: "12px", color: "#991b1b" }}>
+                        <strong style={{ display: "block", marginBottom: "4px" }}>⚠️ Avertissement RGPD (Confidentialité)</strong>
+                        Merci de ne téléverser <b>aucune donnée personnelle</b> (noms, dossiers étudiants/formateurs). Veuillez anonymiser vos documents (biffage) ou utiliser des trames vierges avant l'envoi.
+                      </div>
+
+                      <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                        <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" id="file-chantier" style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
+                        <label htmlFor="file-chantier" style={{ background: "white", border: "1px dashed #d97706", color: "#d97706", padding: "8px 16px", borderRadius: "8px", cursor: uploading ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", opacity: uploading ? 0.6 : 1 }}>
+                          {uploading ? "⏳ Upload..." : "📎 Importer un PDF ou une Image"}
+                        </label>
+                        
+                        {chantierFiles.length > 0 && (
+                          <button onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ background: "linear-gradient(135deg, #a855f7, #6366f1)", color: "white", border: "none", padding: "9px 16px", borderRadius: "8px", cursor: isAnalyzing ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", opacity: isAnalyzing ? 0.7 : 1 }}>
+                            ✨ {isAnalyzing ? "Analyse en cours..." : "Auditer tout le chantier avec l'IA"}
+                          </button>
+                        )}
+                      </div>
+                    </>
                   )}
 
                   {aiReport && (
