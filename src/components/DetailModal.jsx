@@ -84,7 +84,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     setAiReport("⏳ Analyse IA en cours...");
     try {
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-      const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+      const model = genAI.getGenerativeModel({ model: "models/gemini-1.5-flash" });
       const arrayBuffer = await getBytes(ref(storage, file.path));
       const base64 = btoa(new Uint8Array(arrayBuffer).reduce((d, b) => d + String.fromCharCode(b), ''));
       const prompt = `Auditeur Qualiopi. Analyse l'indicateur ${critere.num}. Attendu: ${guide.niveau}. Preuves: ${guide.preuves}.`;
