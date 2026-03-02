@@ -7,6 +7,7 @@ import { CRITERES_LABELS, STATUT_CONFIG, RESPONSABLES, GUIDE_QUALIOPI, ROLE_COLO
 function MultiSelect({ selected, onChange, disabled }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef();
+  
   useEffect(() => { 
     function h(e) { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpen(false); } 
     document.addEventListener("mousedown", h); 
@@ -61,7 +62,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const fileRef = ref(storage, `preuves/${critere.id}_${Date.now()}_${file.name}`);
       await uploadBytesResumable(fileRef, file);
       const url = await getDownloadURL(fileRef);
-      // Fichier non validé par défaut -> va dans le Chantier
       const newFile = { name: file.name, url: url, path: fileRef.fullPath, validated: false };
       setData({ ...data, fichiers: [...data.fichiers, newFile] });
     } catch (error) { 
@@ -91,67 +91,73 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     const chantierFiles = data.fichiers.filter(f => !f.validated);
     if (chantierFiles.length === 0) return alert("Aucun document dans la zone chantier !");
     
-    const file = chantierFiles[chantierFiles.length - 1]; // On analyse le dernier ajouté
-    const ext = file.name.split('.').pop().toLowerCase();
-    
-    // Détection précise du type MIME
-    let mime = '';
-    if (ext === 'pdf') mime = 'application/pdf';
-    else if (['jpg', 'jpeg'].includes(ext)) mime = 'image/jpeg';
-    else if (ext === 'png') mime = 'image/png';
-    else if (ext === 'webp') mime = 'image/webp';
-    
-    if (!mime) {
-      alert(`Format ${ext.toUpperCase()} non supporté.\nL'IA lit les PDF et les images (JPG, PNG).`);
-      return;
-    }
-
     setIsAnalyzing(true);
-    setAiReport("⏳ Lecture et analyse du document par l'IA en cours...");
+    setAiReport(`⏳ Lecture et analyse globale de ${chantierFiles.length} document(s) par l'IA...`);
     
     try {
       const genAI = new GoogleGenerativeAI(import.meta.env.VITE_GEMINI_API_KEY);
-      
-      // Utilisation du modèle Gemini 2.5 Flash comme convenu
       const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
-      const fileRef = ref(storage, file.path);
-      const arrayBuffer = await getBytes(fileRef);
-      
-      // Conversion robuste en Base64 pour supporter les gros fichiers
-      const uint8Array = new Uint8Array(arrayBuffer);
-      let binary = '';
-      const len = uint8Array.byteLength;
-      for (let i = 0; i < len; i++) {
-        binary += String.fromCharCode(uint8Array[i]);
-      }
-      const base64 = btoa(binary);
-
-      const prompt = `Tu es un auditeur Qualiopi expert pour un IFSI. 
-      Analyse ce document pour l'Indicateur ${critere.num} ("${critere.titre}").
+      // 1. On prépare le texte d'introduction pour l'IA
+      const promptText = `Tu es un auditeur Qualiopi expert pour un IFSI. 
+      Je te fournis ${chantierFiles.length} document(s) de preuve pour l'Indicateur ${critere.num} ("${critere.titre}").
       
       Référentiel :
       - Attendu : ${guide.niveau}
       - Preuves suggérées : ${guide.preuves}
       
+      Fais une analyse globale de l'ensemble de ces documents.
       Réponds de façon structurée :
-      - PERTINENCE : (Le document correspond-il à l'indicateur ?)
-      - POINTS FORTS : (Ce qui est bien traité)
-      - ÉCARTS / MANQUES : (Ce qu'il faut ajouter pour être 100% conforme)
+      - BILAN GLOBAL : (La somme de ces documents permet-elle de valider l'indicateur ?)
+      - POINTS FORTS : (Ce qui est bien couvert par les documents)
+      - ÉCARTS / MANQUES : (Ce qu'il manque à l'ensemble pour être 100% conforme)
       
-      Sois concis, utilise des tirets et un ton professionnel.`;
+      Précise quel document apporte quelle preuve si nécessaire. Sois concis, utilise des tirets et un ton professionnel.`;
 
-      const result = await model.generateContent([
-        prompt,
-        { inlineData: { data: base64, mimeType: mime } }
-      ]);
+      // On initialise le tableau des éléments à envoyer à l'IA avec le texte
+      const contentsArray = [promptText];
 
+      // 2. On boucle sur TOUS les fichiers du chantier
+      for (let i = 0; i < chantierFiles.length; i++) {
+        const file = chantierFiles[i];
+        const ext = file.name.split('.').pop().toLowerCase();
+        
+        let mime = '';
+        if (ext === 'pdf') mime = 'application/pdf';
+        else if (['jpg', 'jpeg'].includes(ext)) mime = 'image/jpeg';
+        else if (ext === 'png') mime = 'image/png';
+        else if (ext === 'webp') mime = 'image/webp';
+        
+        if (!mime) {
+          console.warn(`Format ignoré par l'IA : ${file.name}`);
+          continue; // On passe au fichier suivant si le format n'est pas géré
+        }
+
+        const fileRef = ref(storage, file.path);
+        const arrayBuffer = await getBytes(fileRef);
+        
+        // Conversion robuste en Base64 pour supporter les gros fichiers
+        const uint8Array = new Uint8Array(arrayBuffer);
+        let binary = '';
+        const len = uint8Array.byteLength;
+        for (let j = 0; j < len; j++) {
+          binary += String.fromCharCode(uint8Array[j]);
+        }
+        const base64 = btoa(binary);
+
+        // On ajoute le nom du fichier et son contenu à la suite du prompt
+        contentsArray.push(`\n--- Document ${i + 1} : ${file.name} ---`);
+        contentsArray.push({ inlineData: { data: base64, mimeType: mime } });
+      }
+
+      // 3. On envoie tout le paquet d'un seul coup à Gemini
+      const result = await model.generateContent(contentsArray);
       const response = await result.response;
       setAiReport(response.text());
 
     } catch (e) {
       console.error("Erreur IA:", e);
-      setAiReport(`❌ Erreur technique : ${e.message}\nVérifiez que votre clé API est valide et que le modèle gemini-2.5-flash est bien accessible.`);
+      setAiReport(`❌ Erreur technique : ${e.message}\nVérifiez que votre clé API est valide.`);
     }
     setIsAnalyzing(false);
   }
@@ -281,7 +287,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                       
                       {chantierFiles.length > 0 && (
                         <button onClick={handleAIAnalysis} disabled={isAnalyzing} style={{ background: "linear-gradient(135deg, #a855f7, #6366f1)", color: "white", border: "none", padding: "9px 16px", borderRadius: "8px", cursor: isAnalyzing ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", display: "flex", alignItems: "center", gap: "6px", opacity: isAnalyzing ? 0.7 : 1 }}>
-                          ✨ {isAnalyzing ? "Analyse en cours..." : "Auditer la dernière preuve avec l'IA"}
+                          ✨ {isAnalyzing ? "Analyse globale en cours..." : "Auditer tout le chantier avec l'IA"}
                         </button>
                       )}
                     </div>
@@ -289,7 +295,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
                   {aiReport && (
                     <div style={{ marginTop: "16px", background: "white", padding: "16px", borderRadius: "8px", fontSize: "13px", border: "1px solid #d8b4fe", color: "#4c1d95", lineHeight: "1.6" }}>
-                      <h4 style={{ margin: "0 0 8px 0", color: "#6b21a8", fontSize: "14px" }}>Rapport IA</h4>
+                      <h4 style={{ margin: "0 0 8px 0", color: "#6b21a8", fontSize: "14px" }}>Rapport IA Global</h4>
                       <div style={{ whiteSpace: "pre-wrap" }}>{aiReport}</div>
                     </div>
                   )}
