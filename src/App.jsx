@@ -239,7 +239,7 @@ export default function App() {
     });
     const headerRow = worksheet.getRow(1); headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; headerRow.alignment = { vertical: 'middle', horizontal: 'center' }; worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
     worksheet.eachRow((row, rowNumber) => { row.eachCell((cell) => { cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } }; if (rowNumber > 1) { if (!cell.alignment) { cell.alignment = { vertical: 'top', wrapText: true }; } else { cell.alignment.wrapText = true; } } }); });
-    const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `Qualiopi_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+    const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
@@ -262,8 +262,19 @@ export default function App() {
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}><svg viewBox="0 0 24 24" width="36" height="36"><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stopColor="#1d4ed8"/><stop offset="100%" stopColor="#3b82f6"/></linearGradient></defs><path fill="url(#g)" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg></div>
-            <div><div style={{ fontSize: "17px", fontWeight: "800", color: "#1e3a5f", display: "flex", alignItems: "center", flexWrap: "wrap" }}>Qualiopi Tracker <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>V1.6</span><span style={{ margin: "0 8px", color: "#d1d5db" }}>—</span> {NOM_ETABLISSEMENT}</div><div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Référentiel National Qualité · 32 indicateurs</div></div>
+            {/* NOUVEAU LOGO "Q VALIDÉ" ICI */}
+            <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs>
+                <path fill-rule="evenodd" clip-rule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#grad)"/>
+                <path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#grad)"/>
+              </svg>
+            </div>
+            <div>
+              {/* NOUVEAU NOM ICI */}
+              <div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", display: "flex", alignItems: "center", flexWrap: "wrap" }}>QualiForma <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>V2.0</span><span style={{ margin: "0 8px", color: "#d1d5db" }}>—</span> {NOM_ETABLISSEMENT}</div>
+              <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Référentiel National Qualité · 32 indicateurs</div>
+            </div>
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px", borderLeft: "2px solid #f1f5f9", paddingLeft: "16px" }}>
               <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ ...sel, fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", background: "#eff6ff", outline: "none" }}>{campaigns.map(c => <option key={c.id} value={c.id}>{c.name} {c.locked ? "(Archive)" : ""}</option>)}<option disabled>──────────</option><option value="NEW">➕ Nouvelle certification...</option></select>
               {campaigns.length > 1 && <button onClick={handleDeleteCampaign} className="no-print" title="Supprimer" style={{ background: "white", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "14px", color: "#ef4444", padding: "6px 8px" }}>🗑️</button>}
@@ -297,14 +308,12 @@ export default function App() {
             )}
           </div>
 
-          {/* --- NOUVEAUTÉ : BARRE DE PROGRESSION GLOBALE --- */}
           <div className="print-break-avoid no-print" style={{ ...card, marginBottom: "24px", padding: "20px 24px" }}>
             <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#1e3a5f", fontWeight: "800", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
               <span>🚀 État d'avancement global</span>
               <span style={{ fontSize: "15px", color: "#1d4ed8", fontWeight: "800", background: "#eff6ff", padding: "4px 10px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>{Math.round((stats.conforme / stats.total) * 100) || 0}% Achevé</span>
             </h3>
             
-            {/* La barre empilée */}
             <div style={{ display: "flex", height: "26px", borderRadius: "13px", overflow: "hidden", background: "#f1f5f9", gap: "3px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)" }}>
               <div style={{ width: `${(stats.conforme / stats.total) * 100}%`, background: "#10b981", transition: "width 0.8s ease" }} title={`Conforme: ${stats.conforme}`} />
               <div style={{ width: `${(stats.enCours / stats.total) * 100}%`, background: "#f59e0b", transition: "width 0.8s ease" }} title={`En cours: ${stats.enCours}`} />
@@ -312,7 +321,6 @@ export default function App() {
               <div style={{ width: `${(stats.nonEvalue / stats.total) * 100}%`, background: "#d1d5db", transition: "width 0.8s ease" }} title={`Non évalué: ${stats.nonEvalue}`} />
             </div>
             
-            {/* Légende */}
             <div style={{ display: "flex", gap: "20px", marginTop: "14px", fontSize: "12px", fontWeight: "700", flexWrap: "wrap", justifyContent: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#10b981" }}></span><span style={{ color: "#065f46" }}>{stats.conforme} Conformes ({Math.round((stats.conforme / stats.total) * 100) || 0}%)</span></div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#f59e0b" }}></span><span style={{ color: "#92400e" }}>{stats.enCours} En cours ({Math.round((stats.enCours / stats.total) * 100) || 0}%)</span></div>
@@ -321,13 +329,16 @@ export default function App() {
             </div>
           </div>
 
-          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(6,1fr)", gap: "12px", marginBottom: "24px" }}>
-            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#475569","#e2e8f0","#cbd5e1",stats.nonConcerne,"Non concernés"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents < 30j"]].map(([color,bg,border,num,label]) => (
+          {/* GRILLE DES STATS NETTOYÉE (PLUS DE NON CONCERNÉS) */}
+          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px", marginBottom: "24px" }}>
+            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents < 30j"]].map(([color,bg,border,num,label]) => (
               <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "14px 16px", opacity: isArchive ? 0.8 : 1 }}><div style={{ fontSize: "28px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div><div style={{ fontSize: "10px", color, opacity: 0.9, marginTop: "4px", textTransform: "uppercase", fontWeight: "700", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div></div>
             ))}
           </div>
+          
+          {/* CARTE DE GAUGE NETTOYÉE */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"], ["Non concerné",stats.nonConcerne,"#64748b"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{l==="Non concerné" ? v : `${v}/${stats.total}`}</span></div>{l!=="Non concerné" && <ProgressBar value={v} max={stats.total} color={col} />}</div>))}</div></div></div>
+            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
             <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
           </div>
         </>}
@@ -381,7 +392,6 @@ export default function App() {
                 const d = days(c.delai); 
                 const resps = Array.isArray(c.responsables) ? c.responsables : []; 
                 
-                // Nouvelle logique des preuves réseau et fichiers uploadés
                 const nbFiles = (c.fichiers || []).filter(f => !f.archive).length;
                 const nbChemins = (c.chemins_reseau || []).length;
                 const hasLink = (c.preuves || "").trim().length > 0;
