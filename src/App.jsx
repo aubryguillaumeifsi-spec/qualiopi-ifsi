@@ -42,6 +42,8 @@ export default function App() {
 
   async function loadUserDataAndContent(user) {
     try {
+      console.log("Tentative de connexion pour UID:", user.uid);
+      
       // 1. Récupération du profil utilisateur
       const userDoc = await getDoc(doc(db, "users", user.uid));
       let etablissementId = "demo_ifps_cham";
@@ -50,37 +52,46 @@ export default function App() {
         const userData = userDoc.data();
         setUserProfile(userData);
         etablissementId = userData.etablissementId || etablissementId;
+        console.log("Etablissement trouvé:", etablissementId);
+      } else {
+        console.warn("Profil utilisateur non trouvé dans la collection 'users'");
       }
 
       // 2. Récupération du tiroir de l'établissement
       const etabRef = getEtablissementRef(etablissementId);
       let snap = await getDoc(etabRef);
 
-      // --- LOGIQUE DE MIGRATION CIBLÉE ---
-      // Si le nouveau tiroir est vide, on va chercher le document "criteres" dans la collection "qualiopi"
-      if (!snap.exists() || !snap.data()?.campaigns) {
-        console.log("Migration QualiForma en cours...");
+      // --- LOGIQUE DE MIGRATION FORCEE ---
+      // Si le tiroir est vide ou contient une liste par défaut (32 à évaluer), on tente la migration
+      const isNewOrEmpty = !snap.exists() || !snap.data()?.campaigns || snap.data()?.campaigns[0]?.liste[0]?.statut === "non-evalue";
+
+      if (isNewOrEmpty) {
+        console.log("Analyse de l'ancienne collection 'qualiopi'...");
+        // On teste le document 'criteres' (le plus probable selon tes infos)
         const oldSnap = await getDoc(doc(db, "qualiopi", "criteres")); 
         
         if (oldSnap.exists()) {
+          console.log("Anciennes données trouvées ! Migration en cours...");
           const oldData = oldSnap.data();
-          // On crée la structure de campagne à partir de ton ancien document
+          
           const migratedCampaign = [{
             id: oldData.id || Date.now().toString(),
-            name: oldData.name || "Évaluation migrée",
+            name: oldData.name || "Migration QualiForma",
             auditDate: oldData.auditDate || "2026-10-15",
             liste: oldData.liste || [],
             locked: false,
-            updatedAt: oldData.updatedAt || new Date().toISOString()
+            updatedAt: new Date().toISOString()
           }];
 
           await setDoc(etabRef, { 
             campaigns: migratedCampaign, 
             updatedAt: new Date().toISOString(),
-            nom: "IFPS du CHAM" 
+            nom: "IFPS du CHAM (Migré)" 
           }, { merge: true });
           
-          snap = await getDoc(etabRef);
+          snap = await getDoc(etabRef); // On recharge les données migrées
+        } else {
+          console.error("Impossible de trouver le document 'qualiopi/criteres'. Vérifiez le nom dans Firebase.");
         }
       }
 
@@ -90,11 +101,12 @@ export default function App() {
         setCampaigns(d.campaigns); 
         setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
       } else {
+        console.log("Aucune donnée à migrer, chargement de la structure par défaut.");
         initDefault();
       }
       setAuthChecked(true);
     } catch (e) {
-      console.error("Erreur fatale migration:", e);
+      console.error("Erreur critique loadUserDataAndContent:", e);
       initDefault();
       setAuthChecked(true);
     }
