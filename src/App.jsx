@@ -28,7 +28,6 @@ const ROLE_PALETTE = [
   { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" }  
 ];
 
-// 👉 CORRECTION ICI : la variable s'appelle bien "today" pour tout le monde
 const today = new Date();
 const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
 const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
@@ -126,6 +125,7 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
+  // Correction de la fuite de mémoire signalée par Claude
   useEffect(() => {
     let unsubUsers = null;
     if (selectedIfsi && userProfile && userProfile.role !== "guest") {
@@ -147,6 +147,7 @@ function MainApp() {
     let unsubSnapshot = null; let unsubIfsiDoc = null;
     if (selectedIfsi && userProfile?.role !== "guest" && !userProfile?.mustChangePassword) {
       setCampaigns(null); 
+      
       unsubSnapshot = onSnapshot(getDocRef(selectedIfsi), (snap) => {
         if (snap.exists()) {
           const d = snap.data();
@@ -183,6 +184,7 @@ function MainApp() {
     } catch (e) { setSaveStatus("error"); setTimeout(() => setSaveStatus("idle"), 3000); }
   }
 
+  // 👉 Optimisations useMemo pour stopper les re-calculs permanents
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
@@ -242,7 +244,8 @@ function MainApp() {
     return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate, liste };
   }, [allQualiopiData]);
 
-  const { activeIfsisStats, globalScore, topAlerts, activeIfsis, archivedIfsis } = useMemo(() => {
+  // 👉 L'OPTIMISATION TOUR DE CONTRÔLE CORRIGÉE
+  const { activeIfsisStats, globalScore, topAlerts, totalAlertsCount, activeIfsis, archivedIfsis } = useMemo(() => {
     const active = ifsiList.filter(i => !i.archived);
     const archived = ifsiList.filter(i => i.archived);
     
@@ -261,7 +264,14 @@ function MainApp() {
         });
       }
     });
-    return { activeIfsis: active, archivedIfsis: archived, activeIfsisStats: statsArr, globalScore: score, topAlerts: alerts.slice(0, 12) };
+    return { 
+      activeIfsis: active, 
+      archivedIfsis: archived, 
+      activeIfsisStats: statsArr, 
+      globalScore: score, 
+      topAlerts: alerts.slice(0, 12),
+      totalAlertsCount: alerts.length 
+    };
   }, [ifsiList, getIfsiGlobalStats]);
 
   const sortedTourIfsis = useMemo(() => {
@@ -492,22 +502,6 @@ function MainApp() {
     if ((oldCritere.preuves || "") !== (updated.preuves || "")) newLogs.push({ date: now, user: userEmail, msg: `📝 A modifié le texte des justifications / liens publics` });
     if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) newLogs.push({ date: now, user: userEmail, msg: `🚧 A modifié le texte de la zone de chantier` });
 
-    const oldFiles = oldCritere.fichiers || []; const newFiles = updated.fichiers || [];
-    newFiles.forEach(nf => {
-      const of = oldFiles.find(o => o.url === nf.url);
-      if (!of) newLogs.push({ date: now, user: userEmail, msg: `📎 A importé le fichier : ${nf.name}` });
-      else if (of.validated !== nf.validated) newLogs.push({ date: now, user: userEmail, msg: nf.validated ? `✅ A validé le document comme preuve officielle : ${nf.name}` : `❌ A repassé en chantier le document : ${nf.name}` });
-    });
-    oldFiles.forEach(of => { if (!newFiles.find(nf => nf.url === of.url)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le fichier : ${of.name}` }); });
-
-    const oldChemins = oldCritere.chemins_reseau || []; const newChemins = updated.chemins_reseau || [];
-    newChemins.forEach(nc => {
-      const oc = oldChemins.find(o => o.chemin === nc.chemin);
-      if (!oc) newLogs.push({ date: now, user: userEmail, msg: `🔗 A ajouté le lien réseau : ${nc.nom}` });
-      else if (oc.validated !== nc.validated) newLogs.push({ date: now, user: userEmail, msg: nc.validated ? `✅ A validé le lien réseau comme preuve officielle : ${nc.nom}` : `❌ A repassé en chantier le lien réseau : ${nc.nom}` });
-    });
-    oldChemins.forEach(oc => { if (!newChemins.find(nc => nc.chemin === oc.chemin)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le lien réseau : ${oc.nom}` }); });
-
     let finalUpdated = { ...updated };
     if (newLogs.length > 0) finalUpdated.historique = [...(oldCritere.historique || []), ...newLogs];
 
@@ -522,8 +516,15 @@ function MainApp() {
 
   function handleAutoSave(updated) {
     if (isArchive) return;
-    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
+    const newCriteres = criteres.map(c => c.id === updated.id ? updated : c);
+    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
   }
+
+  const handleSortTeam = (key) => {
+    let direction = "asc";
+    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc";
+    setTeamSortConfig({ key, direction });
+  };
 
   async function exportToExcel() {
     if (!criteres) return;
@@ -679,6 +680,10 @@ function MainApp() {
         </div>
       </div>
       
+      {currentIfsiObj?.archived && <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>⚠️ ATTENTION : Cet établissement est actuellement ARCHIVÉ. Il est invisible pour les utilisateurs normaux.</div>}
+      {isArchive && <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>🔒 Mode Lecture Seule : Cette évaluation est une archive historique.</div>}
+      {isAuditMode && !isArchive && <div className="no-print" style={{ background: "#d1fae5", borderBottom: "1px solid #6ee7b7", color: "#065f46", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>✅ Mode Audit Activé : Les notes internes et preuves en cours sont masquées.</div>}
+      
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
         {/* ========================================================= */}
@@ -796,6 +801,7 @@ function MainApp() {
               </div>
             </div>
 
+            {/* 👉 AFFICHAGE DE TOTALALERTSCOUNT CORRECT */}
             {topAlerts.length > 0 && (
               <div style={{ marginBottom: "32px" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#991b1b", margin: "0 0 10px 0", display: "flex", alignItems: "center", gap: "6px" }}>🚨 Alertes Urgentes sur le réseau</h3>
@@ -809,9 +815,9 @@ function MainApp() {
                       </div>
                     </div>
                   ))}
-                  {globalAlerts.length > 12 && (
+                  {totalAlertsCount > 12 && (
                     <div style={{ minWidth: "150px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#64748b", fontWeight: "700" }}>
-                      + {globalAlerts.length - 12} autres alertes
+                      + {totalAlertsCount - 12} autres alertes
                     </div>
                   )}
                 </div>
@@ -1111,7 +1117,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- DASHBOARD, CRITERES, AXES, RESPONSABLES, COMPTE --- */}
+        {/* --- DASHBOARD --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -1199,7 +1205,7 @@ function MainApp() {
 
         {/* --- RESPONSABLES --- */}
         {activeTab === "responsables" && <>
-          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Avancement par Membre de l'équipe</h2></div>
+          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
             {byPerson.map(p => {
               const conformes = p.items.filter(c => c.statut==="conforme").length;
