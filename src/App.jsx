@@ -424,7 +424,6 @@ function MainApp() {
     }
   }
 
-  // 👉 DEFINITION DES DATES / COULEURS POUR LE DASHBOARD (Remis dans le bon ordre !)
   const today = new Date();
   const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
   const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
@@ -482,13 +481,6 @@ function MainApp() {
   const isArchive = currentCampaign.locked || false;
   const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
 
-  // 👉 DEFINITIONS DASHBOARD / FILTRES
-  const auditDateObj = new Date(currentAuditDate);
-  const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
-  let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
-  if (daysToAudit < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` };
-  else if (daysToAudit <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` };
-  
   const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
   const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; 
 
@@ -497,7 +489,7 @@ function MainApp() {
   const filtered = criteres.filter(c => { if (filterStatut !== "tous" && c.statut !== filterStatut) return false; if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false; if (searchTerm) { const s = searchTerm.toLowerCase(); return String(c.titre||"").toLowerCase().includes(s) || String(c.num||"").toLowerCase().includes(s); } return true; });
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]));
 
-  // 👉 LA NOUVELLE FONCTION SAVE MODAL (AVEC HISTORIQUE ET NAVIGATION)
+  // 👉 LA FONCTION SAVE MODAL AVEC HISTORIQUE INTELLIGENT
   function saveModal(updated, action) {
     if (isArchive) {
        if (action === "close" || !action) setModalCritere(null);
@@ -511,34 +503,59 @@ function MainApp() {
     const userEmail = auth.currentUser?.email || "Utilisateur inconnu";
     const now = new Date().toISOString();
 
-    // Traque le changement de statut
+    // 1. Traque le changement de statut
     if (oldCritere.statut !== updated.statut) {
       const oldName = STATUT_CONFIG[oldCritere.statut]?.label || "Non évalué";
       const newName = STATUT_CONFIG[updated.statut]?.label || "Non évalué";
       newLogs.push({ date: now, user: userEmail, msg: `Statut : ${oldName} ➡️ ${newName}` });
     }
     
-    // Traque les responsables
-    const oldResps = Array.isArray(oldCritere.responsables) ? oldCritere.responsables.slice().sort().join(",") : "";
-    const newResps = Array.isArray(updated.responsables) ? updated.responsables.slice().sort().join(",") : "";
+    // 2. Traque les responsables
+    const oldResps = Array.isArray(oldCritere.responsables) ? oldCritere.responsables.slice().sort().join(", ") : "";
+    const newResps = Array.isArray(updated.responsables) ? updated.responsables.slice().sort().join(", ") : "";
     if (oldResps !== newResps) {
-      newLogs.push({ date: now, user: userEmail, msg: `A modifié les responsables` });
+      newLogs.push({ date: now, user: userEmail, msg: `Responsables mis à jour : ${newResps || "Aucun"}` });
     }
 
-    // Traque les textes
+    // 3. Traque les textes
     if ((oldCritere.preuves || "") !== (updated.preuves || "")) {
-       newLogs.push({ date: now, user: userEmail, msg: `A mis à jour les preuves finalisées` });
+       newLogs.push({ date: now, user: userEmail, msg: `A modifié le texte des justifications / liens publics` });
     }
     if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) {
-       newLogs.push({ date: now, user: userEmail, msg: `A mis à jour le chantier / brouillon` });
+       newLogs.push({ date: now, user: userEmail, msg: `A modifié le texte de la zone de chantier` });
     }
 
-    // Traque les fichiers et liens
-    const oldFCount = (oldCritere.fichiers || []).length + (oldCritere.chemins_reseau || []).length;
-    const newFCount = (updated.fichiers || []).length + (updated.chemins_reseau || []).length;
-    if (oldFCount !== newFCount) {
-       newLogs.push({ date: now, user: userEmail, msg: `A ajouté/supprimé des pièces jointes` });
-    }
+    // 4. Traque les FICHIERS CLOUD (Ajout, suppression, validation)
+    const oldFiles = oldCritere.fichiers || [];
+    const newFiles = updated.fichiers || [];
+    
+    newFiles.forEach(nf => {
+      const of = oldFiles.find(o => o.url === nf.url);
+      if (!of) newLogs.push({ date: now, user: userEmail, msg: `📎 A importé le fichier : ${nf.name}` });
+      else if (of.validated !== nf.validated) {
+        if (nf.validated) newLogs.push({ date: now, user: userEmail, msg: `✅ A validé le document comme preuve officielle : ${nf.name}` });
+        else newLogs.push({ date: now, user: userEmail, msg: `❌ A repassé en chantier le document : ${nf.name}` });
+      }
+    });
+    oldFiles.forEach(of => {
+      if (!newFiles.find(nf => nf.url === of.url)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le fichier : ${of.name}` });
+    });
+
+    // 5. Traque les CHEMINS RÉSEAU (Ajout, suppression, validation)
+    const oldChemins = oldCritere.chemins_reseau || [];
+    const newChemins = updated.chemins_reseau || [];
+
+    newChemins.forEach(nc => {
+      const oc = oldChemins.find(o => o.chemin === nc.chemin);
+      if (!oc) newLogs.push({ date: now, user: userEmail, msg: `🔗 A ajouté le lien réseau : ${nc.nom}` });
+      else if (oc.validated !== nc.validated) {
+        if (nc.validated) newLogs.push({ date: now, user: userEmail, msg: `✅ A validé le lien réseau comme preuve officielle : ${nc.nom}` });
+        else newLogs.push({ date: now, user: userEmail, msg: `❌ A repassé en chantier le lien réseau : ${nc.nom}` });
+      }
+    });
+    oldChemins.forEach(oc => {
+      if (!newChemins.find(nc => nc.chemin === oc.chemin)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le lien réseau : ${oc.nom}` });
+    });
 
     // Application de l'historique
     let finalUpdated = { ...updated };
@@ -676,7 +693,6 @@ function MainApp() {
         .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
       
-      {/* 👉 APPEL DE DETAIL MODAL AVEC LES NOUVELLES PROPS (hasPrev / hasNext) */}
       {modalCritere && (
         <DetailModal 
           critere={modalCritere} 
@@ -1194,7 +1210,6 @@ function MainApp() {
           })}
         </>}
 
-        {/* --- RESPONSABLES --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
@@ -1236,7 +1251,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- COMPTE --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
