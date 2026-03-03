@@ -2,33 +2,49 @@ import { useState, useEffect, useRef } from "react";
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getBytes } from "firebase/storage";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { storage } from "../firebase";
-import { CRITERES_LABELS, STATUT_CONFIG, RESPONSABLES, GUIDE_QUALIOPI, ROLE_COLORS } from "../data";
+// 👉 On n'importe plus RESPONSABLES d'ici !
+import { CRITERES_LABELS, STATUT_CONFIG, GUIDE_QUALIOPI, ROLE_COLORS } from "../data";
 
-function MultiSelect({ selected, onChange, disabled }) {
-  const [open, setOpen] = useState(false);
-  const dropdownRef = useRef();
-  
-  useEffect(() => { 
-    function h(e) { if (dropdownRef.current && !dropdownRef.current.contains(e.target)) setOpen(false); } 
-    document.addEventListener("mousedown", h); 
-    return () => document.removeEventListener("mousedown", h); 
-  }, []);
-  
-  function toggle(r) { onChange(selected.includes(r) ? selected.filter(x => x !== r) : [...selected, r]); }
-  const display = selected.length === 0 ? "Aucun responsable" : selected.length === 1 ? selected[0].split("(")[0].trim() : `${selected.length} responsables`;
-  
+// 👉 NOUVEAU COMPOSANT : Saisie libre d'étiquettes (Smart Tags)
+function TagInput({ tags, onChange, disabled }) {
+  const [inputValue, setInputValue] = useState("");
+
+  const handleKeyDown = (e) => {
+    if (e.key === 'Enter') {
+      e.preventDefault(); // Empêche de fermer la fenêtre
+      const newTag = inputValue.trim();
+      if (newTag && !tags.includes(newTag)) {
+        onChange([...tags, newTag]);
+      }
+      setInputValue("");
+    }
+  };
+
+  const handleRemove = (tagToRemove) => {
+    onChange(tags.filter(t => t !== tagToRemove));
+  };
+
   return (
-    <div className="no-print" ref={dropdownRef} style={{ position: "relative" }}>
-      <button onClick={() => !disabled && setOpen(!open)} style={{ width: "100%", background: disabled ? "#f9fafb" : "white", border: "1px solid #d1d5db", borderRadius: "8px", padding: "8px 12px", textAlign: "left", cursor: disabled ? "not-allowed" : "pointer", fontSize: "13px" }}><span>{display}</span></button>
-      {open && !disabled && (
-        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "white", border: "1px solid #d1d5db", borderRadius: "10px", zIndex: 300, maxHeight: "200px", overflowY: "auto", boxShadow: "0 4px 12px rgba(0,0,0,0.1)" }}>
-          {RESPONSABLES.map(r => (
-            <label key={r} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "8px 12px", cursor: "pointer" }}>
-              <input type="checkbox" checked={selected.includes(r)} onChange={() => toggle(r)} />
-              <span style={{ fontSize: "13px" }}>{r.split("(")[0].trim()}</span>
-            </label>
-          ))}
-        </div>
+    <div style={{ border: "1px solid #d1d5db", borderRadius: "8px", padding: "6px", background: disabled ? "#f9fafb" : "white", display: "flex", flexWrap: "wrap", gap: "6px", minHeight: "42px", boxSizing: "border-box", alignItems: "center" }}>
+      {tags.map(tag => (
+        <span key={tag} style={{ background: "#eff6ff", color: "#1d4ed8", padding: "4px 10px", borderRadius: "6px", fontSize: "12px", fontWeight: "600", display: "flex", alignItems: "center", gap: "6px", border: "1px solid #bfdbfe" }}>
+          {tag}
+          {!disabled && (
+            <button type="button" onClick={() => handleRemove(tag)} style={{ border: "none", background: "transparent", color: "#3b82f6", cursor: "pointer", fontSize: "16px", lineHeight: "1", padding: 0, display: "flex" }}>
+              ×
+            </button>
+          )}
+        </span>
+      ))}
+      {!disabled && (
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder={tags.length === 0 ? "Taper un nom et faire Entrée..." : "Ajouter..."}
+          style={{ border: "none", outline: "none", flex: 1, minWidth: "150px", fontSize: "13px", padding: "4px", background: "transparent" }}
+        />
       )}
     </div>
   );
@@ -181,7 +197,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Lien réseau";
       setData({ 
         ...data, 
-        // Le nouveau chemin est ajouté, mais il n'est PAS validé par défaut (il va dans le chantier)
         chemins_reseau: [...data.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim(), validated: false }] 
       });
       setNewCheminNom("");
@@ -205,7 +220,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const chantierFiles = data.fichiers.filter(f => !f.validated);
   const validatedFiles = data.fichiers.filter(f => f.validated);
 
-  // Vérifie s'il y a des chemins réseau validés ou en chantier
   const hasValidatedChemins = data.chemins_reseau.some(c => c.validated);
   const hasChantierChemins = data.chemins_reseau.some(c => !c.validated);
 
@@ -250,9 +264,15 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                   {Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}
                 </select>
               </div>
+              
+              {/* 👉 LA NOUVELLE ZONE "SMART TAGS" EST ICI */}
               <div>
                 <label style={lbl}>Responsable(s)</label>
-                <MultiSelect disabled={isAuditMode || isReadOnly} selected={data.responsables} onChange={v => setData({...data, responsables: v})} />
+                <TagInput 
+                  disabled={isAuditMode || isReadOnly} 
+                  tags={data.responsables} 
+                  onChange={v => setData({...data, responsables: v})} 
+                />
               </div>
             </div>
 
@@ -364,7 +384,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                     </div>
                   )}
 
-                  {/* --- Formulaire d'ajout de chemin déplacé ici ! --- */}
+                  {/* --- Formulaire d'ajout de chemin --- */}
                   {!isReadOnly && (
                     <div style={{ marginBottom: "20px", padding: "12px", background: "#fef3c7", borderRadius: "8px", border: "1px solid #fde68a" }}>
                       <p style={{ margin: "0 0 8px 0", fontSize: "11px", color: "#92400e", fontWeight: "700" }}>Ajouter un lien réseau :</p>
