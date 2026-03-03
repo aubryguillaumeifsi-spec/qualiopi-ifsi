@@ -33,12 +33,21 @@ export default function LoginPage() {
         
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "10px", marginBottom: "6px" }}>
           
-          {/* NOUVEAU LOGO INTÉGRÉ ICI */}
+          {/* LE FAMEUX LOGO EN SVG EST ICI */}
           <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-            <svg viewBox="0 0 24 24" width="38" height="38"><defs><linearGradient id="g" x1="0" y1="0" x2="24" y2="24"><stop offset="0%" stopColor="#1d4ed8"/><stop offset="100%" stopColor="#3b82f6"/></linearGradient></defs><path fill="url(#g)" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/></svg>
+            <svg viewBox="0 0 24 24" width="38" height="38">
+              <defs>
+                <linearGradient id="g" x1="0" y1="0" x2="24" y2="24">
+                  <stop offset="0%" stopColor="#1d4ed8"/>
+                  <stop offset="100%" stopColor="#3b82f6"/>
+                </linearGradient>
+              </defs>
+              <path fill="url(#g)" d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm-2 16l-4-4 1.41-1.41L10 14.17l6.59-6.59L18 9l-8 8z"/>
+            </svg>
           </div>
           
-          <div style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Qualiopi Tracker</div>
+          {/* LE NOM MIS À JOUR */}
+          <div style={{ fontSize: "24px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</div>
         </div>
         
         <div style={{ fontSize: "13px", color: "#6b7280", marginBottom: "6px" }}>{NOM_ETABLISSEMENT}</div>
