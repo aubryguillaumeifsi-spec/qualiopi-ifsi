@@ -29,6 +29,7 @@ class ErrorBoundary extends React.Component {
   }
 }
 
+const DEFAULT_ROLES = ["Direction", "Qualité", "Secrétariat", "Pôle Stages", "Formateurs IFSI", "Formateurs IFAS"];
 const ROLE_PALETTE = [ { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, { bg: "#dcfce7", border: "#86efac", text: "#166534" }, { bg: "#fef3c7", border: "#fde68a", text: "#92400e" }, { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" }, { bg: "#fee2e2", border: "#fca5a5", text: "#991b1b" }, { bg: "#ccfbf1", border: "#67e8f9", text: "#155e75" }, { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" } ];
 
 const today = new Date();
@@ -61,7 +62,6 @@ function MainApp() {
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
 
-  // Initialisation liste établissements
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = [];
@@ -71,7 +71,6 @@ function MainApp() {
     return () => unsub();
   }, []);
 
-  // Auth & Profile
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -94,7 +93,6 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
-  // Cleanup Team Users listener
   useEffect(() => {
     let unsub = null;
     if (selectedIfsi && userProfile && userProfile.role !== "guest") {
@@ -107,7 +105,6 @@ function MainApp() {
     return () => unsub && unsub();
   }, [selectedIfsi, userProfile]);
 
-  // Data Qualiopi Sync
   useEffect(() => {
     if (!selectedIfsi || !userProfile || userProfile.mustChangePassword) return;
     setCampaigns(null);
@@ -131,7 +128,6 @@ function MainApp() {
     await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
   };
 
-  // --- OPTIMISATIONS ---
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
@@ -176,8 +172,8 @@ function MainApp() {
     const score = active.length ? Math.round(active.reduce((acc, curr) => acc + curr.pct, 0) / active.length) : 0;
     let alerts = [];
     active.forEach(s => (s.liste || []).forEach(c => {
-      if (c.statut === "non-conforme") alerts.push({ ifsiName: s.name, critere: c, type: "non-conforme" });
-      else if (days(c.delai) < 0 && c.statut !== "non-concerne" && c.statut !== "conforme") alerts.push({ ifsiName: s.name, critere: c, type: "depasse", days: Math.abs(days(c.delai)) });
+      if (c.statut === "non-conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "non-conforme" });
+      else if (days(c.delai) < 0 && c.statut !== "non-concerne" && c.statut !== "conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "depasse", days: Math.abs(days(c.delai)) });
     }));
     return { active, archived: ifsiList.filter(i => i.archived), score, alerts };
   }, [ifsiList, getIfsiGlobalStats]);
@@ -188,9 +184,6 @@ function MainApp() {
     return a.name.localeCompare(b.name);
   }), [tourData.active, tourSort]);
 
-  const totalUsersInNetwork = teamUsers.length;
-
-  // 👉 HANDLERS RÉINTRODUITS ICI
   const handleIfsiSwitch = async (e) => {
     if (e.target.value === "NEW") {
       const nom = prompt("Nom de l'établissement :");
@@ -199,9 +192,7 @@ function MainApp() {
         await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false });
         setSelectedIfsi(id);
       }
-    } else {
-      setSelectedIfsi(e.target.value);
-    }
+    } else { setSelectedIfsi(e.target.value); }
   };
 
   const handleRenameIfsi = async (id, currentName) => {
@@ -241,7 +232,7 @@ function MainApp() {
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
   };
 
-  const handleEditAuditDate = async () => {
+  const handleEditAuditDate = () => {
     const d = prompt("Date d'audit (AAAA-MM-JJ) :", currentAuditDate);
     if (d) saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: d } : c));
   };
@@ -267,16 +258,32 @@ function MainApp() {
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
 
-  const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
-
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       
       <style>{`
+        @media print { .no-print { display: none !important; } body { background: white !important; } .print-break-avoid { page-break-inside: avoid; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        @media (max-width: 1024px) { .hide-mobile { display: none !important; } }
+        
+        .flex-nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; gap: 20px; flex-wrap: wrap; }
+        .nav-center { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; flex: 1; justify-content: center; }
+        
+        .responsive-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
+        .responsive-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        
+        @media (max-width: 1024px) {
+          .flex-nav { flex-direction: column; align-items: stretch !important; }
+          .nav-center { justify-content: flex-start; }
+          .hide-mobile { display: none !important; }
+          .responsive-grid-5 { grid-template-columns: 1fr 1fr; }
+          .responsive-grid-2 { grid-template-columns: 1fr; }
+        }
+        
+        .td-dash { transition: all 0.2s ease; cursor: pointer; border: 1px solid transparent; }
+        .td-dash:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1); border-color: #bfdbfe !important; }
+        .alert-ticker::-webkit-scrollbar { height: 6px; } .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
 
       {modalCritere && (
@@ -288,18 +295,23 @@ function MainApp() {
       )}
 
       {/* NAVIGATION */}
-      <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "14px 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
-        <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "20px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-            <span style={{ fontSize: "20px", fontWeight: "800", color: "#1d4ed8", cursor: "pointer" }} onClick={() => setActiveTab("dashboard")}>QualiForma</span>
-            <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db" }}>
+      <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+        <div className="flex-nav" style={{ maxWidth: "1440px", margin: "0 auto" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
+            <div onClick={() => { setActiveTab("dashboard"); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}>
+              <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs><path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#g)"/><path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#g)"/></svg>
+              </div>
+              <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</span>
+            </div>
+            <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db", fontWeight: "800", color: "#1d4ed8" }}>
               {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
               {userProfile?.role === "superadmin" && <option value="NEW">+ Nouvel établissement</option>}
             </select>
           </div>
 
-          <div style={{ display: "flex", gap: "4px", flexWrap: "wrap" }}>
-            {userProfile?.role === "superadmin" && <button style={navBtn(activeTab === "tour_controle")} onClick={() => setActiveTab("tour_controle")}>🛸 Tour Contrôle</button>}
+          <div className="nav-center">
+            {userProfile?.role === "superadmin" && <button style={navBtn(activeTab === "tour_controle")} onClick={() => setActiveTab("tour_controle")}>🛸 Superadmin</button>}
             <button style={navBtn(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>Dashboard</button>
             <button style={navBtn(activeTab === "criteres")} onClick={() => setActiveTab("criteres")}>Indicateurs</button>
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Priorités</button>
@@ -317,12 +329,12 @@ function MainApp() {
       {/* CONTENU */}
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit Qualiopi" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={handleEditAuditDate} stats={stats} urgents={urgents} criteres={criteres} />}
-        {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={totalUsersInNetwork} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={tourData.alerts.length} />}
-        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleDragOverOrg={handleDragOverOrg} handleDropOrg={handleDropOrg} handleDragStartOrg={handleDragStartOrg} removeRoleFromUser={removeRoleFromUser} editOrgRole={editOrgRole} editManualUser={editManualUser} deleteManualUser={deleteManualUser} addManualUser={addManualUser} addOrgRole={addOrgRole} newManualUserInput={newManualUserInput} setNewManualUserInput={setNewManualUserInput} newRoleInput={newRoleInput} setNewRoleInput={setNewRoleInput} deleteOrgRole={handleHardDeleteIfsi} applyDefaultRoles={applyDefaultRoles} />}
+        {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={tourData.alerts.length} />}
+        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={ifsiList.find(i=>i.id===selectedIfsi)?.name} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} />}
         {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} />}
         {activeTab === "axes" && <AxesTab axes={axes} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} isAuditMode={isAuditMode} />}
         {activeTab === "responsables" && <ResponsablesTab byPerson={byPerson} setModalCritere={setModalCritere} isArchive={isArchive} getRoleColor={getRoleColor} />}
-        {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} currentCampaign={currentCampaign} criteres={criteres} />}
+        {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={ifsiList.find(i=>i.id===selectedIfsi)?.name} currentCampaign={currentCampaign} criteres={criteres} />}
         {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} />}
         {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={handleChangePassword} />}
       </div>
