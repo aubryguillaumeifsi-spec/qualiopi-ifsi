@@ -347,7 +347,7 @@ function MainApp() {
   }
 
   function deleteManualUser(idToDelete) {
-    if (window.confirm("Supprimer ce profil manuel de l'IFSI ?")) {
+    if (window.confirm("Supprimer ce profil manuel ?")) {
       setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true });
     }
   }
@@ -424,7 +424,6 @@ function MainApp() {
     }
   }
 
-  // 👉 FONCTION DAYCOLOR (Elle est bien là)
   const today = new Date();
   const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
   const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
@@ -482,7 +481,6 @@ function MainApp() {
   const isArchive = currentCampaign.locked || false;
   const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
 
-  // 👉 DEFINITIONS DASHBOARD / FILTRES ET BANNERCONFIG (Restauré !)
   const auditDateObj = new Date(currentAuditDate);
   const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
   let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
@@ -497,7 +495,6 @@ function MainApp() {
   const filtered = criteres.filter(c => { if (filterStatut !== "tous" && c.statut !== filterStatut) return false; if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false; if (searchTerm) { const s = searchTerm.toLowerCase(); return String(c.titre||"").toLowerCase().includes(s) || String(c.num||"").toLowerCase().includes(s); } return true; });
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]));
 
-  // 👉 LA FONCTION SAVE MODAL ALLÉGÉE (Ne gère que le texte/statut, DetailModal gère les fichiers)
   function saveModal(updated, action) {
     if (isArchive) {
        if (action === "close" || !action) setModalCritere(null);
@@ -544,7 +541,6 @@ function MainApp() {
     if (action === "prev") setModalCritere(filtered[currentIndex - 1]);
   }
 
-  // 👉 LA FONCTION AUTO-SAVE QUI INTERCEPTE LES CHANGEMENTS DE FICHIERS DEPUIS LA MODALE
   function handleAutoSave(updated) {
     if (isArchive) return;
     const newCriteres = criteres.map(c => c.id === updated.id ? updated : c);
@@ -613,7 +609,7 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
-  const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
+  const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap", transition: "all 0.2s" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
   const nb = col => ({ padding: "4px 10px", background: `${col}15`, color: col, borderRadius: "6px", fontSize: "12px", fontWeight: "800", textAlign: "center", border: `1px solid ${col}30`, flexShrink: 0, whiteSpace: "nowrap" });
   const th = { textAlign: "left", padding: "10px 14px", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.8px", borderBottom: "2px solid #f1f5f9", background: "#fafafa" };
@@ -621,9 +617,6 @@ function MainApp() {
   const sel = { background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 10px", fontSize: "12px", cursor: "pointer" };
   const inp = { background: "white", border: "1px solid #d1d5db", borderRadius: "8px", outline: "none", boxSizing: "border-box", fontFamily: "Outfit, sans-serif" };
 
-  const activeIfsis = ifsiList.filter(i => !i.archived);
-  const archivedIfsis = ifsiList.filter(i => i.archived);
-  
   const activeIfsisStats = activeIfsis.map(i => ({ id: i.id, name: i.name, ...getIfsiGlobalStats(i.id) }));
   
   const sortedTourIfsis = [...activeIfsisStats].sort((a, b) => {
@@ -662,7 +655,11 @@ function MainApp() {
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <style>{`
-        @media print { .no-print { display: none !important; } body { background: white !important; } }
+        @media print { 
+          .no-print { display: none !important; } 
+          body { background: white !important; } 
+          .print-break-avoid { page-break-inside: avoid; }
+        }
         .org-card { background: white; border: 1px solid #d1d5db; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; cursor: grab; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .org-card:active { cursor: grabbing; opacity: 0.7; }
         .td-dash:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
@@ -670,7 +667,6 @@ function MainApp() {
         .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
       
-      {/* 👉 APPEL DE DETAIL MODAL AVEC onAutoSave */}
       {modalCritere && (
         <DetailModal 
           critere={modalCritere} 
@@ -746,7 +742,8 @@ function MainApp() {
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginLeft: "auto" }}>
             <div style={{ display: "flex", gap: "6px" }}>
               <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
-              <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📄</span> PDF</button>
+              {/* 👉 NOUVEAU BOUTON LIVRE BLANC */}
+              <button onClick={() => setActiveTab("livre_blanc")} style={{ ...navBtn(activeTab === "livre_blanc"), color: activeTab === "livre_blanc" ? "white" : "#4f46e5", background: activeTab === "livre_blanc" ? "#4f46e5" : "#e0e7ff", fontSize: "12px", border: "1px solid #6366f1", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📘</span> Livre Blanc</button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", paddingLeft: "10px", borderLeft: "2px solid #f1f5f9" }}>
                <button onClick={() => setActiveTab("compte")} style={{ ...navBtn(activeTab === "compte"), fontSize: "11px", border: "1px solid #d1d5db", background: "white", color: "#4b5563", padding: "6px 12px" }}>⚙️ Mon compte</button>
@@ -763,6 +760,115 @@ function MainApp() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
+        {/* ========================================================= */}
+        {/* 👉 NOUVEAU : ONGLET LIVRE BLANC                           */}
+        {/* ========================================================= */}
+        {activeTab === "livre_blanc" && (
+          <div style={{ background: "white", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 10px rgba(0,0,0,0.05)", maxWidth: "900px", margin: "0 auto", color: "black", fontFamily: "Arial, sans-serif" }}>
+            
+            {/* Bandeau d'impression (masqué lors de l'impression) */}
+            <div className="no-print" style={{ marginBottom: "30px", display: "flex", justifyContent: "space-between", alignItems: "center", background: "#eff6ff", padding: "16px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>
+              <p style={{ margin: 0, color: "#1d4ed8", fontWeight: "600", fontSize: "14px" }}>Ceci est la vue propre optimisée pour l'impression ou l'export PDF du rapport officiel.</p>
+              <button onClick={() => window.print()} style={{ background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", padding: "10px 20px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", display: "flex", alignItems: "center", gap: "8px" }}>🖨️ Générer le PDF (Imprimer)</button>
+            </div>
+
+            {/* En-tête du document */}
+            <div style={{ textAlign: "center", marginBottom: "40px", borderBottom: "3px solid #1e3a5f", paddingBottom: "20px" }}>
+              <h1 style={{ fontSize: "32px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 10px 0" }}>Livre Blanc Qualiopi</h1>
+              <h2 style={{ fontSize: "20px", fontWeight: "600", color: "#475569", margin: "0 0 10px 0" }}>{currentIfsiName}</h2>
+              <div style={{ fontSize: "14px", color: "#64748b" }}>Généré le {new Date().toLocaleDateString('fr-FR')} • Évaluation : {currentCampaign.name}</div>
+            </div>
+
+            {/* Liste des critères */}
+            {criteres.sort((a,b) => parseInt(a.num) - parseInt(b.num)).map(c => {
+               const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
+               const validFiles = (c.fichiers || []).filter(f => f.validated);
+               const validChemins = (c.chemins_reseau || []).filter(ch => ch.validated);
+               const hasPreuves = validFiles.length > 0 || validChemins.length > 0 || (c.preuves && c.preuves.trim());
+               
+               // Optionnel : ne pas afficher les "non-concernés" pour épurer le PDF
+               if (c.statut === "non-concerne") return null; 
+
+               return (
+                 <div key={c.id} className="print-break-avoid" style={{ marginBottom: "30px", border: "1px solid #e2e8f0", borderRadius: "8px", overflow: "hidden" }}>
+                   
+                   {/* Titre du critère */}
+                   <div style={{ background: "#f8fafc", padding: "12px 16px", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                       <span style={{ background: cConf.color, color: "white", padding: "4px 10px", borderRadius: "6px", fontWeight: "900", fontSize: "14px" }}>{c.num}</span>
+                       <span style={{ fontWeight: "700", color: "#1e3a5f", fontSize: "15px" }}>{c.titre}</span>
+                     </div>
+                     <StatusBadge statut={c.statut} />
+                   </div>
+                   
+                   {/* Contenu du critère */}
+                   <div style={{ padding: "16px" }}>
+                     
+                     {/* Responsables */}
+                     <div style={{ marginBottom: "16px", fontSize: "13px" }}>
+                       <strong style={{ color: "#475569" }}>Responsable(s) de l'indicateur : </strong>
+                       {c.responsables && c.responsables.length > 0 ? (
+                         <span style={{ color: "#1e3a5f", fontWeight: "600" }}>{c.responsables.join(', ')}</span>
+                       ) : (
+                         <span style={{ color: "#9ca3af", fontStyle: "italic" }}>Non assigné</span>
+                       )}
+                     </div>
+
+                     {/* Boîte de preuves */}
+                     <div>
+                       <strong style={{ color: "#475569", fontSize: "13px", display: "block", marginBottom: "8px" }}>Éléments de preuve présentés :</strong>
+                       
+                       {!hasPreuves ? (
+                         <div style={{ fontSize: "13px", color: "#9ca3af", fontStyle: "italic", background: "#f8fafc", padding: "10px", borderRadius: "6px" }}>Aucune preuve validée pour le moment.</div>
+                       ) : (
+                         <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "12px", borderRadius: "8px" }}>
+                           
+                           {/* Textes publics */}
+                           {c.preuves && (
+                             <div style={{ fontSize: "13px", color: "#166534", whiteSpace: "pre-wrap", marginBottom: (validFiles.length > 0 || validChemins.length > 0) ? "12px" : "0" }}>
+                               {c.preuves}
+                             </div>
+                           )}
+
+                           {/* Liens réseau */}
+                           {validChemins.length > 0 && (
+                             <div style={{ marginBottom: validFiles.length > 0 ? "8px" : "0" }}>
+                               {validChemins.map((link, i) => (
+                                 <div key={i} style={{ fontSize: "12px", color: "#065f46", display: "flex", gap: "6px", alignItems: "flex-start", marginBottom: "4px" }}>
+                                   <span>🔗</span> <span style={{ fontWeight: "600" }}>{link.nom}</span> <span style={{ color: "#10b981" }}>({link.chemin})</span>
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+
+                           {/* Fichiers uploadés */}
+                           {validFiles.length > 0 && (
+                             <div>
+                               {validFiles.map((file, i) => (
+                                 <div key={i} style={{ fontSize: "12px", color: "#065f46", display: "flex", gap: "6px", alignItems: "center", marginBottom: "4px" }}>
+                                   <span>☁️</span> <span style={{ fontWeight: "600" }}>{file.name}</span>
+                                 </div>
+                               ))}
+                             </div>
+                           )}
+
+                         </div>
+                       )}
+                     </div>
+
+                   </div>
+                 </div>
+               )
+            })}
+
+            {/* Pied de page du document */}
+            <div style={{ marginTop: "40px", paddingTop: "20px", borderTop: "2px solid #e2e8f0", textAlign: "center", fontSize: "11px", color: "#9ca3af" }}>
+              Document officiel généré par la plateforme QualiForma
+            </div>
+
+          </div>
+        )}
+
         {/* --- TOUR DE CONTRÔLE --- */}
         {activeTab === "tour_controle" && userProfile?.role === "superadmin" && (
           <div>
@@ -1102,134 +1208,6 @@ function MainApp() {
             </div>
           </div>
         )}
-
-        {/* --- RESTE DES ONGLETS (Dashboard, Criteres, Axes, Responsables, Compte) --- */}
-        {activeTab === "dashboard" && <>
-          <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ fontSize: "24px" }}>{bannerConfig.icon}</span>
-              <div>
-                <div style={{ fontSize: "16px", fontWeight: "800", color: bannerConfig.color, textTransform: "uppercase", letterSpacing: "0.5px" }}>{bannerConfig.text}</div>
-                <div style={{ fontSize: "12px", color: bannerConfig.color, opacity: 0.8, marginTop: "2px", fontWeight: "600" }}>Date officielle visée : {new Date(currentAuditDate).toLocaleDateString("fr-FR")}</div>
-              </div>
-            </div>
-            {!isArchive && <button onClick={handleEditAuditDate} style={{ background: "transparent", border: `1px solid ${bannerConfig.color}`, color: bannerConfig.color, padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", opacity: 0.7, transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>Modifier la date</button>}
-          </div>
-
-          <div className="print-break-avoid no-print" style={{ ...card, marginBottom: "24px", padding: "20px 24px" }}>
-            <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#1e3a5f", fontWeight: "800", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-              <span>🚀 État d'avancement global</span>
-              <span style={{ fontSize: "15px", color: "#1d4ed8", fontWeight: "800", background: "#eff6ff", padding: "4px 10px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>{Math.round((stats.conforme / stats.total) * 100) || 0}% Achevé</span>
-            </h3>
-            <div style={{ display: "flex", height: "26px", borderRadius: "13px", overflow: "hidden", background: "#f1f5f9", gap: "3px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)" }}>
-              <div style={{ width: `${(stats.conforme / stats.total) * 100}%`, background: "#10b981", transition: "width 0.8s ease" }} title={`Conforme: ${stats.conforme}`} />
-              <div style={{ width: `${(stats.enCours / stats.total) * 100}%`, background: "#f59e0b", transition: "width 0.8s ease" }} title={`En cours: ${stats.enCours}`} />
-              <div style={{ width: `${(stats.nonConforme / stats.total) * 100}%`, background: "#ef4444", transition: "width 0.8s ease" }} title={`Non conforme: ${stats.nonConforme}`} />
-              <div style={{ width: `${(stats.nonEvalue / stats.total) * 100}%`, background: "#d1d5db", transition: "width 0.8s ease" }} title={`Non évalué: ${stats.nonEvalue}`} />
-            </div>
-            <div style={{ display: "flex", gap: "20px", marginTop: "14px", fontSize: "12px", fontWeight: "700", flexWrap: "wrap", justifyContent: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#10b981" }}></span><span style={{ color: "#065f46" }}>{stats.conforme} Conformes ({Math.round((stats.conforme / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#f59e0b" }}></span><span style={{ color: "#92400e" }}>{stats.enCours} En cours ({Math.round((stats.enCours / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#ef4444" }}></span><span style={{ color: "#991b1b" }}>{stats.nonConforme} Non conformes ({Math.round((stats.nonConforme / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#d1d5db" }}></span><span style={{ color: "#4b5563" }}>{stats.nonEvalue} À faire ({Math.round((stats.nonEvalue / stats.total) * 100) || 0}%)</span></div>
-            </div>
-          </div>
-
-          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px", marginBottom: "24px" }}>
-            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents < 30j"]].map(([color,bg,border,num,label]) => (
-              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "14px 16px", opacity: isArchive ? 0.8 : 1 }}><div style={{ fontSize: "28px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div><div style={{ fontSize: "10px", color, opacity: 0.9, marginTop: "4px", textTransform: "uppercase", fontWeight: "700", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div></div>
-            ))}
-          </div>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
-          </div>
-        </>}
-
-        {/* --- CRITERES --- */}
-        {activeTab === "criteres" && <>
-          <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
-          <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{["N°","Indicateur","Responsable(s)","Échéance","Statut","Preuves fournies"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
-              <tbody>{filtered.map(c => { 
-                const cConf = CRITERES_LABELS[c.critere] || { label: "Critère Inconnu", color: "#9ca3af" };
-                const d = days(c.delai); 
-                const resps = Array.isArray(c.responsables) ? c.responsables : []; 
-                const nbFiles = (c.fichiers || []).filter(f => !f.archive).length;
-                const nbChemins = (c.chemins_reseau || []).length;
-                const hasLink = (c.preuves || "").trim().length > 0;
-                return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td><td style={{ ...td, maxWidth: "280px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{cConf.label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); return <span key={rSafe} style={{ fontSize: "10px", color: "#1e40af", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{resps.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td>
-                <td style={td}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
-                    {nbChemins > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 6px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>🔗 {nbChemins} Lien(s) Réseau</span>}
-                    {nbFiles > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 6px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>☁️ {nbFiles} Upload(s)</span>}
-                    {hasLink && <span style={{ fontSize: "10px", color: "#1d4ed8", background: "#eff6ff", padding: "2px 6px", borderRadius: "4px", border: "1px solid #bfdbfe", whiteSpace: "nowrap" }}>📝 Texte</span>}
-                    {nbFiles === 0 && nbChemins === 0 && !hasLink && <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vide</span>}
-                  </div>
-                </td>
-                <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>{isArchive ? "Consulter" : "Éditer"}</button></td></tr>);})}</tbody>
-            </table>
-          </div>
-        </>}
-
-        {/* --- AXES --- */}
-        {activeTab === "axes" && <>
-          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
-          {["non-conforme","en-cours"].map(st => {
-            const items = axes.filter(c => c.statut === st); if (items.length === 0) return null; const isNC = st === "non-conforme";
-            return (<div key={st}><div className="print-break-avoid" style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase" }}>{isNC ? "🔴 Non conformes — Action immédiate" : "🟠 En cours — À finaliser"}</div>
-              {items.map(c => {
-                const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
-                const d = days(c.delai);
-                return (<div key={c.id} className="print-break-avoid" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px" }}><div style={{ display: "flex", gap: "12px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span><div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>{cConf.label}</div>{(!isAuditMode && (c.attendus||"")) && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Remarques : </span>{c.attendus}</div>}{((c.fichiers && c.fichiers.length > 0) || (c.preuves||"").trim()) && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>{isAuditMode ? "Preuves :" : "Preuves finalisées :"} </span>{c.fichiers?.length > 0 ? `${c.fichiers.length} document(s) joint(s). ` : ""}{c.preuves}</div>}{(!isAuditMode && (c.preuves_encours||"").trim()) && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px" }}><span style={{ fontWeight: "700", color: "#d97706" }}>En cours : </span>{c.preuves_encours}</div>}</div><div style={{ textAlign: "right", minWidth: "140px" }}><StatusBadge statut={c.statut} /><div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>{new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{!isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}<button onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isArchive ? "#f1f5f9" : (isNC?"#fff5f5":"#fffbeb"), border:`1px solid ${isArchive ? "#d1d5db" : (isNC?"#fca5a5":"#fcd34d")}`, borderRadius: "6px", color: isArchive ? "#4b5563" : (isNC?"#dc2626":"#92400e"), padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>{isArchive ? "Consulter" : "Éditer"}</button></div></div></div>)
-              })}
-            </div>);
-          })}
-        </>}
-
-        {/* --- RESPONSABLES --- */}
-        {activeTab === "responsables" && <>
-          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Avancement par Membre de l'équipe</h2></div>
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
-            {byPerson.map(p => {
-              const conformes = p.items.filter(c => c.statut==="conforme").length;
-              return (
-                <div key={p.id} className="print-break-avoid" style={card}>
-                  <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
-                    <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "#f1f5f9", border: `2px solid #cbd5e1`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "#475569", flexShrink: 0 }}>{p.name.substring(0,2).toUpperCase()}</div>
-                    <div style={{ flex: 1 }}>
-                       <div style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f" }}>{p.name}</div>
-                       <div style={{ display: "flex", gap: "4px", flexWrap: "wrap", marginTop: "4px" }}>
-                         {p.roles.map(r => {
-                            const cCol = getRoleColor(r);
-                            return <span key={r} style={{ fontSize: "10px", background: cCol.bg, color: cCol.text, border: `1px solid ${cCol.border}`, padding: "2px 6px", borderRadius: "4px", fontWeight: "700" }}>{r}</span>
-                         })}
-                         {p.roles.length === 0 && <span style={{ fontSize: "10px", color: "#9ca3af" }}>Sans rôle défini</span>}
-                       </div>
-                    </div>
-                  </div>
-                  {p.items.length > 0 ? (
-                    <>
-                      <ProgressBar value={conformes} max={p.items.length} color="#1d4ed8" />
-                      <div style={{ marginTop: "12px" }}>
-                        {p.items.sort((a,b) => ({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3,"non-concerne":4}[a.statut])-({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3,"non-concerne":4}[b.statut])).map(c => {
-                          const cConf = CRITERES_LABELS[c.critere] || { color: "#9ca3af" };
-                          return (
-                            <div key={c.id} style={{ display: "flex", alignItems: "center", gap: "8px", padding: "7px 0", borderBottom: "1px solid #f8fafc", opacity: c.statut==="non-concerne"?0.6:1 }}><span style={nb(cConf.color)}>{c.num || "-"}</span><div style={{ flex: 1, fontSize: "12px" }}>{c.titre || "-"}</div><StatusBadge statut={c.statut} /><button onClick={() => setModalCritere(c)} style={{ background: isArchive?"#f1f5f9":"white", border: "1px solid #e2e8f0", borderRadius: "5px", color: isArchive?"#4b5563":"#1d4ed8", padding: "3px 10px", fontSize: "10px", cursor: "pointer", fontWeight: "600" }}>{isArchive?"Vue":"Éditer"}</button></div>
-                          )
-                        })}
-                      </div>
-                    </>
-                  ) : (
-                    <div style={{ fontSize: "12px", color: "#9ca3af", fontStyle: "italic" }}>Aucun indicateur affecté pour le moment.</div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        </>}
 
         {/* --- COMPTE --- */}
         {activeTab === "compte" && (
