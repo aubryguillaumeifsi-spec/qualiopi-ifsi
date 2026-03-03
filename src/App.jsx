@@ -1,11 +1,31 @@
+import React, { useState, useEffect } from "react";
 import LoginPage from "./components/LoginPage";
 import DetailModal from "./components/DetailModal";
-import { useState, useEffect } from "react";
 import { getDoc, setDoc, deleteDoc, doc, collection, getDocs, onSnapshot } from "firebase/firestore";
-// 👉 AJOUT DE updatePassword ICI !
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
 import { TODAY, RESPONSABLES, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG, ROLE_COLORS } from "./data";
+
+// --- LE BOUCLIER ANTI-ÉCRAN BLANC ---
+class ErrorBoundary extends React.Component {
+  constructor(props) { super(props); this.state = { hasError: false, error: null }; }
+  static getDerivedStateFromError(error) { return { hasError: true, error }; }
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "40px", fontFamily: "Outfit", color: "#1e3a5f", textAlign: "center" }}>
+          <h1 style={{ color: "#ef4444" }}>⚠️ L'application a rencontré une erreur</h1>
+          <p>Prenez une capture d'écran de ce message pour le diagnostic :</p>
+          <pre style={{ background: "#fef2f2", padding: "20px", border: "1px solid #fca5a5", borderRadius: "8px", color: "#991b1b", textAlign: "left", overflowX: "auto" }}>
+            {this.state.error?.toString()}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{ padding: "10px 20px", background: "#1d4ed8", color: "white", borderRadius: "8px", border: "none", marginTop: "20px", cursor: "pointer" }}>Recharger l'application</button>
+        </div>
+      );
+    }
+    return this.props.children;
+  }
+}
 
 // --- LISTE DES ÉTABLISSEMENTS ---
 const IFSI_LIST = [
@@ -34,7 +54,7 @@ function ProgressBar({ value, max, color }) {
   return <div style={{ background: "#f1f5f9", borderRadius: "4px", height: "7px", overflow: "hidden" }}><div style={{ width: `${max ? (value / max) * 100 : 0}%`, background: color, height: "100%", borderRadius: "4px", transition: "width 0.8s ease" }} /></div>;
 }
 
-export default function App() {
+function MainApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [userProfile, setUserProfile] = useState(null); 
@@ -52,8 +72,6 @@ export default function App() {
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
-
-  // ÉTATS POUR LA GESTION DU MOT DE PASSE
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
 
   useEffect(() => {
@@ -162,7 +180,6 @@ export default function App() {
       const newUid = userCredential.user.uid;
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
 
-      // 👉 NOUVEAU : ON AJOUTE mustChangePassword: true
       await setDoc(doc(db, "users", newUid), {
         email: newMember.email,
         role: newMember.role,
@@ -191,7 +208,6 @@ export default function App() {
     }
   }
 
-  // 👉 NOUVELLE FONCTION POUR CHANGER LE MOT DE PASSE (Forcé ou Volontaire)
   async function handleChangePassword(e, isForced) {
     e.preventDefault();
     setPwdUpdate({ ...pwdUpdate, error: "", success: "", loading: true });
@@ -199,19 +215,16 @@ export default function App() {
     if (pwdUpdate.p1 !== pwdUpdate.p2) {
       return setPwdUpdate({ ...pwdUpdate, error: "Les mots de passe ne correspondent pas.", loading: false });
     }
-    // Validation stricte : 8 caractères, 1 majuscule, 1 chiffre
     if (pwdUpdate.p1.length < 8 || !/[A-Z]/.test(pwdUpdate.p1) || !/[0-9]/.test(pwdUpdate.p1)) {
       return setPwdUpdate({ ...pwdUpdate, error: "Sécurité faible : 8 caractères min., 1 majuscule et 1 chiffre requis.", loading: false });
     }
 
     try {
-      // 1. Mise à jour du mot de passe dans Firebase Auth
       await updatePassword(auth.currentUser, pwdUpdate.p1);
       
-      // 2. Si c'était forcé, on met à jour la base de données pour débloquer le compte
       if (isForced) {
         await setDoc(doc(db, "users", auth.currentUser.uid), { mustChangePassword: false }, { merge: true });
-        setUserProfile({ ...userProfile, mustChangePassword: false }); // Débloque l'UI instantanément
+        setUserProfile({ ...userProfile, mustChangePassword: false }); 
       }
 
       setPwdUpdate({ p1: "", p2: "", loading: false, error: "", success: "Votre mot de passe a été mis à jour avec succès !" });
@@ -255,7 +268,6 @@ export default function App() {
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
 
-  // 👉 1. ÉCRAN DE BLOCAGE : UTILISATEUR NON ENREGISTRÉ
   if (userProfile?.role === "guest") {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "Outfit" }}>
@@ -267,7 +279,6 @@ export default function App() {
     );
   }
 
-  // 👉 2. ÉCRAN DE BLOCAGE : PREMIÈRE CONNEXION (CHANGEMENT MDP OBLIGATOIRE)
   if (userProfile?.mustChangePassword) {
     return (
       <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#f0f4ff,#e8f0fe)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit" }}>
@@ -285,9 +296,7 @@ export default function App() {
               <label style={{ fontSize: "12px", color: "#374151", fontWeight: "700" }}>Confirmez le mot de passe</label>
               <input type="password" value={pwdUpdate.p2} onChange={e => setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "6px", boxSizing: "border-box" }} placeholder="Répétez le mot de passe" required />
             </div>
-
             {pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600" }}>{pwdUpdate.error}</div>}
-
             <button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: pwdUpdate.loading ? "wait" : "pointer", opacity: pwdUpdate.loading ? 0.7 : 1 }}>
               {pwdUpdate.loading ? "Mise à jour..." : "Valider et accéder au portail"}
             </button>
@@ -298,7 +307,6 @@ export default function App() {
     );
   }
 
-  // --- SI TOUT EST BON, ON CHARGE L'APPLICATION ---
   if (campaigns === null || activeCampaignId === null) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700" }}>⏳ Chargement de l'établissement...</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
@@ -323,6 +331,16 @@ export default function App() {
     if (!critereId) return;
     const newListe = criteres.map(c => c.id.toString() === critereId ? { ...c, statut: newStatut } : c);
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp));
+  }
+
+  function handleEditAuditDate() {
+    if (isArchive) return;
+    const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
+    if (newDate) {
+      if (isNaN(new Date(newDate).getTime())) { alert("Format de date invalide. Veuillez utiliser AAAA-MM-JJ."); return; }
+      const newCampaigns = campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c);
+      saveData(newCampaigns);
+    }
   }
 
   const today = new Date();
@@ -364,7 +382,36 @@ export default function App() {
     items: criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(r)), 
   })).filter(r => r.items.length > 0);
 
-  async function exportToExcel() { /* ... fonction Excel intacte ... */ }
+  // --- RESTAURATION COMPLÈTE DE LA FONCTION EXCEL ---
+  async function exportToExcel() {
+    if (!criteres) return;
+    if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
+    const workbook = new window.ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
+    worksheet.columns = [
+      { header: 'N°', key: 'num', width: 8 }, { header: 'Critère', key: 'critere', width: 12 }, { header: 'Indicateur', key: 'titre', width: 45 }, { header: 'Statut', key: 'statut', width: 18 },
+      { header: 'Échéance', key: 'delai', width: 14 }, { header: 'Responsable(s)', key: 'resp', width: 25 }, { header: 'Preuves finalisées', key: 'preuves', width: 50 },
+      { header: 'Preuves en cours', key: 'preuves_encours', width: 50 }, { header: 'Remarques Évaluateur', key: 'attendus', width: 45 }, { header: 'Notes internes', key: 'notes', width: 45 }
+    ];
+    const toArgb = (hex) => hex ? hex.replace('#', 'FF').toUpperCase() : 'FF000000';
+    criteres.forEach(c => {
+      const d = days(c.delai);
+      const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"];
+      const resps = Array.isArray(c.responsables) ? c.responsables : []; 
+      
+      const row = worksheet.addRow({
+        num: c.num || "", critere: `Critère ${c.critere || ""}`, titre: c.titre || "", statut: sConf.label, delai: c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR"),
+        resp: resps.map(r => String(r).split("(")[0].trim()).join("\n"), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || ""
+      });
+      const cConf = CRITERES_LABELS[c.critere] || { color: "#9ca3af" }; 
+      row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true }; row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' }; 
+      row.getCell('statut').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(sConf.bg) } }; row.getCell('statut').font = { color: { argb: toArgb(sConf.color) }, bold: true }; row.getCell('statut').alignment = { horizontal: 'center', vertical: 'middle' }; 
+      const cellDelai = row.getCell('delai'); if (!isNaN(d) && d < 0 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFDC2626' }, bold: true }; } else if (!isNaN(d) && d < 30 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFD97706' }, bold: true }; }
+    });
+    const headerRow = worksheet.getRow(1); headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; headerRow.alignment = { vertical: 'middle', horizontal: 'center' }; worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+    worksheet.eachRow((row, rowNumber) => { row.eachCell((cell) => { cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } }; if (rowNumber > 1) { if (!cell.alignment) { cell.alignment = { vertical: 'top', wrapText: true }; } else { cell.alignment.wrapText = true; } } }); });
+    const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }
 
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
@@ -427,7 +474,6 @@ export default function App() {
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
             
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "12px", paddingLeft: "12px", borderLeft: "2px solid #f1f5f9" }}>
-               {/* 👉 LE NOUVEAU BOUTON MON COMPTE */}
                <button onClick={() => setActiveTab("compte")} style={{ ...navBtn(activeTab === "compte"), fontSize: "11px", border: "1px solid #d1d5db", background: "white", color: "#4b5563" }}>⚙️ Mon compte</button>
                <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444", fontSize: "11px", border: "1px solid #fca5a5", background: "#fef2f2" }}>Déconnexion</button>
             </div>
@@ -700,5 +746,14 @@ export default function App() {
         </>}
       </div>
     </div>
+  );
+}
+
+// On exporte notre application encapsulée dans le bouclier anti-crash !
+export default function App() {
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
   );
 }
