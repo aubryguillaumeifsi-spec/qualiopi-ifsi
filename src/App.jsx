@@ -347,7 +347,7 @@ function MainApp() {
   }
 
   function deleteManualUser(idToDelete) {
-    if (window.confirm("Supprimer ce profil manuel de l'IFSI ?")) {
+    if (window.confirm("Supprimer ce profil manuel ?")) {
       setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true });
     }
   }
@@ -625,7 +625,6 @@ function MainApp() {
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
           
-          {/* 👉 LOGO ET NOM CLIQUABLES (RETOUR ACCUEIL SANS RECHARGER TOUTE LA PAGE) */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <div 
               onClick={() => {
@@ -709,7 +708,6 @@ function MainApp() {
               </div>
             </div>
 
-            {/* --- STATISTIQUES --- */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
               <div style={{ background: "linear-gradient(135deg, #4f46e5, #3b82f6)", borderRadius: "12px", padding: "20px", color: "white", boxShadow: "0 4px 10px rgba(79,70,229,0.2)" }}>
                 <div style={{ fontSize: "13px", fontWeight: "700", textTransform: "uppercase", opacity: 0.9 }}>Score National Moyen</div>
@@ -725,7 +723,6 @@ function MainApp() {
               </div>
             </div>
 
-            {/* --- ALERTES ROUGES --- */}
             {topAlerts.length > 0 && (
               <div style={{ marginBottom: "32px" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#991b1b", margin: "0 0 10px 0", display: "flex", alignItems: "center", gap: "6px" }}>🚨 Alertes Urgentes sur le réseau</h3>
@@ -748,7 +745,6 @@ function MainApp() {
               </div>
             )}
 
-            {/* --- LISTE DES IFSI --- */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #86efac", paddingBottom: "8px", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "16px", color: "#10b981", margin: 0 }}>✅ Établissements Actifs ({activeIfsis.length})</h3>
               <select value={tourSort} onChange={e => setTourSort(e.target.value)} style={{ ...sel, borderColor: "#cbd5e1", fontWeight: "600", padding: "6px 12px" }}>
@@ -808,7 +804,6 @@ function MainApp() {
               {sortedTourIfsis.length === 0 && <div style={{ color: "#9ca3af", fontStyle: "italic" }}>Aucun établissement actif.</div>}
             </div>
 
-            {/* --- ÉTABLISSEMENTS ARCHIVÉS --- */}
             {archivedIfsis.length > 0 && (
               <>
                 <h3 style={{ fontSize: "16px", color: "#991b1b", borderBottom: "2px solid #fca5a5", paddingBottom: "8px", marginBottom: "16px", marginTop: "40px" }}>📦 Établissements Archivés ({archivedIfsis.length})</h3>
@@ -868,7 +863,8 @@ function MainApp() {
               </div>
             )}
 
-            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", overflowX: "auto", paddingBottom: "20px" }}>
+            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", paddingBottom: "20px" }}>
+              
               <div style={{ width: "280px", flexShrink: 0, background: "#f8fafc", borderRadius: "12px", padding: "16px", border: "1px solid #e2e8f0", minHeight: "60vh" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#475569", marginBottom: "16px", textTransform: "uppercase", borderBottom: "2px solid #cbd5e1", paddingBottom: "8px" }}>👥 Équipe globale</h3>
                 
@@ -957,7 +953,7 @@ function MainApp() {
                 </div>
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Email</label>
-                  <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="formateur@ifsi.fr" />
+                  <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="contact@institut.fr" />
                 </div>
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Mot de passe provisoire</label>
@@ -967,13 +963,13 @@ function MainApp() {
                 <div style={{ marginBottom: "16px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Rôle système</label>
                   <select value={newMember.role} onChange={e => setNewMember({...newMember, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px", background: "white" }}>
-                    <option value="user">Formateur / Membre (Lecture & Écriture)</option>
-                    {userProfile.role === "superadmin" && <option value="admin">Administrateur IFSI (Peut inviter des gens)</option>}
+                    <option value="user">Membre (lecture & écriture)</option>
+                    {userProfile.role === "superadmin" && <option value="admin">Admin (création de compte)</option>}
                   </select>
                 </div>
                 {userProfile.role === "superadmin" && (
                    <div style={{ marginBottom: "16px", background: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px dashed #fcd34d" }}>
-                     <label style={{ fontSize: "11px", fontWeight: "800", color: "#d97706", textTransform: "uppercase" }}>👑 Choix IFSI (Mode Superadmin)</label>
+                     <label style={{ fontSize: "11px", fontWeight: "800", color: "#d97706", textTransform: "uppercase" }}>👑 Établissement (Mode Superadmin)</label>
                      <select value={newMember.ifsi || selectedIfsi} onChange={e => setNewMember({...newMember, ifsi: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #fcd34d", marginTop: "4px", background: "white" }}>
                        {ifsiList.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
                      </select>
@@ -1011,7 +1007,7 @@ function MainApp() {
                       </th>
                       {userProfile.role === "superadmin" && (
                         <th style={{...th, cursor: "pointer", userSelect: "none"}} onClick={() => handleSortTeam('ifsi')} title="Trier par Établissement">
-                          IFSI Attaché {teamSortConfig.key === 'ifsi' ? (teamSortConfig.direction === 'asc' ? '🔼' : '🔽') : '↕'}
+                          Établissement {teamSortConfig.key === 'ifsi' ? (teamSortConfig.direction === 'asc' ? '🔼' : '🔽') : '↕'}
                         </th>
                       )}
                       <th style={th}>Actions</th>
@@ -1023,8 +1019,8 @@ function MainApp() {
                         <td style={{ ...td, fontWeight: "600", color: "#1e3a5f" }}>{u.email || u.id}</td>
                         <td style={td}>
                           {u.role === "superadmin" && <span style={{ background: "#fef2f2", color: "#991b1b", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fca5a5" }}>SUPERADMIN</span>}
-                          {u.role === "admin" && <span style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fed7aa" }}>ADMIN IFSI</span>}
-                          {(u.role === "user" || !u.role) && <span style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #d1d5db" }}>FORMATEUR</span>}
+                          {u.role === "admin" && <span style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fed7aa" }}>ADMIN</span>}
+                          {(u.role === "user" || !u.role) && <span style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #d1d5db" }}>MEMBRE</span>}
                         </td>
                         {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
                         <td style={td}>
@@ -1042,7 +1038,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- DASHBOARD --- */}
+        {/* --- RESTE DES ONGLETS (Dashboard, Criteres, Axes, Responsables, Compte) --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -1086,7 +1082,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- CRITERES --- */}
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -1113,7 +1108,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- AXES --- */}
         {activeTab === "axes" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
           {["non-conforme","en-cours"].map(st => {
