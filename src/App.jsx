@@ -87,7 +87,6 @@ function MainApp() {
       if (list.length === 0) {
         setDoc(doc(db, "etablissements", "demo_ifps_cham"), { name: "IFPS du CHAM", roles: DEFAULT_ROLES, archived: false });
       } else { 
-        // 👉 LE FAMEUX BLINDAGE ANTI-CRASH EST LÀ !
         list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || ""))); 
         setIfsiList(list); 
       }
@@ -179,6 +178,18 @@ function MainApp() {
     } else {
       setSelectedIfsi(e.target.value);
       setActiveTab("dashboard");
+    }
+  }
+
+  // 👉 NOUVELLE FONCTION : RENOMMER UN IFSI
+  async function handleRenameIfsi(ifsiId, currentName) {
+    const newName = prompt(`Renommer l'établissement "${currentName}" :`, currentName);
+    if (newName && newName.trim() !== "" && newName !== currentName) {
+      try {
+        await setDoc(doc(db, "etablissements", ifsiId), { name: newName.trim() }, { merge: true });
+      } catch (error) {
+        alert("Erreur lors du renommage : " + error.message);
+      }
     }
   }
 
@@ -372,7 +383,6 @@ function MainApp() {
     }
   }
 
-  // 👉 FONCTION DAYCOLOR RESTAURÉE POUR LES INDICATEURS
   const today = new Date();
   const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
   const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
@@ -650,7 +660,6 @@ function MainApp() {
               </div>
             </div>
 
-            {/* --- STATISTIQUES --- */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
               <div style={{ background: "linear-gradient(135deg, #4f46e5, #3b82f6)", borderRadius: "12px", padding: "20px", color: "white", boxShadow: "0 4px 10px rgba(79,70,229,0.2)" }}>
                 <div style={{ fontSize: "13px", fontWeight: "700", textTransform: "uppercase", opacity: 0.9 }}>Score National Moyen</div>
@@ -666,7 +675,6 @@ function MainApp() {
               </div>
             </div>
 
-            {/* --- ALERTES ROUGES --- */}
             {topAlerts.length > 0 && (
               <div style={{ marginBottom: "32px" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#991b1b", margin: "0 0 10px 0", display: "flex", alignItems: "center", gap: "6px" }}>🚨 Alertes Urgentes sur le réseau</h3>
@@ -689,7 +697,6 @@ function MainApp() {
               </div>
             )}
 
-            {/* --- LISTE DES IFSI --- */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #86efac", paddingBottom: "8px", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "16px", color: "#10b981", margin: 0 }}>✅ Établissements Actifs ({activeIfsis.length})</h3>
               <select value={tourSort} onChange={e => setTourSort(e.target.value)} style={{ ...sel, borderColor: "#cbd5e1", fontWeight: "600", padding: "6px 12px" }}>
@@ -711,7 +718,11 @@ function MainApp() {
                   <div key={s.id} className="td-dash" style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #e0e7ff", background: "white", transition: "all 0.2s ease" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
                       <div>
-                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 2px 0" }}>{s.name}</h3>
+                        {/* 👉 BOUTON RENOMMER INTÉGRÉ ICI */}
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                          <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: 0 }}>{s.name}</h3>
+                          <button onClick={() => handleRenameIfsi(s.id, s.name)} style={{ border: "none", background: "#f1f5f9", borderRadius: "4px", padding: "2px 6px", cursor: "pointer", fontSize: "10px", color: "#64748b" }} title="Renommer">✏️</button>
+                        </div>
                         <div style={{ fontSize: "11px", color: "#9ca3af", fontFamily: "monospace", marginBottom: "8px" }}>ID: {s.id}</div>
                         <div style={{ fontSize: "12px", color: "#6b7280", display: "flex", alignItems: "center", gap: "6px", fontWeight: "600" }}>
                            <span>🗓️ {new Date(s.auditDate).toLocaleDateString("fr-FR")}</span>
@@ -754,7 +765,11 @@ function MainApp() {
                     return (
                       <div key={ifsi.id} style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px dashed #fca5a5", background: "#fef2f2", opacity: 0.9 }}>
                         <div style={{ marginBottom: "16px" }}>
-                          <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#991b1b", margin: "0 0 2px 0" }}>{ifsi.name}</h3>
+                          {/* 👉 BOUTON RENOMMER INTÉGRÉ ICI AUSSI */}
+                          <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
+                            <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#991b1b", margin: 0 }}>{ifsi.name}</h3>
+                            <button onClick={() => handleRenameIfsi(ifsi.id, ifsi.name)} style={{ border: "none", background: "white", borderRadius: "4px", padding: "2px 6px", cursor: "pointer", fontSize: "10px", color: "#64748b" }} title="Renommer">✏️</button>
+                          </div>
                           <div style={{ fontSize: "11px", color: "#ef4444", fontFamily: "monospace", marginBottom: "8px" }}>ID: {ifsi.id}</div>
                           <p style={{ fontSize: "12px", color: "#991b1b", margin: 0 }}>Cet établissement est invisible pour ses utilisateurs.</p>
                         </div>
@@ -862,7 +877,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ONGLET ÉQUIPE (COMPTES AVEC TRI & FILTRES) --- */}
+        {/* --- ONG ÉQUIPE (COMPTES AVEC TRI & FILTRES) --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
