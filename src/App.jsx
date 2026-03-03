@@ -2,12 +2,16 @@ import LoginPage from "./components/LoginPage";
 import DetailModal from "./components/DetailModal";
 import { useState, useEffect, useRef } from "react";
 import { getDoc, setDoc, doc } from "firebase/firestore";
-import { signInWithEmailAndPassword, onAuthStateChanged, signOut } from "firebase/auth";
+import { onAuthStateChanged, signOut } from "firebase/auth";
 import { db, auth } from "./firebase";
-import { NOM_ETABLISSEMENT, TODAY, RESPONSABLES, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG, ROLE_COLORS } from "./data";
+import { TODAY, RESPONSABLES, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG, ROLE_COLORS } from "./data";
 
-// 🎯 LE FAMEUX LASER QUI POINTE SUR TES VRAIES DONNÉES !
-const DOC_REF = doc(db, "qualiopi", "criteres");
+// --- LISTE DES ÉTABLISSEMENTS (Tu pourras en rajouter ici plus tard) ---
+const IFSI_LIST = [
+  { id: "demo_ifps_cham", name: "IFPS du CHAM" },
+  { id: "ifsi_lyon", name: "IFSI de Lyon" },
+  { id: "ifsi_marseille", name: "IFSI de Marseille" }
+];
 
 function GaugeChart({ value, max, color }) {
   const pct = max > 0 ? (value / max) * 100 : 0, r = 38, circ = 2 * Math.PI * r;
@@ -32,6 +36,8 @@ function ProgressBar({ value, max, color }) {
 export default function App() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [userProfile, setUserProfile] = useState(null); // PROFIL UTILISATEUR
+  const [selectedIfsi, setSelectedIfsi] = useState(null); // IFSI ACTUELLEMENT AFFICHÉ
   const [campaigns, setCampaigns] = useState(null);
   const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [saveStatus, setSaveStatus] = useState("idle");
@@ -42,39 +48,75 @@ export default function App() {
   const [modalCritere, setModalCritere] = useState(null);
   const [isAuditMode, setIsAuditMode] = useState(false);
 
+  // 1. GESTION DE LA CONNEXION ET DU PROFIL
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      if (user) { setIsLoggedIn(true); loadData(); } 
-      else { setIsLoggedIn(false); }
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        setIsLoggedIn(true);
+        try {
+          // Va lire la fiche utilisateur pour connaître son rôle et son IFSI
+          const userSnap = await getDoc(doc(db, "users", user.uid));
+          let profile = { role: "user", etablissementId: "demo_ifps_cham" }; // Défaut
+          if (userSnap.exists()) profile = userSnap.data();
+          
+          setUserProfile(profile);
+          setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
+        } catch (err) {
+          console.error("Erreur profil:", err);
+          setSelectedIfsi("demo_ifps_cham");
+        }
+      } else {
+        setIsLoggedIn(false);
+        setUserProfile(null);
+        setSelectedIfsi(null);
+      }
       setAuthChecked(true);
     });
     return () => unsubscribe();
   }, []);
 
-  async function loadData() {
+  // 2. CHARGEMENT DES DONNÉES DÈS QU'UN IFSI EST SÉLECTIONNÉ
+  useEffect(() => {
+    if (selectedIfsi) {
+      loadCampaigns(selectedIfsi);
+    }
+  }, [selectedIfsi]);
+
+  // LA FONCTION MAGIQUE QUI PROTÈGE TES DONNÉES DU CHAM
+  const getDocRef = (ifsiId) => {
+    const docName = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
+    return doc(db, "qualiopi", docName);
+  };
+
+  async function loadCampaigns(ifsiId) {
+    setCampaigns(null); // Affiche "Chargement..." pendant le switch
     try {
-      const snap = await getDoc(DOC_REF);
+      const ref = getDocRef(ifsiId);
+      const snap = await getDoc(ref);
       if (snap.exists()) {
         const d = snap.data();
         if (d.campaigns && d.campaigns.length > 0) {
-          setCampaigns(d.campaigns); setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
+          setCampaigns(d.campaigns); 
+          setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
         } else if (d.liste) {
           const mig = [{ id: Date.now().toString(), name: "Évaluation initiale", auditDate: "2026-10-15", liste: d.liste, locked: false }];
           setCampaigns(mig); setActiveCampaignId(mig[0].id);
-        } else { initDefault(); }
-      } else { initDefault(); }
-    } catch (e) { initDefault(); }
+        } else { initDefault(ref); }
+      } else { initDefault(ref); }
+    } catch (e) { initDefault(getDocRef(ifsiId)); }
   }
 
-  function initDefault() {
+  function initDefault(ref) {
     const def = [{ id: Date.now().toString(), name: "Évaluation initiale", auditDate: "2026-10-15", liste: DEFAULT_CRITERES, locked: false }];
     setCampaigns(def); setActiveCampaignId(def[0].id);
+    setDoc(ref, { campaigns: def, updatedAt: new Date().toISOString() }, { merge: true });
   }
 
   async function saveData(newCampaigns) {
+    if (!selectedIfsi) return;
     setCampaigns(newCampaigns); setSaveStatus("saving");
     try {
-      await setDoc(DOC_REF, { campaigns: newCampaigns, updatedAt: new Date().toISOString() });
+      await setDoc(getDocRef(selectedIfsi), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
       setSaveStatus("saved"); setTimeout(() => setSaveStatus("idle"), 2000);
     } catch (e) {
       setSaveStatus("error"); setTimeout(() => setSaveStatus("idle"), 3000);
@@ -122,12 +164,13 @@ export default function App() {
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
-  if (campaigns === null || activeCampaignId === null) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center" }}>⏳ Chargement...</div>;
+  if (campaigns === null || activeCampaignId === null) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700" }}>⏳ Chargement de l'établissement...</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
   const criteres = currentCampaign.liste || [];
   const isArchive = currentCampaign.locked || false;
   const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
+  const currentIfsiName = IFSI_LIST.find(i => i.id === selectedIfsi)?.name || "Établissement Inconnu";
 
   function saveModal(updated) {
     if (isArchive) return; 
@@ -265,19 +308,33 @@ export default function App() {
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            {/* NOUVEAU LOGO "Q VALIDÉ" ICI */}
             <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs>
-                <path fill-rule="evenodd" clip-rule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#grad)"/>
+                <path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#grad)"/>
                 <path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#grad)"/>
               </svg>
             </div>
-            <div>
-              {/* NOUVEAU NOM ICI */}
-              <div style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", display: "flex", alignItems: "center", flexWrap: "wrap" }}>QualiForma <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>V2.0</span><span style={{ margin: "0 8px", color: "#d1d5db" }}>—</span> {NOM_ETABLISSEMENT}</div>
-              <div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "2px" }}>Référentiel National Qualité · 32 indicateurs</div>
+            
+            {/* L'AIGUILLAGE VISUEL SUPERADMIN EST ICI ! */}
+            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</span>
+              <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>V2.0</span>
+              <span style={{ color: "#d1d5db" }}>—</span>
+              
+              {userProfile?.role === "superadmin" ? (
+                <select 
+                  value={selectedIfsi} 
+                  onChange={(e) => setSelectedIfsi(e.target.value)} 
+                  style={{ fontSize: "14px", fontWeight: "800", color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", padding: "4px 8px", cursor: "pointer", outline: "none" }}
+                >
+                  {IFSI_LIST.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
+                </select>
+              ) : (
+                <span style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f" }}>{currentIfsiName}</span>
+              )}
             </div>
+            
             <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px", borderLeft: "2px solid #f1f5f9", paddingLeft: "16px" }}>
               <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ ...sel, fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", background: "#eff6ff", outline: "none" }}>{campaigns.map(c => <option key={c.id} value={c.id}>{c.name} {c.locked ? "(Archive)" : ""}</option>)}<option disabled>──────────</option><option value="NEW">➕ Nouvelle certification...</option></select>
               {campaigns.length > 1 && <button onClick={handleDeleteCampaign} className="no-print" title="Supprimer" style={{ background: "white", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "14px", color: "#ef4444", padding: "6px 8px" }}>🗑️</button>}
@@ -332,14 +389,12 @@ export default function App() {
             </div>
           </div>
 
-          {/* GRILLE DES STATS NETTOYÉE (PLUS DE NON CONCERNÉS) */}
           <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px", marginBottom: "24px" }}>
             {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents < 30j"]].map(([color,bg,border,num,label]) => (
               <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "14px 16px", opacity: isArchive ? 0.8 : 1 }}><div style={{ fontSize: "28px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div><div style={{ fontSize: "10px", color, opacity: 0.9, marginTop: "4px", textTransform: "uppercase", fontWeight: "700", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div></div>
             ))}
           </div>
           
-          {/* CARTE DE GAUGE NETTOYÉE */}
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
             <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
             <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
