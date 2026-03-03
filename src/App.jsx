@@ -63,18 +63,16 @@ function MainApp() {
   const [isAuditMode, setIsAuditMode] = useState(false);
 
   const [ifsiList, setIfsiList] = useState([]);
-  const [ifsiData, setIfsiData] = useState(null); // Contient roles et manualUsers
+  const [ifsiData, setIfsiData] = useState(null);
 
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
 
-  // ÉTATS ORGANIGRAMME
   const [newRoleInput, setNewRoleInput] = useState("");
   const [newManualUserInput, setNewManualUserInput] = useState("");
 
-  // 1. ÉCOUTE DE LA LISTE DES IFSI EN TEMPS RÉEL
   useEffect(() => {
     const unsubIfsi = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = [];
@@ -89,7 +87,6 @@ function MainApp() {
     return () => unsubIfsi();
   }, []);
 
-  // 2. GESTION DE LA CONNEXION ET DU PROFIL
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -122,7 +119,6 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
-  // 3. CHARGEMENT DES DONNÉES QUALIOPI ET DE L'ORGANIGRAMME
   useEffect(() => {
     let unsubSnapshot = null;
     let unsubIfsiDoc = null;
@@ -131,10 +127,8 @@ function MainApp() {
       if (userProfile?.role === "superadmin") {
         loadTeamUsers("superadmin", selectedIfsi);
       }
-
       setCampaigns(null); 
       
-      // Écoute les indicateurs Qualiopi
       unsubSnapshot = onSnapshot(getDocRef(selectedIfsi), (snap) => {
         if (snap.exists()) {
           const d = snap.data();
@@ -151,7 +145,6 @@ function MainApp() {
         } else { initDefault(getDocRef(selectedIfsi)); }
       });
 
-      // 👉 NOUVEAU : Écoute les Rôles et Membres manuels de l'IFSI
       unsubIfsiDoc = onSnapshot(doc(db, "etablissements", selectedIfsi), (snap) => {
         if (snap.exists()) {
           setIfsiData(snap.data());
@@ -202,7 +195,6 @@ function MainApp() {
 
   async function loadTeamUsers(role, currentIfsi) {
     try {
-      // On écoute aussi les users en temps réel pour que l'organigramme se mette à jour !
       onSnapshot(collection(db, "users"), (snapshot) => {
          const usersList = [];
          snapshot.forEach((doc) => {
@@ -216,11 +208,8 @@ function MainApp() {
     } catch (e) { console.error("Erreur chargement équipe", e); }
   }
 
-  // --- FONCTIONS DE L'ORGANIGRAMME (DRAG & DROP) ---
   const orgRoles = ifsiData?.roles || [];
   const manualUsers = ifsiData?.manualUsers || [];
-  
-  // Les comptes ne doivent pas inclure le Superadmin dans l'organigramme (intouchable)
   const orgAccounts = teamUsers.filter(u => u.role !== "superadmin" && u.etablissementId === selectedIfsi);
 
   function handleDragStartOrg(e, type, id) {
@@ -275,7 +264,6 @@ function MainApp() {
     }
   }
 
-  // --- AUTRES FONCTIONS ---
   async function handleCreateUser() {
     if (!newMember.email || !newMember.pwd) return alert("Email et mot de passe requis.");
     if (newMember.pwd.length < 6) return alert("Le mot de passe provisoire doit contenir au moins 6 caractères.");
@@ -289,7 +277,7 @@ function MainApp() {
         email: newMember.email,
         role: newMember.role,
         etablissementId: targetIfsi,
-        orgRole: "", // Nouveau compte sans affectation
+        orgRole: "", 
         mustChangePassword: true 
       });
 
@@ -449,18 +437,15 @@ function MainApp() {
   
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({ "non-conforme": 0, "en-cours": 1 }[a.statut] - { "non-conforme": 0, "en-cours": 1 }[b.statut] || new Date(a.delai || today) - new Date(b.delai || today)));
   
-  // 👉 NOUVEAU GÉNÉRATEUR POUR L'ONGLET RESPONSABLES
-  // Il lit les rôles de l'organigramme, et associe les personnes qui sont dedans + leurs critères
+  // NOUVEAU GÉNÉRATEUR POUR L'ONGLET RESPONSABLES BASE SUR L'ORGANIGRAMME
   const byResp = orgRoles.map(role => {
-    // Trouve toutes les personnes (comptes ou manuels) qui ont CE RÔLE
     const roleAccounts = orgAccounts.filter(u => u.orgRole === role).map(u => u.email.split('@')[0]);
     const roleManuals = manualUsers.filter(u => u.role === role).map(u => u.name);
     const allNamesInRole = [...roleAccounts, ...roleManuals];
 
-    // Trouve tous les critères dont le Responsable est l'une de ces personnes, OU le nom du rôle lui-même
     const roleCriteres = criteres.filter(c => {
        const respList = Array.isArray(c.responsables) ? c.responsables : [];
-       return respList.includes(role) || respList.some(r => allNamesInRole.includes(r));
+       return respList.includes(role); 
     });
 
     return {
@@ -469,7 +454,7 @@ function MainApp() {
       role: allNamesInRole.length > 0 ? allNamesInRole.join(", ") : "Vide",
       items: roleCriteres
     };
-  }).filter(r => r.items.length > 0 || r.role !== "Vide"); // Affiche si y a des critères ou des gens
+  }).filter(r => r.items.length > 0 || r.role !== "Vide"); 
 
   async function exportToExcel() {
     if (!criteres) return;
@@ -488,7 +473,7 @@ function MainApp() {
       const resps = Array.isArray(c.responsables) ? c.responsables : []; 
       const row = worksheet.addRow({
         num: c.num || "", critere: `Critère ${c.critere || ""}`, titre: c.titre || "", statut: sConf.label, delai: c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR"),
-        resp: resps.map(r => String(r).split("(")[0].trim()).join("\n"), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || ""
+        resp: resps.join(", "), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || ""
       });
       const cConf = CRITERES_LABELS[c.critere] || { color: "#9ca3af" }; 
       row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true }; row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' }; 
@@ -500,12 +485,16 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   }
 
+  // --- VARIABLES DE STYLE UI ---
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
   const nb = col => ({ padding: "4px 10px", background: `${col}15`, color: col, borderRadius: "6px", fontSize: "12px", fontWeight: "800", textAlign: "center", border: `1px solid ${col}30`, flexShrink: 0, whiteSpace: "nowrap" });
   const th = { textAlign: "left", padding: "10px 14px", fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase", letterSpacing: "0.8px", borderBottom: "2px solid #f1f5f9", background: "#fafafa" };
   const td = { padding: "11px 14px", fontSize: "13px", borderBottom: "1px solid #f8fafc", verticalAlign: "middle", color: "#374151" };
   const sel = { background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 10px", fontSize: "12px", cursor: "pointer" };
+  
+  // 👉 AJOUT DU STYLE MANQUANT ICI :
+  const inp = { background: "white", border: "1px solid #d1d5db", borderRadius: "8px", outline: "none", boxSizing: "border-box", fontFamily: "Outfit, sans-serif" };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
@@ -519,7 +508,8 @@ function MainApp() {
         .org-account { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
       `}</style>
       
-      {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} />}
+      {/* ON PASSE LA LISTE DES ROLES AU DETAIL MODAL POUR L'ÉTAPE 2 */}
+      {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} orgRoles={orgRoles} />}
       
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
