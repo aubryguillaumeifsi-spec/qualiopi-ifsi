@@ -4,7 +4,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { storage, auth } from "../firebase";
 import { CRITERES_LABELS, STATUT_CONFIG, GUIDE_QUALIOPI } from "../data";
 
-// --- SOUS-COMPOSANT DE SÉLECTION DES RESPONSABLES ---
 function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalette, orgRoles }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef();
@@ -59,13 +58,9 @@ function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalett
   );
 }
 
-// --- COMPOSANT PRINCIPAL : MODALE DE DÉTAIL ---
 export default function DetailModal({ critere, onClose, onSave, onAutoSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles, hasNext, hasPrev }) {
   
-  const rawChemins = Array.isArray(critere.chemins_reseau) ? critere.chemins_reseau : [];
-  const initialChemins = rawChemins.map(c => ({ ...c, validated: c.validated !== false }));
-
-  const [data, setData] = useState({});
+  const [data, setData] = useState(null); // On initialise à null pour la sécurité
   const [activeSubTab, setActiveSubTab] = useState("validation");
   const [uploading, setUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -74,18 +69,26 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
   const [newCheminVal, setNewCheminVal] = useState("");
   
   useEffect(() => {
-    setData({ 
-      ...critere, 
-      responsables: [...(critere.responsables || [])], 
-      fichiers: [...(critere.fichiers || [])],
-      preuves: critere.preuves || "", 
-      chemins_reseau: initialChemins, 
-      preuves_encours: critere.preuves_encours || "", 
-      attendus: critere.attendus || "", 
-      notes: critere.notes || "",
-      historique: critere.historique || [] 
-    });
+    if (critere) {
+      const rawChemins = Array.isArray(critere.chemins_reseau) ? critere.chemins_reseau : [];
+      const initialChemins = rawChemins.map(c => ({ ...c, validated: c.validated !== false }));
+      
+      setData({ 
+        ...critere, 
+        responsables: critere.responsables || [], 
+        fichiers: critere.fichiers || [],
+        preuves: critere.preuves || "", 
+        chemins_reseau: initialChemins, 
+        preuves_encours: critere.preuves_encours || "", 
+        attendus: critere.attendus || "", 
+        notes: critere.notes || "",
+        historique: critere.historique || [] 
+      });
+    }
   }, [critere]);
+
+  // SÉCURITÉ : Si les données ne sont pas prêtes, on affiche un petit chargement au lieu de planter
+  if (!data) return <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ color: "white", fontWeight: "bold" }}>Chargement de l'indicateur...</div></div>;
 
   const cfg = CRITERES_LABELS[critere.critere] || { color: "#9ca3af" };
   const guide = GUIDE_QUALIOPI[critere.id] || { niveau: "Non défini", preuves: "Non défini", nonConformite: "Non défini" };
@@ -101,7 +104,6 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
     if (onAutoSave) onAutoSave(finalData); 
   };
 
-  // --- ACTIONS FICHIERS ---
   async function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -128,7 +130,6 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
     triggerAutoSave({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) }, `🗑️ Suppression fichier : ${fileToDelete.name}`);
   }
 
-  // --- ACTIONS RÉSEAU ---
   const addChemin = () => {
     if (!newCheminVal.trim()) return;
     const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Lien réseau";
@@ -151,7 +152,6 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
     navigator.clipboard.writeText(chemin); alert("Copié !");
   };
 
-  // --- ANALYSE IA GEMINI 2.5 FLASH ---
   async function handleAnalyze(file) {
     if (!file.url) return;
     setIsAnalyzing(true); setAiReport("");
@@ -302,12 +302,16 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
 
           {activeSubTab === "historique" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
-              {[...data.historique].reverse().map((h, i) => (
-                <div key={i} style={{ fontSize: "12px", background: "white", padding: "10px", borderLeft: "4px solid #3b82f6", borderRadius: "6px", display: "flex", justifyContent: "space-between" }}>
-                  <span>{h.msg}</span>
-                  <span style={{ color: "#9ca3af" }}>{h.user.split('@')[0]} • {new Date(h.date).toLocaleDateString()}</span>
-                </div>
-              ))}
+              {(!data.historique || data.historique.length === 0) ? (
+                <div style={{ fontSize: "13px", color: "#9ca3af", fontStyle: "italic", textAlign: "center", padding: "20px" }}>Aucun historique disponible.</div>
+              ) : (
+                [...data.historique].reverse().map((h, i) => (
+                  <div key={i} style={{ fontSize: "12px", background: "white", padding: "10px", borderLeft: "4px solid #3b82f6", borderRadius: "6px", display: "flex", justifyContent: "space-between" }}>
+                    <span>{h.msg}</span>
+                    <span style={{ color: "#9ca3af" }}>{h.user.split('@')[0]} • {new Date(h.date).toLocaleDateString()}</span>
+                  </div>
+                ))
+              )}
             </div>
           )}
         </div>
@@ -315,8 +319,8 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
         {/* FOOTER */}
         <div style={{ padding: "20px 24px", background: "white", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "10px" }}>
-            <button disabled={!hasPrev} onClick={() => onSave(data, "prev")} style={{ padding: "10px 15px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", cursor: "pointer" }}>⬅️ Précédent</button>
-            <button disabled={!hasNext} onClick={() => onSave(data, "next")} style={{ padding: "10px 15px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", cursor: "pointer" }}>Suivant ➡️</button>
+            <button disabled={!hasPrev} onClick={() => onSave(data, "prev")} style={{ padding: "10px 15px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", cursor: "pointer", color: hasPrev ? "#1e3a5f" : "#9ca3af" }}>⬅️ Précédent</button>
+            <button disabled={!hasNext} onClick={() => onSave(data, "next")} style={{ padding: "10px 15px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", cursor: "pointer", color: hasNext ? "#1e3a5f" : "#9ca3af" }}>Suivant ➡️</button>
           </div>
           <button onClick={() => onSave(data, "close")} style={{ padding: "10px 30px", borderRadius: "8px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", border: "none", fontWeight: "bold", cursor: "pointer" }}>{isReadOnly || isAuditMode ? "Fermer" : "Enregistrer & Fermer"}</button>
         </div>
