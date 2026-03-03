@@ -4,7 +4,7 @@ import DetailModal from "./components/DetailModal";
 import { getDoc, setDoc, deleteDoc, doc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
-import { TODAY, RESPONSABLES, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG, ROLE_COLORS } from "./data";
+import { TODAY, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG, ROLE_COLORS } from "./data";
 
 // --- LE BOUCLIER ANTI-ÉCRAN BLANC ---
 class ErrorBoundary extends React.Component {
@@ -62,25 +62,26 @@ function MainApp() {
   const [modalCritere, setModalCritere] = useState(null);
   const [isAuditMode, setIsAuditMode] = useState(false);
 
-  // 👉 NOUVEAU : L'état qui stocke la liste dynamique des IFSI
   const [ifsiList, setIfsiList] = useState([]);
-  
+  const [ifsiData, setIfsiData] = useState(null); // Contient roles et manualUsers
+
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
+
+  // ÉTATS ORGANIGRAMME
+  const [newRoleInput, setNewRoleInput] = useState("");
+  const [newManualUserInput, setNewManualUserInput] = useState("");
 
   // 1. ÉCOUTE DE LA LISTE DES IFSI EN TEMPS RÉEL
   useEffect(() => {
     const unsubIfsi = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = [];
       snapshot.forEach(doc => list.push({ id: doc.id, name: doc.data().name }));
-      
-      // Si la base est totalement vide, on recrée le CHAM par défaut pour ne pas bloquer
       if (list.length === 0) {
         setDoc(doc(db, "etablissements", "demo_ifps_cham"), { name: "IFPS du CHAM" });
       } else {
-        // On trie la liste par ordre alphabétique
         list.sort((a, b) => a.name.localeCompare(b.name));
         setIfsiList(list);
       }
@@ -121,18 +122,20 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
-  // 3. CHARGEMENT DES DONNÉES QUALIOPI LORS DU CHANGEMENT D'IFSI
+  // 3. CHARGEMENT DES DONNÉES QUALIOPI ET DE L'ORGANIGRAMME
   useEffect(() => {
     let unsubSnapshot = null;
+    let unsubIfsiDoc = null;
+
     if (selectedIfsi && userProfile?.role !== "guest" && !userProfile?.mustChangePassword) {
       if (userProfile?.role === "superadmin") {
         loadTeamUsers("superadmin", selectedIfsi);
       }
 
       setCampaigns(null); 
-      const ref = getDocRef(selectedIfsi);
       
-      unsubSnapshot = onSnapshot(ref, (snap) => {
+      // Écoute les indicateurs Qualiopi
+      unsubSnapshot = onSnapshot(getDocRef(selectedIfsi), (snap) => {
         if (snap.exists()) {
           const d = snap.data();
           if (d.campaigns && d.campaigns.length > 0) {
@@ -144,11 +147,21 @@ function MainApp() {
           } else if (d.liste) {
             const mig = [{ id: Date.now().toString(), name: "Évaluation initiale", auditDate: "2026-10-15", liste: d.liste, locked: false }];
             setCampaigns(mig); setActiveCampaignId(mig[0].id);
-          } else { initDefault(ref); }
-        } else { initDefault(ref); }
+          } else { initDefault(getDocRef(selectedIfsi)); }
+        } else { initDefault(getDocRef(selectedIfsi)); }
+      });
+
+      // 👉 NOUVEAU : Écoute les Rôles et Membres manuels de l'IFSI
+      unsubIfsiDoc = onSnapshot(doc(db, "etablissements", selectedIfsi), (snap) => {
+        if (snap.exists()) {
+          setIfsiData(snap.data());
+        }
       });
     }
-    return () => { if (unsubSnapshot) unsubSnapshot(); };
+    return () => { 
+      if (unsubSnapshot) unsubSnapshot(); 
+      if (unsubIfsiDoc) unsubIfsiDoc();
+    };
   }, [selectedIfsi, userProfile]);
 
   const getDocRef = (ifsiId) => {
@@ -172,21 +185,15 @@ function MainApp() {
     }
   }
 
-  // 👉 NOUVEAU : FONCTION DE CRÉATION D'UN NOUVEL IFSI
   async function handleIfsiSwitch(e) {
     if (e.target.value === "NEW") {
       const nomEtablissement = prompt("Nom du nouvel établissement (ex: IFSI de Bordeaux) :");
       if (nomEtablissement && nomEtablissement.trim() !== "") {
-        // Crée un identifiant web propre (bordeaux_8452)
         const safeId = nomEtablissement.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 10000);
         try {
-          // Ajoute l'établissement dans la base de données
-          await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim() });
-          // Bascule automatiquement dessus
+          await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim(), roles: [], manualUsers: [] });
           setSelectedIfsi(safeId);
-        } catch (error) {
-          alert("Erreur lors de la création de l'établissement.");
-        }
+        } catch (error) { alert("Erreur lors de la création."); }
       }
     } else {
       setSelectedIfsi(e.target.value);
@@ -195,24 +202,83 @@ function MainApp() {
 
   async function loadTeamUsers(role, currentIfsi) {
     try {
-      const querySnapshot = await getDocs(collection(db, "users"));
-      const usersList = [];
-      querySnapshot.forEach((doc) => {
-        const data = doc.data();
-        if (role === "superadmin" || data.etablissementId === currentIfsi) {
+      // On écoute aussi les users en temps réel pour que l'organigramme se mette à jour !
+      onSnapshot(collection(db, "users"), (snapshot) => {
+         const usersList = [];
+         snapshot.forEach((doc) => {
+           const data = doc.data();
            if (data.etablissementId === currentIfsi || role === "superadmin") {
               usersList.push({ id: doc.id, ...data });
            }
-        }
+         });
+         setTeamUsers(usersList.filter(u => role === "superadmin" ? true : u.etablissementId === currentIfsi));
       });
-      setTeamUsers(usersList.filter(u => role === "superadmin" ? true : u.etablissementId === currentIfsi));
     } catch (e) { console.error("Erreur chargement équipe", e); }
   }
 
+  // --- FONCTIONS DE L'ORGANIGRAMME (DRAG & DROP) ---
+  const orgRoles = ifsiData?.roles || [];
+  const manualUsers = ifsiData?.manualUsers || [];
+  
+  // Les comptes ne doivent pas inclure le Superadmin dans l'organigramme (intouchable)
+  const orgAccounts = teamUsers.filter(u => u.role !== "superadmin" && u.etablissementId === selectedIfsi);
+
+  function handleDragStartOrg(e, type, id) {
+    e.dataTransfer.setData("type", type);
+    e.dataTransfer.setData("id", id);
+  }
+  function handleDragOverOrg(e) { e.preventDefault(); }
+  function handleDropOrg(e, targetRole) {
+    e.preventDefault();
+    const type = e.dataTransfer.getData("type");
+    const id = e.dataTransfer.getData("id");
+    
+    if (type === "account") {
+      setDoc(doc(db, "users", id), { orgRole: targetRole }, { merge: true });
+    } else if (type === "manual") {
+      const updatedManuals = manualUsers.map(u => u.id === id ? { ...u, role: targetRole } : u);
+      setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true });
+    }
+  }
+
+  function addOrgRole() {
+    const r = newRoleInput.trim();
+    if (r && !orgRoles.includes(r)) {
+      setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, r] }, { merge: true });
+      setNewRoleInput("");
+    }
+  }
+
+  function deleteOrgRole(roleToDelete) {
+    const hasPeople = orgAccounts.some(u => u.orgRole === roleToDelete) || manualUsers.some(u => u.role === roleToDelete);
+    if (hasPeople) {
+      alert("⚠️ Impossible de supprimer ce rôle : des personnes y sont encore affectées. Déplacez-les d'abord.");
+      return;
+    }
+    if (window.confirm(`Supprimer la colonne "${roleToDelete}" ?`)) {
+      setDoc(doc(db, "etablissements", selectedIfsi), { roles: orgRoles.filter(r => r !== roleToDelete) }, { merge: true });
+    }
+  }
+
+  function addManualUser() {
+    const n = newManualUserInput.trim();
+    if (n) {
+      const newUser = { id: 'm_' + Date.now(), name: n, role: "" };
+      setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
+      setNewManualUserInput("");
+    }
+  }
+
+  function deleteManualUser(idToDelete) {
+    if (window.confirm("Supprimer ce profil manuel ?")) {
+      setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true });
+    }
+  }
+
+  // --- AUTRES FONCTIONS ---
   async function handleCreateUser() {
     if (!newMember.email || !newMember.pwd) return alert("Email et mot de passe requis.");
     if (newMember.pwd.length < 6) return alert("Le mot de passe provisoire doit contenir au moins 6 caractères.");
-    
     setIsCreatingUser(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
@@ -223,15 +289,14 @@ function MainApp() {
         email: newMember.email,
         role: newMember.role,
         etablissementId: targetIfsi,
+        orgRole: "", // Nouveau compte sans affectation
         mustChangePassword: true 
       });
 
       alert(`✅ Le compte ${newMember.email} a été créé avec succès !`);
       setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
-      loadTeamUsers(userProfile.role, selectedIfsi); 
       secondaryAuth.signOut();
     } catch (error) {
-      console.error(error);
       let msg = "Une erreur est survenue lors de la création du compte.";
       if (error.code === "auth/email-already-in-use") msg = "Cette adresse email est déjà utilisée par un autre compte.";
       if (error.code === "auth/invalid-email") msg = "Le format de l'adresse email est invalide.";
@@ -242,26 +307,16 @@ function MainApp() {
   }
 
   async function handleDeleteUser(userId, userEmail) {
-    if (!window.confirm(`Êtes-vous sûr de vouloir révoquer l'accès de : ${userEmail} ?\n\nIl ne pourra plus se connecter à l'application.`)) return;
-    try {
-      await deleteDoc(doc(db, "users", userId));
-      loadTeamUsers(userProfile.role, selectedIfsi); 
-    } catch (e) {
-      alert("Erreur lors de la suppression : " + e.message);
-    }
+    if (!window.confirm(`Êtes-vous sûr de vouloir révoquer l'accès de : ${userEmail} ?`)) return;
+    try { await deleteDoc(doc(db, "users", userId)); } 
+    catch (e) { alert("Erreur lors de la suppression : " + e.message); }
   }
 
   async function handleChangePassword(e, isForced) {
     e.preventDefault();
     setPwdUpdate({ ...pwdUpdate, error: "", success: "", loading: true });
-
-    if (pwdUpdate.p1 !== pwdUpdate.p2) {
-      return setPwdUpdate({ ...pwdUpdate, error: "Les mots de passe ne correspondent pas.", loading: false });
-    }
-    if (pwdUpdate.p1.length < 8 || !/[A-Z]/.test(pwdUpdate.p1) || !/[0-9]/.test(pwdUpdate.p1)) {
-      return setPwdUpdate({ ...pwdUpdate, error: "Sécurité faible : 8 caractères min., 1 majuscule et 1 chiffre requis.", loading: false });
-    }
-
+    if (pwdUpdate.p1 !== pwdUpdate.p2) return setPwdUpdate({ ...pwdUpdate, error: "Les mots de passe ne correspondent pas.", loading: false });
+    if (pwdUpdate.p1.length < 8 || !/[A-Z]/.test(pwdUpdate.p1) || !/[0-9]/.test(pwdUpdate.p1)) return setPwdUpdate({ ...pwdUpdate, error: "Sécurité faible : 8 caractères min., 1 majuscule et 1 chiffre.", loading: false });
     try {
       await updatePassword(auth.currentUser, pwdUpdate.p1);
       if (isForced) {
@@ -271,7 +326,7 @@ function MainApp() {
       setPwdUpdate({ p1: "", p2: "", loading: false, error: "", success: "Votre mot de passe a été mis à jour avec succès !" });
     } catch (err) {
       let msg = "Erreur de mise à jour.";
-      if (err.code === 'auth/requires-recent-login') msg = "Veuillez vous déconnecter et vous reconnecter pour des raisons de sécurité avant de changer de mot de passe.";
+      if (err.code === 'auth/requires-recent-login') msg = "Veuillez vous déconnecter et vous reconnecter avant de changer de mot de passe.";
       setPwdUpdate({ ...pwdUpdate, error: msg, loading: false });
     }
   }
@@ -308,7 +363,6 @@ function MainApp() {
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
-
   if (userProfile?.role === "guest") {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "Outfit" }}>
@@ -326,30 +380,20 @@ function MainApp() {
         <div style={{ background: "white", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 40px rgba(0,0,0,0.08)", maxWidth: "400px", width: "100%", textAlign: "center" }}>
           <div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div>
           <h2 style={{ color: "#1e3a5f", margin: "0 0 10px 0", fontSize: "22px", fontWeight: "800" }}>Sécurisez votre compte</h2>
-          <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", lineHeight: "1.5" }}>Ceci est votre première connexion. Veuillez remplacer le mot de passe provisoire par un mot de passe personnel.</p>
+          <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", lineHeight: "1.5" }}>Veuillez remplacer le mot de passe provisoire.</p>
           <form onSubmit={(e) => handleChangePassword(e, true)}>
-            <div style={{ textAlign: "left", marginBottom: "16px" }}>
-              <label style={{ fontSize: "12px", color: "#374151", fontWeight: "700" }}>Nouveau mot de passe</label>
-              <input type="password" value={pwdUpdate.p1} onChange={e => setPwdUpdate({...pwdUpdate, p1: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "6px", boxSizing: "border-box" }} placeholder="8 caractères, 1 majuscule, 1 chiffre" required />
-            </div>
-            <div style={{ textAlign: "left", marginBottom: "24px" }}>
-              <label style={{ fontSize: "12px", color: "#374151", fontWeight: "700" }}>Confirmez le mot de passe</label>
-              <input type="password" value={pwdUpdate.p2} onChange={e => setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "6px", boxSizing: "border-box" }} placeholder="Répétez le mot de passe" required />
-            </div>
+            <input type="password" value={pwdUpdate.p1} onChange={e => setPwdUpdate({...pwdUpdate, p1: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "12px", boxSizing: "border-box" }} placeholder="Nouveau (8 car., 1 maj., 1 chiffre)" required />
+            <input type="password" value={pwdUpdate.p2} onChange={e => setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "16px", boxSizing: "border-box" }} placeholder="Répétez le mot de passe" required />
             {pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600" }}>{pwdUpdate.error}</div>}
-            <button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: pwdUpdate.loading ? "wait" : "pointer", opacity: pwdUpdate.loading ? 0.7 : 1 }}>
-              {pwdUpdate.loading ? "Mise à jour..." : "Valider et accéder au portail"}
-            </button>
+            <button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: pwdUpdate.loading ? "wait" : "pointer" }}>{pwdUpdate.loading ? "Mise à jour..." : "Valider"}</button>
           </form>
-          <button onClick={handleLogout} style={{ marginTop: "20px", background: "none", border: "none", color: "#9ca3af", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Annuler et se déconnecter</button>
+          <button onClick={handleLogout} style={{ marginTop: "20px", background: "none", border: "none", color: "#9ca3af", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Se déconnecter</button>
         </div>
       </div>
     );
   }
 
-  // Permet d'attendre que ifsiList soit chargé pour afficher le bon nom
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
-
   if (campaigns === null || activeCampaignId === null || ifsiList.length === 0) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700" }}>⏳ Chargement de l'établissement...</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
@@ -364,24 +408,12 @@ function MainApp() {
     setModalCritere(null);
   }
 
-  function handleDragStart(e, critereId) { e.dataTransfer.setData("critereId", critereId.toString()); }
-  function handleDragOver(e) { e.preventDefault(); }
-  function handleDrop(e, newStatut) {
-    e.preventDefault();
-    if (isArchive) return;
-    const critereId = e.dataTransfer.getData("critereId");
-    if (!critereId) return;
-    const newListe = criteres.map(c => c.id.toString() === critereId ? { ...c, statut: newStatut } : c);
-    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp));
-  }
-
   function handleEditAuditDate() {
     if (isArchive) return;
     const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
     if (newDate) {
-      if (isNaN(new Date(newDate).getTime())) { alert("Format de date invalide. Veuillez utiliser AAAA-MM-JJ."); return; }
-      const newCampaigns = campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c);
-      saveData(newCampaigns);
+      if (isNaN(new Date(newDate).getTime())) return alert("Format invalide.");
+      saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c));
     }
   }
 
@@ -392,10 +424,9 @@ function MainApp() {
   const auditDateObj = new Date(currentAuditDate);
   const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
   let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
-  if (daysToAudit < 0) { bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` }; } 
-  else if (daysToAudit <= 30) { bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` }; } 
-  else if (daysToAudit <= 90) { bannerConfig = { bg: "#fff7ed", border: "#fed7aa", color: "#c2410c", icon: "⏳", text: `L'audit approche : plus que ${daysToAudit} jour(s)` }; }
-
+  if (daysToAudit < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` };
+  else if (daysToAudit <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` };
+  
   const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
   const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; 
 
@@ -418,11 +449,27 @@ function MainApp() {
   
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({ "non-conforme": 0, "en-cours": 1 }[a.statut] - { "non-conforme": 0, "en-cours": 1 }[b.statut] || new Date(a.delai || today) - new Date(b.delai || today)));
   
-  const byResp = RESPONSABLES.map(r => ({ 
-    name: r, nom: (r||"").split("(")[0].trim(), 
-    role: (r||"").match(/\(([^)]+)\)/)?.[1] || "Défaut", 
-    items: criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(r)), 
-  })).filter(r => r.items.length > 0);
+  // 👉 NOUVEAU GÉNÉRATEUR POUR L'ONGLET RESPONSABLES
+  // Il lit les rôles de l'organigramme, et associe les personnes qui sont dedans + leurs critères
+  const byResp = orgRoles.map(role => {
+    // Trouve toutes les personnes (comptes ou manuels) qui ont CE RÔLE
+    const roleAccounts = orgAccounts.filter(u => u.orgRole === role).map(u => u.email.split('@')[0]);
+    const roleManuals = manualUsers.filter(u => u.role === role).map(u => u.name);
+    const allNamesInRole = [...roleAccounts, ...roleManuals];
+
+    // Trouve tous les critères dont le Responsable est l'une de ces personnes, OU le nom du rôle lui-même
+    const roleCriteres = criteres.filter(c => {
+       const respList = Array.isArray(c.responsables) ? c.responsables : [];
+       return respList.includes(role) || respList.some(r => allNamesInRole.includes(r));
+    });
+
+    return {
+      name: role,
+      nom: role,
+      role: allNamesInRole.length > 0 ? allNamesInRole.join(", ") : "Vide",
+      items: roleCriteres
+    };
+  }).filter(r => r.items.length > 0 || r.role !== "Vide"); // Affiche si y a des critères ou des gens
 
   async function exportToExcel() {
     if (!criteres) return;
@@ -439,7 +486,6 @@ function MainApp() {
       const d = days(c.delai);
       const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"];
       const resps = Array.isArray(c.responsables) ? c.responsables : []; 
-      
       const row = worksheet.addRow({
         num: c.num || "", critere: `Critère ${c.critere || ""}`, titre: c.titre || "", statut: sConf.label, delai: c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR"),
         resp: resps.map(r => String(r).split("(")[0].trim()).join("\n"), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || ""
@@ -466,7 +512,11 @@ function MainApp() {
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <style>{`
         @media print { .no-print { display: none !important; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: portrait; margin: 10mm; } * { box-shadow: none !important; } .print-break-avoid { page-break-inside: avoid; } }
-        .kanban-card { transition: all 0.2s ease; } .kanban-card:hover { transform: translateY(-3px); box-shadow: 0 4px 12px rgba(0,0,0,0.08) !important; border-color: #bfdbfe !important; } .kanban-col { scrollbar-width: thin; }
+        /* Style des cartes pour l'organigramme */
+        .org-card { background: white; border: 1px solid #d1d5db; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; cursor: grab; font-size: 13px; font-weight: 600; display: flex; justify-content: space-between; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
+        .org-card:active { cursor: grabbing; opacity: 0.7; }
+        .org-ghost { background: #fffbeb; border-color: #fcd34d; color: #92400e; }
+        .org-account { background: #eff6ff; border-color: #bfdbfe; color: #1e40af; }
       `}</style>
       
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} />}
@@ -487,7 +537,6 @@ function MainApp() {
               <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>V2.0</span>
               <span style={{ color: "#d1d5db" }}>—</span>
               
-              {/* 👉 LE MENU DYNAMIQUE EST ICI */}
               {userProfile?.role === "superadmin" ? (
                 <select value={selectedIfsi} onChange={handleIfsiSwitch} style={{ fontSize: "14px", fontWeight: "800", color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", padding: "4px 8px", cursor: "pointer", outline: "none" }}>
                   {ifsiList.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
@@ -506,13 +555,17 @@ function MainApp() {
           </div>
           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
             <button style={navBtn(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>Tableau de bord</button>
-            <button style={navBtn(activeTab === "kanban")} onClick={() => setActiveTab("kanban")}>Vue Kanban</button>
             <button style={navBtn(activeTab === "criteres")} onClick={() => setActiveTab("criteres")}>Indicateurs</button>
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Axes prioritaires</button>
             <button style={navBtn(activeTab === "responsables")} onClick={() => setActiveTab("responsables")}>Responsables</button>
             
+            {/* NOUVEL ONGLET ORGANIGRAMME AU LIEU DU KANBAN */}
             {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
-              <button style={{ ...navBtn(activeTab === "equipe"), marginLeft: "8px", border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Équipe IFSI</button>
+              <button style={{ ...navBtn(activeTab === "organigramme"), marginLeft: "8px", border: "1px solid #10b981", color: activeTab === "organigramme" ? "white" : "#059669", background: activeTab === "organigramme" ? "#10b981" : "#d1fae5" }} onClick={() => setActiveTab("organigramme")}>🌳 Organigramme</button>
+            )}
+
+            {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
+              <button style={{ ...navBtn(activeTab === "equipe"), marginLeft: "4px", border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Créer un compte</button>
             )}
 
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
@@ -530,11 +583,92 @@ function MainApp() {
         </div>
       </div>
       
-      {isArchive && <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>🔒 Mode Lecture Seule : Cette évaluation est une archive historique.</div>}
-      {isAuditMode && !isArchive && <div className="no-print" style={{ background: "#d1fae5", borderBottom: "1px solid #6ee7b7", color: "#065f46", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>✅ Mode Audit Activé : Les notes internes et preuves en cours sont masquées.</div>}
-      
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
+        {/* --- NOUVEL ONGLET : L'ORGANIGRAMME INTERACTIF --- */}
+        {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
+          <div>
+            <div style={{ marginBottom: "24px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>🌳 Organigramme & Rôles ({currentIfsiName})</h2>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Glissez-déposez les personnes dans les rôles pour composer votre équipe Qualiopi.</p>
+            </div>
+
+            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start" }}>
+              
+              {/* COLONNE GAUCHE : LE VIVIER (Personnes sans rôle) */}
+              <div style={{ width: "320px", flexShrink: 0, background: "#f8fafc", borderRadius: "12px", padding: "16px", border: "1px solid #e2e8f0", minHeight: "70vh" }} onDragOver={handleDragOverOrg} onDrop={(e) => handleDropOrg(e, "")}>
+                <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#475569", marginBottom: "16px", textTransform: "uppercase", borderBottom: "2px solid #cbd5e1", paddingBottom: "8px" }}>📥 En attente d'affectation</h3>
+                
+                {/* Liste des vrais comptes non affectés */}
+                {orgAccounts.filter(u => !u.orgRole).map(u => (
+                  <div key={u.id} className="org-card org-account" draggable onDragStart={(e) => handleDragStartOrg(e, "account", u.id)} title="Ceci est un compte de connexion (Formateur/Admin)">
+                    <span>👤 {u.email.split('@')[0]}</span>
+                  </div>
+                ))}
+
+                {/* Liste des personnes manuelles non affectées */}
+                {manualUsers.filter(u => !u.role).map(u => (
+                  <div key={u.id} className="org-card org-ghost" draggable onDragStart={(e) => handleDragStartOrg(e, "manual", u.id)} title="Ceci est une étiquette ajoutée manuellement (Pas de connexion)">
+                    <span>👻 {u.name}</span>
+                    <button onClick={() => deleteManualUser(u.id)} style={{ background:"transparent", border:"none", color:"#ef4444", cursor:"pointer", padding:"0 5px" }}>🗑️</button>
+                  </div>
+                ))}
+
+                {orgAccounts.filter(u => !u.orgRole).length === 0 && manualUsers.filter(u => !u.role).length === 0 && (
+                  <div style={{ fontSize: "12px", color: "#9ca3af", fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>Tout le monde est affecté !</div>
+                )}
+
+                {/* Formulaire : Ajouter un profil fantôme */}
+                <div style={{ marginTop: "24px", background: "white", padding: "12px", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", display: "block", marginBottom: "6px" }}>+ AJOUTER UNE PERSONNE (SANS COMPTE)</label>
+                  <input type="text" value={newManualUserInput} onChange={e => setNewManualUserInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addManualUser()} placeholder="Ex: Secrétariat, Dr. Martin..." style={{ ...inp, padding: "8px", fontSize: "12px", marginBottom: "8px" }} />
+                  <button onClick={addManualUser} disabled={!newManualUserInput.trim()} style={{ width: "100%", background: "#f59e0b", color: "white", border: "none", padding: "6px", borderRadius: "6px", fontWeight: "bold", cursor: newManualUserInput.trim() ? "pointer" : "not-allowed" }}>Créer l'étiquette</button>
+                </div>
+              </div>
+
+              {/* ZONE DROITE : LES COLONNES DES RÔLES */}
+              <div style={{ flex: 1, display: "flex", gap: "16px", flexWrap: "wrap", alignItems: "flex-start" }}>
+                {orgRoles.map(role => (
+                  <div key={role} style={{ width: "260px", background: "white", borderRadius: "12px", padding: "16px", border: "1px solid #d1d5db", boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }} onDragOver={handleDragOverOrg} onDrop={(e) => handleDropOrg(e, role)}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "16px", borderBottom: "2px solid #1e3a5f", paddingBottom: "8px" }}>
+                      <span style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", textTransform: "uppercase" }}>{role}</span>
+                      <button onClick={() => deleteOrgRole(role)} style={{ background:"#fef2f2", border:"1px solid #fca5a5", color:"#ef4444", borderRadius:"6px", cursor:"pointer", padding:"2px 6px", fontSize:"10px", fontWeight:"bold" }}>Supprimer</button>
+                    </div>
+                    
+                    <div style={{ minHeight: "100px", paddingBottom: "20px" }}>
+                      {/* Vrais comptes affectés ici */}
+                      {orgAccounts.filter(u => u.orgRole === role).map(u => (
+                        <div key={u.id} className="org-card org-account" draggable onDragStart={(e) => handleDragStartOrg(e, "account", u.id)}>
+                          <span>👤 {u.email.split('@')[0]}</span>
+                        </div>
+                      ))}
+                      {/* Manuels affectés ici */}
+                      {manualUsers.filter(u => u.role === role).map(u => (
+                        <div key={u.id} className="org-card org-ghost" draggable onDragStart={(e) => handleDragStartOrg(e, "manual", u.id)}>
+                          <span>👻 {u.name}</span>
+                          <button onClick={() => deleteManualUser(u.id)} style={{ background:"transparent", border:"none", color:"#ef4444", cursor:"pointer", padding:"0 5px" }}>🗑️</button>
+                        </div>
+                      ))}
+                      {orgAccounts.filter(u => u.orgRole === role).length === 0 && manualUsers.filter(u => u.role === role).length === 0 && (
+                        <div style={{ fontSize: "11px", color: "#9ca3af", fontStyle: "italic", textAlign: "center", marginTop: "20px" }}>Glissez une personne ici</div>
+                      )}
+                    </div>
+                  </div>
+                ))}
+
+                {/* COLONNE POUR CRÉER UN NOUVEAU RÔLE */}
+                <div style={{ width: "260px", background: "#f1f5f9", borderRadius: "12px", padding: "16px", border: "1px dashed #cbd5e1" }}>
+                  <span style={{ fontSize: "12px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "12px" }}>+ NOUVEAU RÔLE / COLONNE</span>
+                  <input type="text" value={newRoleInput} onChange={e => setNewRoleInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addOrgRole()} placeholder="Ex: Direction, Pôle Stage..." style={{ ...inp, padding: "8px", fontSize: "12px", marginBottom: "8px" }} />
+                  <button onClick={addOrgRole} disabled={!newRoleInput.trim()} style={{ width: "100%", background: "#1d4ed8", color: "white", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "bold", cursor: newRoleInput.trim() ? "pointer" : "not-allowed" }}>Créer la colonne</button>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
+        {/* --- ONGLET "MON COMPTE" --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
@@ -569,15 +703,16 @@ function MainApp() {
           </div>
         )}
 
+        {/* --- ONGLET ÉQUIPE (CRÉATION DE COMPTES UNIQUEMENT) --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
-              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>👥 Gestion des accès pour {currentIfsiName}</h2>
-              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Ajoutez des formateurs ou des membres de la direction. Ils ne verront que les données de cet IFSI.</p>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>👥 Création de comptes d'accès</h2>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Créez les identifiants de connexion. Vous pourrez ensuite affecter ces personnes dans l'onglet "Organigramme".</p>
             </div>
             <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", alignItems: "start" }}>
               <div style={{ ...card, background: "#f8fafc" }}>
-                <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Inviter un membre</h3>
+                <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Nouveau compte</h3>
                 <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px", borderRadius: "6px", fontSize: "11px", color: "#1d4ed8", marginBottom: "16px", lineHeight: "1.4" }}>
                   ℹ️ L'utilisateur sera forcé de modifier son mot de passe provisoire lors de sa première connexion.
                 </div>
@@ -588,17 +723,15 @@ function MainApp() {
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Mot de passe provisoire</label>
                   <input type="text" value={newMember.pwd} onChange={e => setNewMember({...newMember, pwd: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="Ex: Qualiopi2026!" />
-                  <div style={{ fontSize: "10px", color: "#6b7280", marginTop: "6px", lineHeight: "1.4" }}>👉 Minimum 6 caractères. L'utilisateur devra modifier ce mot de passe à sa première connexion.</div>
+                  <div style={{ fontSize: "10px", color: "#6b7280", marginTop: "6px", lineHeight: "1.4" }}>👉 Minimum 6 caractères.</div>
                 </div>
                 <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Rôle</label>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Rôle système</label>
                   <select value={newMember.role} onChange={e => setNewMember({...newMember, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px", background: "white" }}>
                     <option value="user">Formateur / Membre (Lecture & Écriture)</option>
                     {userProfile.role === "superadmin" && <option value="admin">Administrateur IFSI (Peut inviter des gens)</option>}
                   </select>
                 </div>
-                
-                {/* 👉 DYNAMISATION DU MENU DE CHOIX IFSI DANS L'ÉQUIPE */}
                 {userProfile.role === "superadmin" && (
                    <div style={{ marginBottom: "16px", background: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px dashed #fcd34d" }}>
                      <label style={{ fontSize: "11px", fontWeight: "800", color: "#d97706", textTransform: "uppercase" }}>👑 Choix IFSI (Mode Superadmin)</label>
@@ -607,7 +740,6 @@ function MainApp() {
                      </select>
                    </div>
                 )}
-                
                 <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ width: "100%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", padding: "10px", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: isCreatingUser ? "wait" : "pointer" }}>
                   {isCreatingUser ? "Création en cours..." : "Créer le compte"}
                 </button>
@@ -615,7 +747,7 @@ function MainApp() {
 
               <div style={{ ...card, padding: 0, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr><th style={th}>Email</th><th style={th}>Rôle</th>{userProfile.role === "superadmin" && <th style={th}>IFSI Attaché</th>}<th style={th}>Actions</th></tr></thead>
+                  <thead><tr><th style={th}>Email</th><th style={th}>Rôle Système</th>{userProfile.role === "superadmin" && <th style={th}>IFSI Attaché</th>}<th style={th}>Actions</th></tr></thead>
                   <tbody>
                     {teamUsers.map(u => (
                       <tr key={u.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
@@ -625,7 +757,6 @@ function MainApp() {
                           {u.role === "admin" && <span style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fed7aa" }}>ADMIN IFSI</span>}
                           {(u.role === "user" || !u.role) && <span style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #d1d5db" }}>FORMATEUR</span>}
                         </td>
-                        {/* 👉 DYNAMISATION DU NOM DE L'IFSI DANS LE TABLEAU ÉQUIPE */}
                         {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
                         <td style={td}>
                           {u.id !== auth.currentUser?.uid && u.role !== "superadmin" && (
@@ -634,7 +765,6 @@ function MainApp() {
                         </td>
                       </tr>
                     ))}
-                    {teamUsers.length === 0 && <tr><td colSpan="4" style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontStyle: "italic", fontSize: "13px" }}>Aucun utilisateur trouvé pour cet établissement.</td></tr>}
                   </tbody>
                 </table>
               </div>
@@ -642,7 +772,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* ... RESTE DU DASHBOARD ... */}
+        {/* ... LE DASHBOARD RESTE EXACTEMENT LE MÊME ... */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -686,45 +816,6 @@ function MainApp() {
           </div>
         </>}
 
-        {activeTab === "kanban" && (
-          <>
-            <div style={{ marginBottom: "22px" }} className="no-print">
-              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Tableau Kanban des indicateurs</h2>
-              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Faites glisser les cartes d'une colonne à l'autre pour mettre à jour leur statut.</p>
-            </div>
-            
-            <div style={{ display: "flex", gap: "16px", overflowX: "auto", paddingBottom: "20px", minHeight: "70vh", alignItems: "flex-start" }} className="no-print">
-              {Object.entries(STATUT_CONFIG).map(([stKey, stVal]) => {
-                const items = criteres.filter(c => c.statut === stKey);
-                return (
-                  <div key={stKey} className="kanban-col" onDragOver={handleDragOver} onDrop={(e) => handleDrop(e, stKey)} style={{ flex: "1 1 220px", minWidth: "220px", background: "#f8fafc", border: `1px solid ${stVal.border}`, borderRadius: "12px", padding: "12px", display: "flex", flexDirection: "column", gap: "12px", minHeight: "65vh", backgroundColor: stVal.bg }}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `3px solid ${stVal.color}`, paddingBottom: "10px", marginBottom: "4px" }}><span style={{ fontWeight: "800", color: stVal.color, textTransform: "uppercase", fontSize: "13px", letterSpacing: "0.5px" }}>{stVal.label}</span><span style={{ background: "white", color: stVal.color, padding: "2px 8px", borderRadius: "12px", fontSize: "11px", fontWeight: "800", border: `1px solid ${stVal.border}` }}>{items.length}</span></div>
-                    {items.map(c => {
-                      const d = days(c.delai);
-                      const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
-                      const resps = Array.isArray(c.responsables) ? c.responsables : []; 
-                      
-                      return (
-                        <div key={c.id} className="kanban-card" draggable={!isArchive} onDragStart={(e) => handleDragStart(e, c.id)} onClick={() => setModalCritere(c)} style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "10px", padding: "14px", cursor: isArchive ? "pointer" : "grab", boxShadow: "0 1px 3px rgba(0,0,0,0.05)", opacity: stKey === "non-concerne" ? 0.6 : 1 }}>
-                          <div style={{ display: "flex", gap: "10px", marginBottom: "8px", alignItems: "flex-start" }}><span style={{ ...nb(cConf.color), padding: "3px 8px", fontSize: "11px" }}>{c.num || "-"}</span><div style={{ fontSize: "13px", fontWeight: "700", color: "#1e3a5f", lineHeight: "1.3" }}>{c.titre || "-"}</div></div>
-                          <div style={{ fontSize: "10px", color: "#6b7280", marginBottom: "12px", paddingLeft: "2px" }}>{cConf.label}</div>
-                          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f8fafc", paddingTop: "10px" }}>
-                            <div style={{ display: "flex", gap: "4px" }}>
-                              {resps.length > 0 ? resps.slice(0, 3).map(r => { const rSafe = String(r || ""); const rRole = rSafe.match(/\(([^)]+)\)/)?.[1] || "Défaut"; const rCfg = ROLE_COLORS[rRole] || ROLE_COLORS["Défaut"]; return <span key={rSafe} title={rSafe} style={{ width: "24px", height: "24px", borderRadius: "50%", background: rCfg.bg, border: `1px solid ${rCfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "800", color: rCfg.text, cursor: "help" }}>{rSafe.split(" ").map(n=>(n[0]||"")).join("").substring(0,2).toUpperCase()}</span> }) : <span style={{ fontSize: "10px", color: "#d97706", fontWeight: "600", background: "#fffbeb", padding: "2px 6px", borderRadius: "4px" }}>À assigner</span>}
-                              {resps.length > 3 && <span style={{ width: "24px", height: "24px", borderRadius: "50%", background: "#f3f4f6", border: "1px solid #d1d5db", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "800", color: "#6b7280" }}>+{resps.length - 3}</span>}
-                            </div>
-                            {stKey !== "non-concerne" && !isNaN(d) && <div style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "700", background: d < 0 ? "#fee2e2" : d < 30 ? "#fef3c7" : "#f3f4f6", padding: "3px 8px", borderRadius: "6px" }}>{d < 0 ? `Dépassé` : `J-${d}`}</div>}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                );
-              })}
-            </div>
-          </>
-        )}
-
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -737,7 +828,7 @@ function MainApp() {
                 const nbFiles = (c.fichiers || []).filter(f => !f.archive).length;
                 const nbChemins = (c.chemins_reseau || []).length;
                 const hasLink = (c.preuves || "").trim().length > 0;
-                return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td><td style={{ ...td, maxWidth: "280px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{cConf.label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); const rRole = rSafe.match(/\(([^)]+)\)/)?.[1] || "Défaut"; const rCfg = ROLE_COLORS[rRole] || ROLE_COLORS["Défaut"]; return <span key={rSafe} style={{ fontSize: "10px", color: rCfg.text, background: rCfg.bg, border: `1px solid ${rCfg.border}`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{resps.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td>
+                return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td><td style={{ ...td, maxWidth: "280px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{cConf.label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); return <span key={rSafe} style={{ fontSize: "10px", color: "#1e40af", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{resps.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td>
                 <td style={td}>
                   <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
                     {nbChemins > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 6px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>🔗 {nbChemins} Lien(s) Réseau</span>}
@@ -766,18 +857,20 @@ function MainApp() {
         </>}
 
         {activeTab === "responsables" && <>
-          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Vue par responsable</h2></div>
+          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Rôle</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
             {byResp.map(r => {
               const conformes = r.items.filter(c => c.statut==="conforme").length;
-              const rCfg = ROLE_COLORS[r.role] || ROLE_COLORS["Défaut"];
               return (
                 <div key={r.name} className="print-break-avoid" style={card}>
                   <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
-                    <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: rCfg.bg, border: `2px solid ${rCfg.border}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: rCfg.text, flexShrink: 0 }}>{r.nom.split(" ").map(n=>n[0]||"").join("").substring(0,2).toUpperCase()}</div>
-                    <div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f" }}>{r.nom}</div><div style={{ fontSize: "11px", color: rCfg.text, fontWeight: "700" }}>{r.role}</div></div>
+                    <div style={{ width: "42px", height: "42px", borderRadius: "50%", background: "#eff6ff", border: `2px solid #bfdbfe`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", fontWeight: "800", color: "#1d4ed8", flexShrink: 0 }}>{r.nom.substring(0,2).toUpperCase()}</div>
+                    <div style={{ flex: 1 }}>
+                       <div style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f", textTransform: "uppercase" }}>{r.nom}</div>
+                       <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "600" }}>Membres : {r.role}</div>
+                    </div>
                   </div>
-                  <ProgressBar value={conformes} max={r.items.length} color={rCfg.text} />
+                  <ProgressBar value={conformes} max={r.items.length} color="#1d4ed8" />
                   <div style={{ marginTop: "12px" }}>
                     {r.items.sort((a,b) => ({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3,"non-concerne":4}[a.statut])-({"non-conforme":0,"en-cours":1,"non-evalue":2,"conforme":3,"non-concerne":4}[b.statut])).map(c => {
                       const cConf = CRITERES_LABELS[c.critere] || { color: "#9ca3af" };
@@ -796,7 +889,6 @@ function MainApp() {
   );
 }
 
-// On exporte notre application encapsulée dans le bouclier anti-crash !
 export default function App() {
   return (
     <ErrorBoundary>
