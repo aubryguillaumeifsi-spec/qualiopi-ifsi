@@ -347,7 +347,7 @@ function MainApp() {
   }
 
   function deleteManualUser(idToDelete) {
-    if (window.confirm("Supprimer ce profil manuel ?")) {
+    if (window.confirm("Supprimer ce profil manuel de l'IFSI ?")) {
       setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true });
     }
   }
@@ -481,18 +481,6 @@ function MainApp() {
   const isArchive = currentCampaign.locked || false;
   const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
 
-  function saveModal(updated) {
-    if (isArchive) return; 
-    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
-    setModalCritere(null);
-  }
-  
-  const auditDateObj = new Date(currentAuditDate);
-  const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
-  let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
-  if (daysToAudit < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` };
-  else if (daysToAudit <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` };
-  
   const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
   const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; 
 
@@ -500,6 +488,66 @@ function MainApp() {
   const urgents = criteres.filter(c => { const d = days(c.delai); return !isNaN(d) && d <= 30 && c.statut !== "conforme" && c.statut !== "non-evalue" && c.statut !== "non-concerne"; });
   const filtered = criteres.filter(c => { if (filterStatut !== "tous" && c.statut !== filterStatut) return false; if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false; if (searchTerm) { const s = searchTerm.toLowerCase(); return String(c.titre||"").toLowerCase().includes(s) || String(c.num||"").toLowerCase().includes(s); } return true; });
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]));
+
+  // 👉 LA NOUVELLE FONCTION SAVE MODAL (AVEC HISTORIQUE ET NAVIGATION)
+  function saveModal(updated, action) {
+    if (isArchive) {
+       if (action === "close") setModalCritere(null);
+       if (action === "next") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) + 1]);
+       if (action === "prev") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) - 1]);
+       return;
+    }
+
+    const oldCritere = criteres.find(c => c.id === updated.id);
+    let newLogs = [];
+    const userEmail = auth.currentUser?.email || "Utilisateur inconnu";
+    const now = new Date().toISOString();
+
+    // Traque le changement de statut
+    if (oldCritere.statut !== updated.statut) {
+      const oldName = STATUT_CONFIG[oldCritere.statut]?.label || "Non évalué";
+      const newName = STATUT_CONFIG[updated.statut]?.label || "Non évalué";
+      newLogs.push({ date: now, user: userEmail, msg: `Statut : ${oldName} ➡️ ${newName}` });
+    }
+    
+    // Traque les responsables
+    const oldResps = Array.isArray(oldCritere.responsables) ? oldCritere.responsables.slice().sort().join(",") : "";
+    const newResps = Array.isArray(updated.responsables) ? updated.responsables.slice().sort().join(",") : "";
+    if (oldResps !== newResps) {
+      newLogs.push({ date: now, user: userEmail, msg: `A modifié les responsables` });
+    }
+
+    // Traque les textes
+    if ((oldCritere.preuves || "") !== (updated.preuves || "")) {
+       newLogs.push({ date: now, user: userEmail, msg: `A mis à jour les preuves finalisées` });
+    }
+    if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) {
+       newLogs.push({ date: now, user: userEmail, msg: `A mis à jour le chantier / brouillon` });
+    }
+
+    // Traque les fichiers et liens
+    const oldFCount = (oldCritere.fichiers || []).length + (oldCritere.chemins_reseau || []).length;
+    const newFCount = (updated.fichiers || []).length + (updated.chemins_reseau || []).length;
+    if (oldFCount !== newFCount) {
+       newLogs.push({ date: now, user: userEmail, msg: `A ajouté/supprimé des pièces jointes` });
+    }
+
+    // Application de l'historique
+    let finalUpdated = { ...updated };
+    if (newLogs.length > 0) {
+      finalUpdated.historique = [...(oldCritere.historique || []), ...newLogs];
+    }
+
+    // Sauvegarde en BDD
+    const newCriteres = criteres.map(c => c.id === finalUpdated.id ? finalUpdated : c);
+    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
+
+    // Gestion de la Navigation
+    const currentIndex = filtered.findIndex(c => c.id === finalUpdated.id);
+    if (action === "close" || action === undefined) setModalCritere(null);
+    if (action === "next") setModalCritere(filtered[currentIndex + 1]);
+    if (action === "prev") setModalCritere(filtered[currentIndex - 1]);
+  }
 
   const byPerson = allIfsiMembers.map(m => {
     const myCriteres = criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(m.name));
@@ -620,7 +668,21 @@ function MainApp() {
         .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
       
-      {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} />}
+      {/* 👉 APPEL DE DETAIL MODAL AVEC LES NOUVELLES PROPS (hasPrev / hasNext) */}
+      {modalCritere && (
+        <DetailModal 
+          critere={modalCritere} 
+          onClose={() => setModalCritere(null)} 
+          onSave={saveModal} 
+          isReadOnly={isArchive} 
+          isAuditMode={isAuditMode} 
+          allMembers={allIfsiMembers} 
+          rolePalette={ROLE_PALETTE} 
+          orgRoles={orgRoles} 
+          hasPrev={filtered.findIndex(c => c.id === modalCritere.id) > 0}
+          hasNext={filtered.findIndex(c => c.id === modalCritere.id) < filtered.length - 1}
+        />
+      )}
       
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
@@ -1038,7 +1100,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- RESTE DES ONGLETS (Dashboard, Criteres, Axes, Responsables, Compte) --- */}
+        {/* --- DASHBOARD --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -1082,6 +1144,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- CRITERES --- */}
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -1108,6 +1171,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- AXES --- */}
         {activeTab === "axes" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
           {["non-conforme","en-cours"].map(st => {
