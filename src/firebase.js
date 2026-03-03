@@ -17,8 +17,6 @@ export const db = getFirestore(app);
 export const auth = getAuth(app);
 export const storage = getStorage(app);
 
-// NOUVELLE LOGIQUE : Fonction pour cibler le bon établissement
-// On passe d'un document fixe à une collection "etablissements"
-export const getEtablissementRef = (etablissementId) => {
-  return doc(db, "etablissements", etablissementId || "demo_ifps_cham");
-};
+// NOUVEAU : ASTUCE POUR CRÉER DES COMPTES SANS DÉCONNECTER L'ADMIN ACTUEL
+const secondaryApp = initializeApp(firebaseConfig, "Secondary");
+export const secondaryAuth = getAuth(secondaryApp);
