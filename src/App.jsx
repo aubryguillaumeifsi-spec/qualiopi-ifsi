@@ -6,30 +6,17 @@ import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePass
 import { db, auth, secondaryAuth } from "./firebase";
 import { TODAY, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
-// --- BOUCLIER ANTI-CRASH ---
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: "40px", fontFamily: "Outfit", color: "#1e3a5f", textAlign: "center" }}>
-          <h1 style={{ color: "#ef4444" }}>⚠️ L'application a rencontré une erreur</h1>
-          <p>Prenez une capture d'écran de ce message pour le diagnostic :</p>
-          <pre style={{ background: "#fef2f2", padding: "20px", border: "1px solid #fca5a5", borderRadius: "8px", color: "#991b1b", textAlign: "left", overflowX: "auto" }}>
-            {this.state.error?.toString()}
-          </pre>
-          <button onClick={() => window.location.reload()} style={{ padding: "10px 20px", background: "#1d4ed8", color: "white", borderRadius: "8px", border: "none", marginTop: "20px", cursor: "pointer" }}>Recharger l'application</button>
-        </div>
-      );
-    }
+    if (this.state.hasError) return (<div style={{ padding: "40px", textAlign: "center" }}><h1 style={{ color: "#ef4444" }}>⚠️ Erreur</h1><pre style={{ background: "#fef2f2", padding: "20px" }}>{this.state.error?.toString()}</pre><button onClick={() => window.location.reload()}>Recharger</button></div>);
     return this.props.children;
   }
 }
 
 const DEFAULT_ROLES = ["Direction", "Qualité", "Secrétariat", "Pôle Stages", "Formateurs IFSI", "Formateurs IFAS"];
 
-// --- PALETTE DE COULEURS POUR LES RÔLES ---
 const ROLE_PALETTE = [
   { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, 
   { bg: "#dcfce7", border: "#86efac", text: "#166534" }, 
@@ -78,7 +65,7 @@ function MainApp() {
 
   const [ifsiList, setIfsiList] = useState([]);
   const [ifsiData, setIfsiData] = useState(null);
-  const [allQualiopiData, setAllQualiopiData] = useState({});
+  const [allQualiopiData, setAllQualiopiData] = useState({}); 
 
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
@@ -176,6 +163,7 @@ function MainApp() {
         try {
           await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim(), roles: DEFAULT_ROLES, manualUsers: [] });
           setSelectedIfsi(safeId);
+          setActiveTab("dashboard");
         } catch (error) { alert("Erreur."); }
       }
     } else {
@@ -197,7 +185,6 @@ function MainApp() {
     } catch (e) { console.error(e); }
   }
 
-  // --- TRAITEMENT DES DONNÉES D'ÉQUIPE (CASQUETTES MULTIPLES) ---
   const orgRoles = ifsiData?.roles || [];
   const manualUsers = ifsiData?.manualUsers || [];
   const orgAccounts = teamUsers.filter(u => u.role !== "superadmin" && u.etablissementId === selectedIfsi);
@@ -325,7 +312,6 @@ function MainApp() {
 
   function handleLogout() { signOut(auth); }
 
-  // 👉 LA FONCTION MANQUANTE REMISE EN PLACE ICI :
   function handleEditAuditDate() {
     if (isArchive) return;
     const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
@@ -357,15 +343,24 @@ function MainApp() {
     }
   }
 
+  // 👉 MISE A JOUR : On récupère aussi la date d'audit pour la Tour de Contrôle
   function getIfsiGlobalStats(ifsiId) {
     const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
     const data = allQualiopiData[docId];
-    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0 };
+    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate: "2026-10-15" };
     
     let liste = [];
-    if (data.campaigns && data.campaigns.length > 0) liste = data.campaigns[data.campaigns.length - 1].liste;
-    else if (data.liste) liste = data.liste;
-    else return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0 };
+    let auditDate = "2026-10-15";
+
+    if (data.campaigns && data.campaigns.length > 0) {
+      const currentCamp = data.campaigns[data.campaigns.length - 1];
+      liste = currentCamp.liste;
+      auditDate = currentCamp.auditDate || "2026-10-15";
+    } else if (data.liste) {
+      liste = data.liste;
+    } else {
+      return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate };
+    }
 
     const nbConcerne = liste.filter(c => c.statut !== "non-concerne").length;
     const total = nbConcerne === 0 ? 1 : nbConcerne;
@@ -373,7 +368,7 @@ function MainApp() {
     const nonConforme = liste.filter(c => c.statut === "non-conforme").length;
     const enCours = liste.filter(c => c.statut === "en-cours").length;
 
-    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0 };
+    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate };
   }
 
   if (!authChecked) return null;
@@ -467,7 +462,11 @@ function MainApp() {
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} />}
       
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+        
+        {/* 👉 HAUT DE PAGE RE-STRUCTURÉ POUR ÉVITER LE RETOUR À LA LIGNE MOCHE */}
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
+          
+          {/* BLOC 1 : LOGO & SÉLECTEUR */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -495,12 +494,12 @@ function MainApp() {
               {campaigns.length > 1 && <button onClick={handleDeleteCampaign} className="no-print" title="Supprimer" style={{ background: "white", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "14px", color: "#ef4444", padding: "6px 8px" }}>🗑️</button>}
             </div>
           </div>
-          <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
-            
+
+          {/* BLOC 2 : MENUS DE NAVIGATION */}
+          <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap", flex: 1, justifyContent: "center" }}>
             {userProfile?.role === "superadmin" && (
               <button style={{ ...navBtn(activeTab === "tour_controle"), marginRight: "8px", border: "1px solid #6366f1", color: activeTab === "tour_controle" ? "white" : "#4f46e5", background: activeTab === "tour_controle" ? "#6366f1" : "#e0e7ff" }} onClick={() => setActiveTab("tour_controle")}>🛸 Tour de Contrôle</button>
             )}
-
             <button style={navBtn(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>Tableau de bord</button>
             <button style={navBtn(activeTab === "criteres")} onClick={() => setActiveTab("criteres")}>Indicateurs</button>
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Axes prioritaires</button>
@@ -512,17 +511,21 @@ function MainApp() {
             {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
               <button style={{ ...navBtn(activeTab === "equipe"), border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Comptes</button>
             )}
-            
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
-            <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}>
-              <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px" }}><span>📊</span> Excel</button>
-              <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px" }}><span>📄</span> PDF</button>
+          </div>
+
+          {/* BLOC 3 : EXPORTS & PROFIL (Forcé sur la droite) */}
+          <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginLeft: "auto" }}>
+            <div style={{ display: "flex", gap: "6px" }}>
+              <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
+              <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📄</span> PDF</button>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "12px", paddingLeft: "12px", borderLeft: "2px solid #f1f5f9" }}>
-               <button onClick={() => setActiveTab("compte")} style={{ ...navBtn(activeTab === "compte"), fontSize: "11px", border: "1px solid #d1d5db", background: "white", color: "#4b5563" }}>⚙️ Mon compte</button>
-               <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444", fontSize: "11px", border: "1px solid #fca5a5", background: "#fef2f2" }}>Déconnexion</button>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px", paddingLeft: "10px", borderLeft: "2px solid #f1f5f9" }}>
+               <button onClick={() => setActiveTab("compte")} style={{ ...navBtn(activeTab === "compte"), fontSize: "11px", border: "1px solid #d1d5db", background: "white", color: "#4b5563", padding: "6px 12px" }}>⚙️ Mon compte</button>
+               <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444", fontSize: "11px", border: "1px solid #fca5a5", background: "#fef2f2", padding: "6px 12px" }}>Déconnexion</button>
             </div>
           </div>
+
         </div>
       </div>
       
@@ -531,6 +534,9 @@ function MainApp() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
+        {/* ========================================================= */}
+        {/* 👉 ONGLET : TOUR DE CONTRÔLE (AVEC CONFORMES + DATE)      */}
+        {/* ========================================================= */}
         {activeTab === "tour_controle" && userProfile?.role === "superadmin" && (
           <div>
             <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
@@ -540,27 +546,46 @@ function MainApp() {
               </div>
             </div>
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "20px" }}>
               {ifsiList.map(ifsi => {
                 const s = getIfsiGlobalStats(ifsi.id);
+                
+                // Calcul pour la date
+                const auditDateObj = new Date(s.auditDate);
+                const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
+                const auditColor = daysToAudit < 0 ? "#ef4444" : daysToAudit <= 30 ? "#f59e0b" : "#10b981";
+                const auditText = daysToAudit < 0 ? `Dépassé (${Math.abs(daysToAudit)}j)` : `J-${daysToAudit}`;
+
                 return (
                   <div key={ifsi.id} className="td-dash" style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #e0e7ff", background: "white", transition: "all 0.2s ease" }}>
+                    
+                    {/* Header : Nom + Date + Jauge */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
                       <div>
-                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px 0" }}>{ifsi.name}</h3>
-                        <span style={{ fontSize: "11px", color: "#9ca3af", fontFamily: "monospace" }}>ID: {ifsi.id}</span>
+                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 2px 0" }}>{ifsi.name}</h3>
+                        <div style={{ fontSize: "11px", color: "#9ca3af", fontFamily: "monospace", marginBottom: "8px" }}>ID: {ifsi.id}</div>
+                        {/* La date et le compte à rebours */}
+                        <div style={{ fontSize: "12px", color: "#6b7280", display: "flex", alignItems: "center", gap: "6px", fontWeight: "600" }}>
+                           <span>🗓️ {new Date(s.auditDate).toLocaleDateString("fr-FR")}</span>
+                           <span style={{ background: auditColor+"20", color: auditColor, padding: "2px 6px", borderRadius: "4px", fontWeight: "800", fontSize: "10px" }}>{auditText}</span>
+                        </div>
                       </div>
                       <GaugeChart value={s.conforme} max={s.total} color={s.pct >= 80 ? "#10b981" : s.pct >= 50 ? "#f59e0b" : "#ef4444"} size={64} fontSize={12} />
                     </div>
 
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
-                      <div style={{ background: "#fef2f2", padding: "10px", borderRadius: "8px", border: "1px solid #fca5a5" }}>
-                         <div style={{ fontSize: "20px", fontWeight: "800", color: "#991b1b" }}>{s.nonConforme}</div>
-                         <div style={{ fontSize: "10px", textTransform: "uppercase", fontWeight: "700", color: "#ef4444" }}>Non conformes</div>
+                    {/* Les 3 métriques */}
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+                      <div style={{ background: "#f0fdf4", padding: "10px", borderRadius: "8px", border: "1px solid #86efac", textAlign: "center" }}>
+                         <div style={{ fontSize: "18px", fontWeight: "800", color: "#166534" }}>{s.conforme}</div>
+                         <div style={{ fontSize: "9px", textTransform: "uppercase", fontWeight: "700", color: "#15803d" }}>Conformes</div>
                       </div>
-                      <div style={{ background: "#fef3c7", padding: "10px", borderRadius: "8px", border: "1px solid #fde68a" }}>
-                         <div style={{ fontSize: "20px", fontWeight: "800", color: "#92400e" }}>{s.enCours}</div>
-                         <div style={{ fontSize: "10px", textTransform: "uppercase", fontWeight: "700", color: "#d97706" }}>En cours</div>
+                      <div style={{ background: "#fef3c7", padding: "10px", borderRadius: "8px", border: "1px solid #fde68a", textAlign: "center" }}>
+                         <div style={{ fontSize: "18px", fontWeight: "800", color: "#92400e" }}>{s.enCours}</div>
+                         <div style={{ fontSize: "9px", textTransform: "uppercase", fontWeight: "700", color: "#d97706" }}>En cours</div>
+                      </div>
+                      <div style={{ background: "#fef2f2", padding: "10px", borderRadius: "8px", border: "1px solid #fca5a5", textAlign: "center" }}>
+                         <div style={{ fontSize: "18px", fontWeight: "800", color: "#991b1b" }}>{s.nonConforme}</div>
+                         <div style={{ fontSize: "9px", textTransform: "uppercase", fontWeight: "700", color: "#ef4444" }}>Non conf.</div>
                       </div>
                     </div>
 
@@ -574,6 +599,7 @@ function MainApp() {
           </div>
         )}
 
+        {/* --- ONGLET : ORGANIGRAMME --- */}
         {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -663,6 +689,7 @@ function MainApp() {
           </div>
         )}
 
+        {/* --- ONGLET RESPONSABLES (TRIÉ PAR PERSONNE) --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
@@ -704,6 +731,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- ONGLET "MON COMPTE" --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
@@ -738,6 +766,7 @@ function MainApp() {
           </div>
         )}
 
+        {/* --- ONGLET ÉQUIPE (CRÉATION DE COMPTES) --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -806,6 +835,7 @@ function MainApp() {
           </div>
         )}
 
+        {/* --- DASHBOARD --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -849,6 +879,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- CRITERES --- */}
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -875,6 +906,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- AXES --- */}
         {activeTab === "axes" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
           {["non-conforme","en-cours"].map(st => {
