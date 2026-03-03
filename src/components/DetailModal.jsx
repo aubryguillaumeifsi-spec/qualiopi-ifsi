@@ -4,7 +4,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { storage } from "../firebase";
 import { CRITERES_LABELS, STATUT_CONFIG, GUIDE_QUALIOPI } from "../data";
 
-// 👉 NOUVEAU COMPOSANT : Menu déroulant avec l'équipe de l'IFSI
 function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalette, orgRoles }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef();
@@ -22,8 +21,9 @@ function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalett
   const display = selected.length === 0 ? "Personne n'est affecté" : selected.length === 1 ? selected[0] : `${selected.length} personnes sélectionnées`;
 
   function getRoleColor(roleName) {
-    const index = orgRoles.indexOf(roleName);
-    if (index === -1) return rolePalette[7]; // Gris par défaut
+    if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" };
+    const index = orgRoles.filter(r => r !== "Direction").indexOf(roleName);
+    if (index === -1) return rolePalette[7];
     return rolePalette[index % rolePalette.length];
   }
 
@@ -59,7 +59,7 @@ function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalett
   );
 }
 
-export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles }) {
+export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles, hasNext, hasPrev }) {
   
   const rawChemins = Array.isArray(critere.chemins_reseau) ? critere.chemins_reseau : (critere.chemin_reseau ? [critere.chemin_reseau] : []);
   const initialChemins = rawChemins.map(c => {
@@ -67,16 +67,22 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     return { ...c, validated: c.validated !== false };
   });
 
-  const [data, setData] = useState({ 
-    ...critere, 
-    responsables: [...(critere.responsables || [])], 
-    fichiers: [...(critere.fichiers || [])],
-    preuves: critere.preuves || "", 
-    chemins_reseau: initialChemins, 
-    preuves_encours: critere.preuves_encours || "", 
-    attendus: critere.attendus || "", 
-    notes: critere.notes || "" 
-  });
+  // On initialise l'état dès que le critère change
+  const [data, setData] = useState({});
+  
+  useEffect(() => {
+    setData({ 
+      ...critere, 
+      responsables: [...(critere.responsables || [])], 
+      fichiers: [...(critere.fichiers || [])],
+      preuves: critere.preuves || "", 
+      chemins_reseau: initialChemins, 
+      preuves_encours: critere.preuves_encours || "", 
+      attendus: critere.attendus || "", 
+      notes: critere.notes || "",
+      historique: critere.historique || [] // Charge l'historique
+    });
+  }, [critere]);
   
   const [uploading, setUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -98,19 +104,19 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       await uploadBytesResumable(fileRef, file);
       const url = await getDownloadURL(fileRef);
       const newFile = { name: file.name, url: url, path: fileRef.fullPath, validated: false };
-      setData({ ...data, fichiers: [...data.fichiers, newFile] });
+      setData(prev => ({ ...prev, fichiers: [...prev.fichiers, newFile] }));
     } catch (error) { alert("Erreur d'envoi : " + error.message); }
     setUploading(false);
   }
 
   const toggleValidation = (fileUrl) => {
-    setData({ ...data, fichiers: data.fichiers.map(f => f.url === fileUrl ? { ...f, validated: !f.validated } : f) });
+    setData(prev => ({ ...prev, fichiers: prev.fichiers.map(f => f.url === fileUrl ? { ...f, validated: !f.validated } : f) }));
   };
 
   async function handleDeleteFile(fileToDelete) {
     if (!window.confirm(`Supprimer définitivement "${fileToDelete.name}" ?`)) return;
     try { if (fileToDelete.path) await deleteObject(ref(storage, fileToDelete.path)); } catch (e) { console.warn("Introuvable"); }
-    setData({ ...data, fichiers: data.fichiers.filter(f => f.url !== fileToDelete.url) });
+    setData(prev => ({ ...prev, fichiers: prev.fichiers.filter(f => f.url !== fileToDelete.url) }));
   }
 
   const copyToClipboard = (chemin) => {
@@ -122,20 +128,24 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const addChemin = () => {
     if (newCheminVal.trim() !== "") {
       const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Lien réseau";
-      setData({ ...data, chemins_reseau: [...data.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim(), validated: false }] });
+      setData(prev => ({ ...prev, chemins_reseau: [...prev.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim(), validated: false }] }));
       setNewCheminNom(""); setNewCheminVal("");
     }
   };
 
   const toggleCheminValidation = (index) => {
-    const updatedChemins = [...data.chemins_reseau];
-    updatedChemins[index].validated = !updatedChemins[index].validated;
-    setData({ ...data, chemins_reseau: updatedChemins });
+    setData(prev => {
+      const updatedChemins = [...prev.chemins_reseau];
+      updatedChemins[index].validated = !updatedChemins[index].validated;
+      return { ...prev, chemins_reseau: updatedChemins };
+    });
   };
 
   const removeChemin = (index) => {
-    setData({ ...data, chemins_reseau: data.chemins_reseau.filter((_, i) => i !== index) });
+    setData(prev => ({ ...prev, chemins_reseau: prev.chemins_reseau.filter((_, i) => i !== index) }));
   };
+
+  if (!data.id) return null; // Sécurité de chargement
 
   const chantierFiles = data.fichiers.filter(f => !f.validated);
   const validatedFiles = data.fichiers.filter(f => f.validated);
@@ -144,34 +154,60 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
   return (
     <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.6)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={onClose}>
-      <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "24px", width: "100%", maxWidth: "1100px", maxHeight: "95vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)" }} onClick={e => e.stopPropagation()}>
+      <div className="modal-content" style={{ background: "white", borderRadius: "16px", padding: "24px", width: "100%", maxWidth: "1100px", maxHeight: "95vh", overflowY: "auto", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.25)", display: "flex", flexDirection: "column" }} onClick={e => e.stopPropagation()}>
         
         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "20px", borderBottom: "1px solid #e2e8f0", paddingBottom: "15px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-             <span style={{ padding: "6px 14px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "16px", fontWeight: "900", border: `1px solid ${cfg.color}30` }}>{critere.num || "-"}</span>
+             <span style={{ padding: "6px 14px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "8px", fontSize: "16px", fontWeight: "900", border: `1px solid ${cfg.color}30` }}>{data.num || "-"}</span>
              <div>
-               <h2 style={{ margin: 0, fontSize: "18px", color: "#1e3a5f", fontWeight: "800" }}>{critere.titre}</h2>
+               <h2 style={{ margin: 0, fontSize: "18px", color: "#1e3a5f", fontWeight: "800" }}>{data.titre}</h2>
                <span style={{ fontSize: "12px", color: "#64748b", fontWeight: "600" }}>{cfg.label}</span>
              </div>
           </div>
           <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", color: "#64748b", fontSize: "20px", cursor: "pointer", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: "bold" }}>×</button>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px" }}>
+        <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", flex: 1 }}>
           
-          {/* RÉFÉRENTIEL */}
-          <div style={{ background: "#f8fafc", padding: "20px", borderRadius: "12px", fontSize: "13px", border: "1px solid #e2e8f0" }}>
-            <h3 style={{ ...lbl, color: "#1e3a5f", fontSize: "13px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px", marginBottom: "12px" }}>📘 Référentiel Officiel</h3>
-            <p style={{ marginBottom: "12px" }}><strong style={{ color: "#475569", display: "block", marginBottom: "4px" }}>Niveau attendu :</strong> <span style={{ color: "#1e3a5f", lineHeight: "1.5" }}>{guide.niveau}</span></p>
-            <p style={{ marginBottom: "12px" }}><strong style={{ color: "#475569", display: "block", marginBottom: "4px" }}>Preuves suggérées :</strong> <span style={{ color: "#475569", lineHeight: "1.5" }}>{guide.preuves}</span></p>
+          {/* COLONNE GAUCHE (RÉFÉRENTIEL + HISTORIQUE) */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+            <div style={{ background: "#f8fafc", padding: "20px", borderRadius: "12px", fontSize: "13px", border: "1px solid #e2e8f0" }}>
+              <h3 style={{ ...lbl, color: "#1e3a5f", fontSize: "13px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px", marginBottom: "12px" }}>📘 Référentiel Officiel</h3>
+              <p style={{ marginBottom: "12px" }}><strong style={{ color: "#475569", display: "block", marginBottom: "4px" }}>Niveau attendu :</strong> <span style={{ color: "#1e3a5f", lineHeight: "1.5" }}>{guide.niveau}</span></p>
+              <p style={{ marginBottom: "12px" }}><strong style={{ color: "#475569", display: "block", marginBottom: "4px" }}>Preuves suggérées :</strong> <span style={{ color: "#475569", lineHeight: "1.5" }}>{guide.preuves}</span></p>
+              {!isAuditMode && (
+                 <div style={{ background: "#fef2f2", padding: "12px", borderRadius: "8px", color: "#991b1b", marginTop: "16px", border: "1px solid #fca5a5", borderLeft: "4px solid #ef4444" }}>
+                   <strong style={{ display: "block", marginBottom: "4px" }}>⚠️ Règle de non-conformité :</strong> 
+                   <span style={{ fontSize: "12px", lineHeight: "1.4" }}>{guide.nonConformite}</span>
+                 </div>
+              )}
+            </div>
+
+            {/* 👉 NOUVEAU : JOURNAL D'HISTORIQUE DE TRAÇABILITÉ */}
             {!isAuditMode && (
-               <div style={{ background: "#fef2f2", padding: "12px", borderRadius: "8px", color: "#991b1b", marginTop: "16px", border: "1px solid #fca5a5", borderLeft: "4px solid #ef4444" }}>
-                 <strong style={{ display: "block", marginBottom: "4px" }}>⚠️ Règle de non-conformité :</strong> 
-                 <span style={{ fontSize: "12px", lineHeight: "1.4" }}>{guide.nonConformite}</span>
-               </div>
+              <div style={{ background: "white", border: "1px solid #e2e8f0", padding: "20px", borderRadius: "12px", flex: 1, display: "flex", flexDirection: "column" }}>
+                <h3 style={{ ...lbl, color: "#1e3a5f", fontSize: "13px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px", marginBottom: "12px" }}>🕰️ Historique & Traçabilité</h3>
+                
+                {(!data.historique || data.historique.length === 0) ? (
+                  <div style={{ fontSize: "12px", color: "#9ca3af", fontStyle: "italic", textAlign: "center", padding: "20px 0" }}>Aucune modification enregistrée.</div>
+                ) : (
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxHeight: "250px", overflowY: "auto", paddingRight: "6px" }}>
+                    {[...data.historique].reverse().map((h, i) => (
+                      <div key={i} style={{ fontSize: "11px", background: "#f8fafc", padding: "10px", borderLeft: "3px solid #3b82f6", borderRadius: "4px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)" }}>
+                         <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "4px" }}>
+                           <span style={{ color: "#64748b", fontWeight: "700" }}>{new Date(h.date).toLocaleDateString("fr-FR")} à {new Date(h.date).toLocaleTimeString("fr-FR").slice(0,5)}</span>
+                           <span style={{ color: "#1d4ed8", fontWeight: "700" }}>{h.user.split('@')[0]}</span>
+                         </div>
+                         <div style={{ color: "#334155", lineHeight: "1.4" }}>{h.msg}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             )}
           </div>
 
+          {/* COLONNE DROITE (FORMULAIRE) */}
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
               <div>
@@ -181,7 +217,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                 </select>
               </div>
               
-              {/* 👉 LE NOUVEAU MENU DÉROULANT VERROUILLÉ EST ICI */}
               <div>
                 <label style={lbl}>Responsable(s)</label>
                 <OrganigramSelect 
@@ -195,7 +230,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
               </div>
             </div>
 
-            {/* LE RESTE DU FICHIER RESTE IDENTIQUE (Coffre-fort, Chantier, Notes...) */}
             <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "20px", borderRadius: "12px", marginBottom: "20px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" }}>
               <label style={{ ...lbl, color: "#166534", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px" }}>🏛️ Preuves Validées (Présentées à l'Audit)</label>
               {(hasValidatedChemins || isAuditMode) && (
@@ -305,9 +339,35 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
           </div>
         </div>
 
-        <div style={{ display: "flex", justifyContent: "flex-end", gap: "12px", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e2e8f0" }}>
-          <button onClick={onClose} style={{ padding: "10px 24px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", color: "#475569", cursor: "pointer", fontWeight: "600" }}>{(isReadOnly || isAuditMode) ? "Fermer" : "Annuler"}</button>
-          {(!isAuditMode && !isReadOnly) && (<button onClick={() => onSave(data)} style={{ padding: "10px 32px", borderRadius: "8px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", border: "none", fontWeight: "bold", cursor: "pointer", boxShadow: "0 4px 12px rgba(29, 78, 216, 0.2)" }}>Enregistrer</button>)}
+        {/* 👉 NOUVEAU FOOTER AVEC NAVIGATION RAPIDE */}
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e2e8f0" }}>
+          
+          <div style={{ display: "flex", gap: "10px" }}>
+            <button 
+              disabled={!hasPrev} 
+              onClick={() => onSave(data, "prev")} 
+              style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: hasPrev ? "white" : "#f8fafc", color: hasPrev ? "#1e3a5f" : "#9ca3af", cursor: hasPrev ? "pointer" : "not-allowed", fontWeight: "700", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s" }}>
+              <span>⬅️</span> Précédent
+            </button>
+            <button 
+              disabled={!hasNext} 
+              onClick={() => onSave(data, "next")} 
+              style={{ padding: "10px 16px", borderRadius: "8px", border: "1px solid #cbd5e1", background: hasNext ? "white" : "#f8fafc", color: hasNext ? "#1e3a5f" : "#9ca3af", cursor: hasNext ? "pointer" : "not-allowed", fontWeight: "700", fontSize: "13px", display: "flex", alignItems: "center", gap: "6px", transition: "all 0.2s" }}>
+              Suivant <span>➡️</span>
+            </button>
+            {!isAuditMode && !isReadOnly && <span style={{ fontSize: "11px", color: "#64748b", alignSelf: "center", marginLeft: "10px" }}>(Sauvegarde auto.)</span>}
+          </div>
+
+          <div style={{ display: "flex", gap: "12px" }}>
+            <button onClick={onClose} style={{ padding: "10px 24px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", color: "#475569", cursor: "pointer", fontWeight: "600" }}>
+              {(isReadOnly || isAuditMode) ? "Fermer" : "Annuler"}
+            </button>
+            {(!isAuditMode && !isReadOnly) && (
+              <button onClick={() => onSave(data, "close")} style={{ padding: "10px 32px", borderRadius: "8px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", border: "none", fontWeight: "bold", cursor: "pointer", boxShadow: "0 4px 12px rgba(29, 78, 216, 0.2)" }}>
+                Enregistrer & Fermer
+              </button>
+            )}
+          </div>
         </div>
       </div>
     </div>
