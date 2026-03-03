@@ -424,6 +424,38 @@ function MainApp() {
     }
   }
 
+  // 👉 FONCTION DAYCOLOR (Elle est bien là)
+  const today = new Date();
+  const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
+  const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
+
+  function getIfsiGlobalStats(ifsiId) {
+    const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
+    const data = allQualiopiData[docId];
+    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate: "2026-10-15", liste: [] };
+    
+    let liste = [];
+    let auditDate = "2026-10-15";
+
+    if (data.campaigns && data.campaigns.length > 0) {
+      const currentCamp = data.campaigns[data.campaigns.length - 1];
+      liste = currentCamp.liste;
+      auditDate = currentCamp.auditDate || "2026-10-15";
+    } else if (data.liste) {
+      liste = data.liste;
+    } else {
+      return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate, liste: [] };
+    }
+
+    const nbConcerne = liste.filter(c => c.statut !== "non-concerne").length;
+    const total = nbConcerne === 0 ? 1 : nbConcerne;
+    const conforme = liste.filter(c => c.statut === "conforme").length;
+    const nonConforme = liste.filter(c => c.statut === "non-conforme").length;
+    const enCours = liste.filter(c => c.statut === "en-cours").length;
+
+    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate, liste };
+  }
+
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
   
@@ -445,16 +477,12 @@ function MainApp() {
   const currentIfsiName = currentIfsiObj?.name || "Chargement...";
   if (campaigns === null || activeCampaignId === null || ifsiList.length === 0) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700", background: "#f8fafc" }}>⏳ Chargement...</div>;
 
-  // 👉 DEFINITIONS DASHBOARD / FILTRES ET BANNERCONFIG
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
   const criteres = currentCampaign.liste || [];
   const isArchive = currentCampaign.locked || false;
   const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
 
-  const today = new Date();
-  const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
-  const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
-
+  // 👉 DEFINITIONS DASHBOARD / FILTRES ET BANNERCONFIG (Restauré !)
   const auditDateObj = new Date(currentAuditDate);
   const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
   let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
@@ -469,7 +497,7 @@ function MainApp() {
   const filtered = criteres.filter(c => { if (filterStatut !== "tous" && c.statut !== filterStatut) return false; if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false; if (searchTerm) { const s = searchTerm.toLowerCase(); return String(c.titre||"").toLowerCase().includes(s) || String(c.num||"").toLowerCase().includes(s); } return true; });
   const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]));
 
-  // 👉 LA FONCTION SAVE MODAL AVEC HISTORIQUE INTELLIGENT
+  // 👉 LA FONCTION SAVE MODAL ALLÉGÉE (Ne gère que le texte/statut, DetailModal gère les fichiers)
   function saveModal(updated, action) {
     if (isArchive) {
        if (action === "close" || !action) setModalCritere(null);
@@ -496,39 +524,11 @@ function MainApp() {
     }
 
     if ((oldCritere.preuves || "") !== (updated.preuves || "")) {
-       newLogs.push({ date: now, user: userEmail, msg: `A modifié le texte des justifications / liens publics` });
+       newLogs.push({ date: now, user: userEmail, msg: `📝 A modifié le texte des justifications / liens publics` });
     }
     if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) {
-       newLogs.push({ date: now, user: userEmail, msg: `A modifié le texte de la zone de chantier` });
+       newLogs.push({ date: now, user: userEmail, msg: `🚧 A modifié le texte de la zone de chantier` });
     }
-
-    const oldFiles = oldCritere.fichiers || [];
-    const newFiles = updated.fichiers || [];
-    newFiles.forEach(nf => {
-      const of = oldFiles.find(o => o.url === nf.url);
-      if (!of) newLogs.push({ date: now, user: userEmail, msg: `📎 A importé le fichier : ${nf.name}` });
-      else if (of.validated !== nf.validated) {
-        if (nf.validated) newLogs.push({ date: now, user: userEmail, msg: `✅ A validé le document comme preuve officielle : ${nf.name}` });
-        else newLogs.push({ date: now, user: userEmail, msg: `❌ A repassé en chantier le document : ${nf.name}` });
-      }
-    });
-    oldFiles.forEach(of => {
-      if (!newFiles.find(nf => nf.url === of.url)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le fichier : ${of.name}` });
-    });
-
-    const oldChemins = oldCritere.chemins_reseau || [];
-    const newChemins = updated.chemins_reseau || [];
-    newChemins.forEach(nc => {
-      const oc = oldChemins.find(o => o.chemin === nc.chemin);
-      if (!oc) newLogs.push({ date: now, user: userEmail, msg: `🔗 A ajouté le lien réseau : ${nc.nom}` });
-      else if (oc.validated !== nc.validated) {
-        if (nc.validated) newLogs.push({ date: now, user: userEmail, msg: `✅ A validé le lien réseau comme preuve officielle : ${nc.nom}` });
-        else newLogs.push({ date: now, user: userEmail, msg: `❌ A repassé en chantier le lien réseau : ${nc.nom}` });
-      }
-    });
-    oldChemins.forEach(oc => {
-      if (!newChemins.find(nc => nc.chemin === oc.chemin)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le lien réseau : ${oc.nom}` });
-    });
 
     let finalUpdated = { ...updated };
     if (newLogs.length > 0) {
@@ -542,6 +542,13 @@ function MainApp() {
     if (action === "close" || action === undefined) setModalCritere(null);
     if (action === "next") setModalCritere(filtered[currentIndex + 1]);
     if (action === "prev") setModalCritere(filtered[currentIndex - 1]);
+  }
+
+  // 👉 LA FONCTION AUTO-SAVE QUI INTERCEPTE LES CHANGEMENTS DE FICHIERS DEPUIS LA MODALE
+  function handleAutoSave(updated) {
+    if (isArchive) return;
+    const newCriteres = criteres.map(c => c.id === updated.id ? updated : c);
+    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
   }
 
   const byPerson = allIfsiMembers.map(m => {
@@ -617,33 +624,6 @@ function MainApp() {
   const activeIfsis = ifsiList.filter(i => !i.archived);
   const archivedIfsis = ifsiList.filter(i => i.archived);
   
-  function getIfsiGlobalStats(ifsiId) {
-    const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
-    const data = allQualiopiData[docId];
-    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate: "2026-10-15", liste: [] };
-    
-    let liste = [];
-    let auditDate = "2026-10-15";
-
-    if (data.campaigns && data.campaigns.length > 0) {
-      const currentCamp = data.campaigns[data.campaigns.length - 1];
-      liste = currentCamp.liste;
-      auditDate = currentCamp.auditDate || "2026-10-15";
-    } else if (data.liste) {
-      liste = data.liste;
-    } else {
-      return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate, liste: [] };
-    }
-
-    const nbConcerne = liste.filter(c => c.statut !== "non-concerne").length;
-    const total = nbConcerne === 0 ? 1 : nbConcerne;
-    const conforme = liste.filter(c => c.statut === "conforme").length;
-    const nonConforme = liste.filter(c => c.statut === "non-conforme").length;
-    const enCours = liste.filter(c => c.statut === "en-cours").length;
-
-    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate, liste };
-  }
-
   const activeIfsisStats = activeIfsis.map(i => ({ id: i.id, name: i.name, ...getIfsiGlobalStats(i.id) }));
   
   const sortedTourIfsis = [...activeIfsisStats].sort((a, b) => {
@@ -690,11 +670,13 @@ function MainApp() {
         .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
       
+      {/* 👉 APPEL DE DETAIL MODAL AVEC onAutoSave */}
       {modalCritere && (
         <DetailModal 
           critere={modalCritere} 
           onClose={() => setModalCritere(null)} 
           onSave={saveModal} 
+          onAutoSave={handleAutoSave}
           isReadOnly={isArchive} 
           isAuditMode={isAuditMode} 
           allMembers={allIfsiMembers} 
@@ -1121,7 +1103,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- DASHBOARD --- */}
+        {/* --- RESTE DES ONGLETS (Dashboard, Criteres, Axes, Responsables, Compte) --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
