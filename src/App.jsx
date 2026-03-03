@@ -343,7 +343,6 @@ function MainApp() {
     }
   }
 
-  // 👉 MISE A JOUR : On récupère aussi la date d'audit pour la Tour de Contrôle
   function getIfsiGlobalStats(ifsiId) {
     const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
     const data = allQualiopiData[docId];
@@ -390,8 +389,10 @@ function MainApp() {
     setModalCritere(null);
   }
 
+  // 👉 LA FONCTION MISSING EST DE RETOUR ICI !
   const today = new Date();
   const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
+  const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
   
   const auditDateObj = new Date(currentAuditDate);
   const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
@@ -462,8 +463,6 @@ function MainApp() {
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} />}
       
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
-        
-        {/* 👉 HAUT DE PAGE RE-STRUCTURÉ POUR ÉVITER LE RETOUR À LA LIGNE MOCHE */}
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
           
           {/* BLOC 1 : LOGO & SÉLECTEUR */}
@@ -514,7 +513,7 @@ function MainApp() {
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
           </div>
 
-          {/* BLOC 3 : EXPORTS & PROFIL (Forcé sur la droite) */}
+          {/* BLOC 3 : EXPORTS & PROFIL */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginLeft: "auto" }}>
             <div style={{ display: "flex", gap: "6px" }}>
               <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
@@ -550,7 +549,6 @@ function MainApp() {
               {ifsiList.map(ifsi => {
                 const s = getIfsiGlobalStats(ifsi.id);
                 
-                // Calcul pour la date
                 const auditDateObj = new Date(s.auditDate);
                 const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
                 const auditColor = daysToAudit < 0 ? "#ef4444" : daysToAudit <= 30 ? "#f59e0b" : "#10b981";
@@ -559,12 +557,10 @@ function MainApp() {
                 return (
                   <div key={ifsi.id} className="td-dash" style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #e0e7ff", background: "white", transition: "all 0.2s ease" }}>
                     
-                    {/* Header : Nom + Date + Jauge */}
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
                       <div>
                         <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 2px 0" }}>{ifsi.name}</h3>
                         <div style={{ fontSize: "11px", color: "#9ca3af", fontFamily: "monospace", marginBottom: "8px" }}>ID: {ifsi.id}</div>
-                        {/* La date et le compte à rebours */}
                         <div style={{ fontSize: "12px", color: "#6b7280", display: "flex", alignItems: "center", gap: "6px", fontWeight: "600" }}>
                            <span>🗓️ {new Date(s.auditDate).toLocaleDateString("fr-FR")}</span>
                            <span style={{ background: auditColor+"20", color: auditColor, padding: "2px 6px", borderRadius: "4px", fontWeight: "800", fontSize: "10px" }}>{auditText}</span>
@@ -573,7 +569,6 @@ function MainApp() {
                       <GaugeChart value={s.conforme} max={s.total} color={s.pct >= 80 ? "#10b981" : s.pct >= 50 ? "#f59e0b" : "#ef4444"} size={64} fontSize={12} />
                     </div>
 
-                    {/* Les 3 métriques */}
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "10px", marginBottom: "20px" }}>
                       <div style={{ background: "#f0fdf4", padding: "10px", borderRadius: "8px", border: "1px solid #86efac", textAlign: "center" }}>
                          <div style={{ fontSize: "18px", fontWeight: "800", color: "#166534" }}>{s.conforme}</div>
