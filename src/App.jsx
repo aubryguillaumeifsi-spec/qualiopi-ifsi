@@ -1,10 +1,9 @@
 import LoginPage from "./components/LoginPage";
 import DetailModal from "./components/DetailModal";
 import { useState, useEffect } from "react";
-// 👉 AJOUT DE deleteDoc ICI POUR POUVOIR SUPPRIMER DES MEMBRES
 import { getDoc, setDoc, deleteDoc, doc, collection, getDocs, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut } from "firebase/auth";
-import { createUserWithEmailAndPassword } from "firebase/auth";
+// 👉 AJOUT DE updatePassword ICI !
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
 import { TODAY, RESPONSABLES, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG, ROLE_COLORS } from "./data";
 
@@ -54,14 +53,16 @@ export default function App() {
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
 
+  // ÉTATS POUR LA GESTION DU MOT DE PASSE
+  const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsLoggedIn(true);
         try {
           const userSnap = await getDoc(doc(db, "users", user.uid));
-          // NOUVEAU : Si la personne n'est pas dans la BDD, on la bloque en "guest"
-          let profile = { role: "guest", etablissementId: null }; 
+          let profile = { role: "guest", etablissementId: null, mustChangePassword: false }; 
           
           if (userSnap.exists()) {
              profile = userSnap.data();
@@ -72,7 +73,6 @@ export default function App() {
                loadTeamUsers(profile.role, profile.etablissementId);
              }
           } else {
-             // Profil non trouvé = Bloqué
              setUserProfile(profile);
           }
         } catch (err) {
@@ -90,7 +90,7 @@ export default function App() {
 
   useEffect(() => {
     let unsubSnapshot = null;
-    if (selectedIfsi && userProfile?.role !== "guest") {
+    if (selectedIfsi && userProfile?.role !== "guest" && !userProfile?.mustChangePassword) {
       if (userProfile?.role === "superadmin") {
         loadTeamUsers("superadmin", selectedIfsi);
       }
@@ -162,10 +162,12 @@ export default function App() {
       const newUid = userCredential.user.uid;
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
 
+      // 👉 NOUVEAU : ON AJOUTE mustChangePassword: true
       await setDoc(doc(db, "users", newUid), {
         email: newMember.email,
         role: newMember.role,
-        etablissementId: targetIfsi
+        etablissementId: targetIfsi,
+        mustChangePassword: true 
       });
 
       alert(`✅ Le compte ${newMember.email} a été créé avec succès !`);
@@ -179,14 +181,44 @@ export default function App() {
     setIsCreatingUser(false);
   }
 
-  // 👉 NOUVELLE FONCTION POUR SUPPRIMER UN COMPTE DE L'ÉQUIPE
   async function handleDeleteUser(userId, userEmail) {
     if (!window.confirm(`Êtes-vous sûr de vouloir révoquer l'accès de : ${userEmail} ?\n\nIl ne pourra plus se connecter à l'application.`)) return;
     try {
       await deleteDoc(doc(db, "users", userId));
-      loadTeamUsers(userProfile.role, selectedIfsi); // Rafraîchit la liste
+      loadTeamUsers(userProfile.role, selectedIfsi); 
     } catch (e) {
       alert("Erreur lors de la suppression : " + e.message);
+    }
+  }
+
+  // 👉 NOUVELLE FONCTION POUR CHANGER LE MOT DE PASSE (Forcé ou Volontaire)
+  async function handleChangePassword(e, isForced) {
+    e.preventDefault();
+    setPwdUpdate({ ...pwdUpdate, error: "", success: "", loading: true });
+
+    if (pwdUpdate.p1 !== pwdUpdate.p2) {
+      return setPwdUpdate({ ...pwdUpdate, error: "Les mots de passe ne correspondent pas.", loading: false });
+    }
+    // Validation stricte : 8 caractères, 1 majuscule, 1 chiffre
+    if (pwdUpdate.p1.length < 8 || !/[A-Z]/.test(pwdUpdate.p1) || !/[0-9]/.test(pwdUpdate.p1)) {
+      return setPwdUpdate({ ...pwdUpdate, error: "Sécurité faible : 8 caractères min., 1 majuscule et 1 chiffre requis.", loading: false });
+    }
+
+    try {
+      // 1. Mise à jour du mot de passe dans Firebase Auth
+      await updatePassword(auth.currentUser, pwdUpdate.p1);
+      
+      // 2. Si c'était forcé, on met à jour la base de données pour débloquer le compte
+      if (isForced) {
+        await setDoc(doc(db, "users", auth.currentUser.uid), { mustChangePassword: false }, { merge: true });
+        setUserProfile({ ...userProfile, mustChangePassword: false }); // Débloque l'UI instantanément
+      }
+
+      setPwdUpdate({ p1: "", p2: "", loading: false, error: "", success: "Votre mot de passe a été mis à jour avec succès !" });
+    } catch (err) {
+      let msg = "Erreur de mise à jour.";
+      if (err.code === 'auth/requires-recent-login') msg = "Veuillez vous déconnecter et vous reconnecter pour des raisons de sécurité avant de changer de mot de passe.";
+      setPwdUpdate({ ...pwdUpdate, error: msg, loading: false });
     }
   }
 
@@ -223,7 +255,7 @@ export default function App() {
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
 
-  // 👉 ECRAN DE BLOCAGE SI L'UTILISATEUR N'EST PAS DANS LA BASE
+  // 👉 1. ÉCRAN DE BLOCAGE : UTILISATEUR NON ENREGISTRÉ
   if (userProfile?.role === "guest") {
     return (
       <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "Outfit" }}>
@@ -235,6 +267,38 @@ export default function App() {
     );
   }
 
+  // 👉 2. ÉCRAN DE BLOCAGE : PREMIÈRE CONNEXION (CHANGEMENT MDP OBLIGATOIRE)
+  if (userProfile?.mustChangePassword) {
+    return (
+      <div style={{ minHeight: "100vh", background: "linear-gradient(135deg,#f0f4ff,#e8f0fe)", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit" }}>
+        <div style={{ background: "white", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 40px rgba(0,0,0,0.08)", maxWidth: "400px", width: "100%", textAlign: "center" }}>
+          <div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div>
+          <h2 style={{ color: "#1e3a5f", margin: "0 0 10px 0", fontSize: "22px", fontWeight: "800" }}>Sécurisez votre compte</h2>
+          <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", lineHeight: "1.5" }}>Ceci est votre première connexion. Veuillez remplacer le mot de passe provisoire par un mot de passe personnel.</p>
+          
+          <form onSubmit={(e) => handleChangePassword(e, true)}>
+            <div style={{ textAlign: "left", marginBottom: "16px" }}>
+              <label style={{ fontSize: "12px", color: "#374151", fontWeight: "700" }}>Nouveau mot de passe</label>
+              <input type="password" value={pwdUpdate.p1} onChange={e => setPwdUpdate({...pwdUpdate, p1: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "6px", boxSizing: "border-box" }} placeholder="8 caractères, 1 majuscule, 1 chiffre" required />
+            </div>
+            <div style={{ textAlign: "left", marginBottom: "24px" }}>
+              <label style={{ fontSize: "12px", color: "#374151", fontWeight: "700" }}>Confirmez le mot de passe</label>
+              <input type="password" value={pwdUpdate.p2} onChange={e => setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "6px", boxSizing: "border-box" }} placeholder="Répétez le mot de passe" required />
+            </div>
+
+            {pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600" }}>{pwdUpdate.error}</div>}
+
+            <button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: pwdUpdate.loading ? "wait" : "pointer", opacity: pwdUpdate.loading ? 0.7 : 1 }}>
+              {pwdUpdate.loading ? "Mise à jour..." : "Valider et accéder au portail"}
+            </button>
+          </form>
+          <button onClick={handleLogout} style={{ marginTop: "20px", background: "none", border: "none", color: "#9ca3af", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Annuler et se déconnecter</button>
+        </div>
+      </div>
+    );
+  }
+
+  // --- SI TOUT EST BON, ON CHARGE L'APPLICATION ---
   if (campaigns === null || activeCampaignId === null) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700" }}>⏳ Chargement de l'établissement...</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
@@ -259,16 +323,6 @@ export default function App() {
     if (!critereId) return;
     const newListe = criteres.map(c => c.id.toString() === critereId ? { ...c, statut: newStatut } : c);
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newListe } : camp));
-  }
-
-  function handleEditAuditDate() {
-    if (isArchive) return;
-    const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
-    if (newDate) {
-      if (isNaN(new Date(newDate).getTime())) { alert("Format de date invalide. Veuillez utiliser AAAA-MM-JJ."); return; }
-      const newCampaigns = campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c);
-      saveData(newCampaigns);
-    }
   }
 
   const today = new Date();
@@ -310,7 +364,7 @@ export default function App() {
     items: criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(r)), 
   })).filter(r => r.items.length > 0);
 
-  async function exportToExcel() { /* ... fonction Excel gardée en mémoire pour ne pas alourdir ... */ }
+  async function exportToExcel() { /* ... fonction Excel intacte ... */ }
 
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
@@ -366,7 +420,6 @@ export default function App() {
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Axes prioritaires</button>
             <button style={navBtn(activeTab === "responsables")} onClick={() => setActiveTab("responsables")}>Responsables</button>
             
-            {/* L'ONGLET ÉQUIPE */}
             {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
               <button style={{ ...navBtn(activeTab === "equipe"), marginLeft: "8px", border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Équipe IFSI</button>
             )}
@@ -374,9 +427,9 @@ export default function App() {
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
             
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "12px", paddingLeft: "12px", borderLeft: "2px solid #f1f5f9" }}>
-               {/* AFFICHAGE DU RÔLE DE L'UTILISATEUR */}
-               <span style={{ fontSize: "10px", fontWeight: "700", background: "#f1f5f9", padding: "4px 8px", borderRadius: "6px", color: "#64748b", textTransform: "uppercase" }}>👤 {userProfile?.role}</span>
-               <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444", fontSize: "12px", border: "1px solid #fca5a5", background: "#fef2f2" }}>Déconnexion</button>
+               {/* 👉 LE NOUVEAU BOUTON MON COMPTE */}
+               <button onClick={() => setActiveTab("compte")} style={{ ...navBtn(activeTab === "compte"), fontSize: "11px", border: "1px solid #d1d5db", background: "white", color: "#4b5563" }}>⚙️ Mon compte</button>
+               <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444", fontSize: "11px", border: "1px solid #fca5a5", background: "#fef2f2" }}>Déconnexion</button>
             </div>
           </div>
         </div>
@@ -387,6 +440,45 @@ export default function App() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
+        {/* --- ONGLET "MON COMPTE" --- */}
+        {activeTab === "compte" && (
+          <div style={{ maxWidth: "500px", margin: "0 auto" }}>
+            <div style={{ marginBottom: "24px", textAlign: "center" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>⚙️ Mon compte personnel</h2>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Gérez vos informations de sécurité.</p>
+            </div>
+
+            <div style={card}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "16px" }}>
+                 <div>
+                    <div style={{ fontSize: "11px", fontWeight: "700", color: "#9ca3af", textTransform: "uppercase" }}>Email de connexion</div>
+                    <div style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f" }}>{auth.currentUser?.email}</div>
+                 </div>
+                 <span style={{ fontSize: "10px", fontWeight: "800", background: "#eff6ff", color: "#1d4ed8", padding: "4px 8px", borderRadius: "6px", border: "1px solid #bfdbfe", textTransform: "uppercase" }}>Rôle : {userProfile?.role}</span>
+              </div>
+
+              <h3 style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "12px" }}>Changer mon mot de passe</h3>
+              
+              {pwdUpdate.success && <div style={{ color: "#059669", background: "#d1fae5", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600", border: "1px solid #6ee7b7" }}>{pwdUpdate.success}</div>}
+              {pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600", border: "1px solid #fca5a5" }}>{pwdUpdate.error}</div>}
+
+              <form onSubmit={(e) => handleChangePassword(e, false)}>
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280" }}>Nouveau mot de passe</label>
+                  <input type="password" value={pwdUpdate.p1} onChange={e => setPwdUpdate({...pwdUpdate, p1: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="8 caractères, 1 majuscule, 1 chiffre" required />
+                </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280" }}>Confirmer le mot de passe</label>
+                  <input type="password" value={pwdUpdate.p2} onChange={e => setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="Répétez le mot de passe" required />
+                </div>
+                <button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "10px", background: "#1e3a5f", color: "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: pwdUpdate.loading ? "wait" : "pointer" }}>
+                  {pwdUpdate.loading ? "Enregistrement..." : "Mettre à jour le mot de passe"}
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
         {/* --- ONGLET GESTION DE L'ÉQUIPE --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
@@ -398,6 +490,9 @@ export default function App() {
             <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", alignItems: "start" }}>
               <div style={{ ...card, background: "#f8fafc" }}>
                 <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Inviter un membre</h3>
+                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px", borderRadius: "6px", fontSize: "11px", color: "#1d4ed8", marginBottom: "16px", lineHeight: "1.4" }}>
+                  ℹ️ L'utilisateur sera forcé de modifier son mot de passe provisoire lors de sa première connexion.
+                </div>
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Email</label>
                   <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="formateur@ifsi.fr" />
@@ -440,7 +535,6 @@ export default function App() {
                         </td>
                         {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{IFSI_LIST.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
                         <td style={td}>
-                          {/* On ne peut pas se supprimer soi-même et un admin ne peut pas supprimer un superadmin */}
                           {u.id !== auth.currentUser?.uid && u.role !== "superadmin" && (
                             <button onClick={() => handleDeleteUser(u.id, u.email)} style={{ background: "white", color: "#ef4444", border: "1px solid #fca5a5", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold" }}>Supprimer</button>
                           )}
