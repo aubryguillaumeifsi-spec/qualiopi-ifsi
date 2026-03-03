@@ -625,30 +625,38 @@ function MainApp() {
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
           
+          {/* 👉 LOGO ET NOM CLIQUABLES (RETOUR ACCUEIL SANS RECHARGER TOUTE LA PAGE) */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
-            <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-              <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs>
-                <path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#grad)"/>
-                <path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#grad)"/>
-              </svg>
-            </div>
-            
-            <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            <div 
+              onClick={() => {
+                setActiveTab(userProfile?.role === "superadmin" ? "tour_controle" : "dashboard");
+                setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous");
+              }} 
+              style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }}
+              title="Retour à l'accueil"
+            >
+              <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs>
+                  <path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#grad)"/>
+                  <path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#grad)"/>
+                </svg>
+              </div>
               <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</span>
               <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>V2.0</span>
-              <span style={{ color: "#d1d5db" }}>—</span>
-              
+            </div>
+            
+            <span style={{ color: "#d1d5db" }}>—</span>
+            
+            <div style={{ display: "flex", alignItems: "center", gap: "8px", borderLeft: "2px solid transparent" }}>
               {userProfile?.role === "superadmin" ? (
                 <select value={selectedIfsi} onChange={handleIfsiSwitch} style={{ fontSize: "14px", fontWeight: "800", color: currentIfsiObj?.archived ? "#991b1b" : "#1d4ed8", background: currentIfsiObj?.archived ? "#fef2f2" : "#eff6ff", border: `1px solid ${currentIfsiObj?.archived ? "#fca5a5" : "#bfdbfe"}`, borderRadius: "6px", padding: "4px 8px", cursor: "pointer", outline: "none" }}>
                   {ifsiList.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name} {ifsi.archived ? " 📦 (Archivé)" : ""}</option>)}
                   <option disabled>──────────</option><option value="NEW">➕ Nouvel établissement...</option>
                 </select>
               ) : (<span style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f" }}>{currentIfsiName}</span>)}
-            </div>
-            
-            <div style={{ display: "flex", alignItems: "center", gap: "8px", marginLeft: "10px", borderLeft: "2px solid #f1f5f9", paddingLeft: "16px" }}>
-              <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ ...sel, fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", background: "#eff6ff", outline: "none" }}>{campaigns.map(c => <option key={c.id} value={c.id}>{c.name} {c.locked ? "(Archive)" : ""}</option>)}<option disabled>──────────</option><option value="NEW">➕ Nouvelle certification...</option></select>
+              
+              <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ ...sel, fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", background: "#eff6ff", outline: "none", marginLeft: "10px" }}>{campaigns.map(c => <option key={c.id} value={c.id}>{c.name} {c.locked ? "(Archive)" : ""}</option>)}<option disabled>──────────</option><option value="NEW">➕ Nouvelle certification...</option></select>
               {campaigns.length > 1 && <button onClick={handleDeleteCampaign} className="no-print" title="Supprimer" style={{ background: "white", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "14px", color: "#ef4444", padding: "6px 8px" }}>🗑️</button>}
             </div>
           </div>
@@ -701,6 +709,7 @@ function MainApp() {
               </div>
             </div>
 
+            {/* --- STATISTIQUES --- */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
               <div style={{ background: "linear-gradient(135deg, #4f46e5, #3b82f6)", borderRadius: "12px", padding: "20px", color: "white", boxShadow: "0 4px 10px rgba(79,70,229,0.2)" }}>
                 <div style={{ fontSize: "13px", fontWeight: "700", textTransform: "uppercase", opacity: 0.9 }}>Score National Moyen</div>
@@ -716,6 +725,7 @@ function MainApp() {
               </div>
             </div>
 
+            {/* --- ALERTES ROUGES --- */}
             {topAlerts.length > 0 && (
               <div style={{ marginBottom: "32px" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#991b1b", margin: "0 0 10px 0", display: "flex", alignItems: "center", gap: "6px" }}>🚨 Alertes Urgentes sur le réseau</h3>
@@ -738,6 +748,7 @@ function MainApp() {
               </div>
             )}
 
+            {/* --- LISTE DES IFSI --- */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #86efac", paddingBottom: "8px", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "16px", color: "#10b981", margin: 0 }}>✅ Établissements Actifs ({activeIfsis.length})</h3>
               <select value={tourSort} onChange={e => setTourSort(e.target.value)} style={{ ...sel, borderColor: "#cbd5e1", fontWeight: "600", padding: "6px 12px" }}>
@@ -797,6 +808,7 @@ function MainApp() {
               {sortedTourIfsis.length === 0 && <div style={{ color: "#9ca3af", fontStyle: "italic" }}>Aucun établissement actif.</div>}
             </div>
 
+            {/* --- ÉTABLISSEMENTS ARCHIVÉS --- */}
             {archivedIfsis.length > 0 && (
               <>
                 <h3 style={{ fontSize: "16px", color: "#991b1b", borderBottom: "2px solid #fca5a5", paddingBottom: "8px", marginBottom: "16px", marginTop: "40px" }}>📦 Établissements Archivés ({archivedIfsis.length})</h3>
@@ -826,7 +838,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ORGANIGRAMME (AVEC FLEX WRAP) --- */}
+        {/* --- ORGANIGRAMME --- */}
         {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -856,10 +868,7 @@ function MainApp() {
               </div>
             )}
 
-            {/* 👉 ICI LE CONTENEUR PRINCIPAL AVEC FLEX-WRAP */}
-            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", paddingBottom: "20px" }}>
-              
-              {/* Le vivier reste à gauche et ne rétrécit pas */}
+            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", overflowX: "auto", paddingBottom: "20px" }}>
               <div style={{ width: "280px", flexShrink: 0, background: "#f8fafc", borderRadius: "12px", padding: "16px", border: "1px solid #e2e8f0", minHeight: "60vh" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#475569", marginBottom: "16px", textTransform: "uppercase", borderBottom: "2px solid #cbd5e1", paddingBottom: "8px" }}>👥 Équipe globale</h3>
                 
@@ -891,7 +900,6 @@ function MainApp() {
                 </div>
               </div>
 
-              {/* 👉 LA ZONE DE DROITE DEVIENT UNE GRILLE QUI REVIENT À LA LIGNE */}
               <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", flex: 1, alignContent: "flex-start" }}>
                 {orgRoles.filter(r => r !== "Direction").map((role) => {
                   const colConf = getRoleColor(role);
