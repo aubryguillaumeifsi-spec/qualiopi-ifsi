@@ -6,17 +6,30 @@ import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePass
 import { db, auth, secondaryAuth } from "./firebase";
 import { TODAY, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
-const DEFAULT_ROLES = ["Direction", "Qualité", "Secrétariat", "Pôle Stages", "Formateurs IFSI", "Formateurs IFAS"];
-
+// --- BOUCLIER ANTI-CRASH ---
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   render() {
-    if (this.state.hasError) return (<div style={{ padding: "40px", textAlign: "center" }}><h1 style={{ color: "#ef4444" }}>⚠️ Erreur</h1><pre style={{ background: "#fef2f2", padding: "20px" }}>{this.state.error?.toString()}</pre><button onClick={() => window.location.reload()}>Recharger</button></div>);
+    if (this.state.hasError) {
+      return (
+        <div style={{ padding: "40px", fontFamily: "Outfit", color: "#1e3a5f", textAlign: "center" }}>
+          <h1 style={{ color: "#ef4444" }}>⚠️ L'application a rencontré une erreur</h1>
+          <p>Prenez une capture d'écran de ce message pour le diagnostic :</p>
+          <pre style={{ background: "#fef2f2", padding: "20px", border: "1px solid #fca5a5", borderRadius: "8px", color: "#991b1b", textAlign: "left", overflowX: "auto" }}>
+            {this.state.error?.toString()}
+          </pre>
+          <button onClick={() => window.location.reload()} style={{ padding: "10px 20px", background: "#1d4ed8", color: "white", borderRadius: "8px", border: "none", marginTop: "20px", cursor: "pointer" }}>Recharger l'application</button>
+        </div>
+      );
+    }
     return this.props.children;
   }
 }
 
+const DEFAULT_ROLES = ["Direction", "Qualité", "Secrétariat", "Pôle Stages", "Formateurs IFSI", "Formateurs IFAS"];
+
+// --- PALETTE DE COULEURS POUR LES RÔLES ---
 const ROLE_PALETTE = [
   { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, 
   { bg: "#dcfce7", border: "#86efac", text: "#166534" }, 
@@ -65,7 +78,7 @@ function MainApp() {
 
   const [ifsiList, setIfsiList] = useState([]);
   const [ifsiData, setIfsiData] = useState(null);
-  const [allQualiopiData, setAllQualiopiData] = useState({}); // Pour le Superadmin
+  const [allQualiopiData, setAllQualiopiData] = useState({});
 
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
@@ -98,7 +111,6 @@ function MainApp() {
              setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
              if (profile.role === "admin" || profile.role === "superadmin") loadTeamUsers(profile.role, profile.etablissementId);
              
-             // Si c'est le superadmin, on charge toutes les données de tous les IFSI pour la Tour de Contrôle
              if (profile.role === "superadmin") {
                 onSnapshot(collection(db, "qualiopi"), (snap) => {
                   const data = {};
@@ -196,13 +208,12 @@ function MainApp() {
   ].sort((a,b) => a.name.localeCompare(b.name));
 
   function getRoleColor(roleName) {
-    if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; // VIP Noir/Bleu foncé
+    if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; 
     const index = orgRoles.filter(r => r !== "Direction").indexOf(roleName);
     if (index === -1) return ROLE_PALETTE[7];
     return ROLE_PALETTE[index % ROLE_PALETTE.length];
   }
 
-  // --- GLISSER DEPOSER (DOUBLE CASQUETTE) ---
   function handleDragStartOrg(e, type, id) { e.dataTransfer.setData("type", type); e.dataTransfer.setData("id", id); }
   function handleDragOverOrg(e) { e.preventDefault(); }
   function handleDropOrg(e, targetRole) {
@@ -314,6 +325,16 @@ function MainApp() {
 
   function handleLogout() { signOut(auth); }
 
+  // 👉 LA FONCTION MANQUANTE REMISE EN PLACE ICI :
+  function handleEditAuditDate() {
+    if (isArchive) return;
+    const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
+    if (newDate) {
+      if (isNaN(new Date(newDate).getTime())) return alert("Format invalide.");
+      saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c));
+    }
+  }
+
   function handleNewCampaign(e) {
     if (e.target.value === "NEW") {
       const name = prompt("Nom certification :");
@@ -376,7 +397,6 @@ function MainApp() {
 
   const today = new Date();
   const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
-  const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
   
   const auditDateObj = new Date(currentAuditDate);
   const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
@@ -477,7 +497,6 @@ function MainApp() {
           </div>
           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
             
-            {/* 👉 BOUTON TOUR DE CONTROLE (SUPERADMIN UNIQUEMENT) */}
             {userProfile?.role === "superadmin" && (
               <button style={{ ...navBtn(activeTab === "tour_controle"), marginRight: "8px", border: "1px solid #6366f1", color: activeTab === "tour_controle" ? "white" : "#4f46e5", background: activeTab === "tour_controle" ? "#6366f1" : "#e0e7ff" }} onClick={() => setActiveTab("tour_controle")}>🛸 Tour de Contrôle</button>
             )}
@@ -512,9 +531,6 @@ function MainApp() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
-        {/* ========================================================= */}
-        {/* 👉 NOUVEL ONGLET : TOUR DE CONTRÔLE (SUPERADMIN SEUL) */}
-        {/* ========================================================= */}
         {activeTab === "tour_controle" && userProfile?.role === "superadmin" && (
           <div>
             <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
@@ -558,19 +574,17 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ONGLET : ORGANIGRAMME --- */}
         {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
               <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>🌳 Organigramme & Rôles ({currentIfsiName})</h2>
-              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Glissez le personnel dans les colonnes. Une personne peut être glissée dans plusieurs colonnes (Double casquette).</p>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Glissez le personnel dans les colonnes. Une personne peut avoir une double casquette.</p>
             </div>
 
             {orgRoles.length === 0 && (
               <button onClick={applyDefaultRoles} style={{ marginBottom: "20px", background: "#10b981", color: "white", padding: "10px 20px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}>✨ Générer les rôles standards (Direction, Qualité...)</button>
             )}
 
-            {/* 👉 LE BLOC VIP "DIRECTION" HORIZONTAL */}
             {orgRoles.includes("Direction") && (
               <div style={{ background: "#1e3a5f", borderRadius: "12px", padding: "16px", marginBottom: "24px", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" }} onDragOver={handleDragOverOrg} onDrop={(e) => handleDropOrg(e, "Direction")}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid #334155", paddingBottom: "8px" }}>
@@ -616,7 +630,6 @@ function MainApp() {
                 </div>
               </div>
 
-              {/* COLONNES DES RÔLES (SANS LA DIRECTION) */}
               {orgRoles.filter(r => r !== "Direction").map((role) => {
                 const colConf = getRoleColor(role);
                 const peopleInRole = allIfsiMembers.filter(m => m.roles.includes(role));
@@ -650,7 +663,6 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ONGLET RESPONSABLES (TRIÉ PAR PERSONNE) --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
@@ -692,7 +704,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- ONGLET "MON COMPTE" --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
@@ -727,7 +738,6 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ONGLET ÉQUIPE (CRÉATION DE COMPTES) --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -796,7 +806,6 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- DASHBOARD --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -835,12 +844,11 @@ function MainApp() {
           </div>
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /></div></div>
+            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
             <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
           </div>
         </>}
 
-        {/* --- CRITERES --- */}
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -867,7 +875,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- AXES --- */}
         {activeTab === "axes" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
           {["non-conforme","en-cours"].map(st => {
