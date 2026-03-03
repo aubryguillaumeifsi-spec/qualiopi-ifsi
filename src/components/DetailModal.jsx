@@ -175,7 +175,7 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
     alert("Copié ! Faites Ctrl+V dans votre explorateur.");
   };
 
-  // 👉 LE RETOUR DE L'INTELLIGENCE ARTIFICIELLE
+  // 👉 LE RETOUR DE L'INTELLIGENCE ARTIFICIELLE (AVEC GEMINI 2.5 FLASH)
   async function handleAnalyze(file) {
     if (!file.url) return;
     setIsAnalyzing(true);
@@ -196,7 +196,8 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
              if (file.name.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
 
              const genAI = new GoogleGenerativeAI(apiKey);
-             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+             // 🔥 Correction de la version du modèle ici :
+             const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
 
              const prompt = `Tu es un auditeur Qualiopi bienveillant mais rigoureux. Analyse ce document pour le critère ${data.num} : "${data.titre}".
               Voici le niveau attendu par le référentiel : ${guide.niveau}.
@@ -383,7 +384,6 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
                         <span style={{ color: "#92400e", fontWeight: "600" }}>☁️ {f.name}</span>
                         {!isReadOnly && (
                           <div style={{ display: "flex", gap: "8px" }}>
-                            {/* 👉 LE BOUTON IA DE RETOUR ICI */}
                             <button onClick={() => handleAnalyze(f)} disabled={isAnalyzing} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", cursor: "pointer", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>
                               {isAnalyzing ? "⏳ IA..." : "🤖 Analyse IA"}
                             </button>
@@ -395,7 +395,6 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
                     ))}
                   </div>
 
-                  {/* Boîte d'affichage du rapport IA */}
                   {aiReport && (
                     <div style={{ background: "#f0fdfa", border: "1px solid #5eead4", padding: "16px", borderRadius: "8px", marginBottom: "16px", position: "relative" }}>
                       <button onClick={() => setAiReport("")} style={{ position: "absolute", top: "10px", right: "10px", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}>❌</button>
