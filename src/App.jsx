@@ -2,17 +2,17 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import LoginPage from "./components/LoginPage";
 import DetailModal from "./components/DetailModal";
 
-// Imports de nos composants propres
+// 👉 IMPORT DE NOS NOUVEAUX FICHIERS DÉCOUPÉS
 import DashboardTab from "./components/DashboardTab";
 import TourControleTab from "./components/TourControleTab";
 import OrganigrammeTab from "./components/OrganigrammeTab";
 import { CriteresTab, AxesTab, ResponsablesTab, LivreBlancTab } from "./components/TabsQualiopi";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
-import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
+import { getDoc, setDoc, deleteDoc, doc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
-import { DEFAULT_CRITERES, CRITERES_LABELS } from "./data";
+import { TODAY, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -124,7 +124,6 @@ function MainApp() {
     catch (e) { setSaveStatus("error"); setTimeout(() => setSaveStatus("idle"), 3000); }
   }
 
-  // --- MEMOIZED DATA ---
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
@@ -174,7 +173,9 @@ function MainApp() {
     return filteredUsers.sort((a, b) => { let valA = ""; let valB = ""; if (teamSortConfig.key === "email") { valA = a.email || ""; valB = b.email || ""; } else if (teamSortConfig.key === "role") { valA = a.role || "user"; valB = b.role || "user"; } else if (teamSortConfig.key === "ifsi") { valA = ifsiList.find(i => i.id === a.etablissementId)?.name || a.etablissementId || ""; valB = ifsiList.find(i => i.id === b.etablissementId)?.name || b.etablissementId || ""; } if (valA < valB) return teamSortConfig.direction === "asc" ? -1 : 1; if (valA > valB) return teamSortConfig.direction === "asc" ? 1 : -1; return 0; });
   }, [teamUsers, teamSearchTerm, teamSortConfig, ifsiList]);
 
-  // --- ACTIONS LOGIQUES ---
+  // 👉 LA RUSTINE MANQUANTE
+  const totalUsersInNetwork = teamUsers.length; 
+
   async function handleIfsiSwitch(e) { if (e.target.value === "NEW") { const nomEtablissement = prompt("Nom du nouvel établissement (ex: IFSI de Bordeaux) :"); if (nomEtablissement && nomEtablissement.trim() !== "") { const safeId = nomEtablissement.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 10000); try { await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim(), roles: DEFAULT_ROLES, manualUsers: [], archived: false }); setSelectedIfsi(safeId); setActiveTab("dashboard"); } catch (error) { alert("Erreur."); } } } else { setSelectedIfsi(e.target.value); setActiveTab("dashboard"); } }
   async function handleRenameIfsi(ifsiId, currentName) { const newName = prompt(`Renommer l'établissement "${currentName}" :`, currentName); if (newName && newName.trim() !== "" && newName !== currentName) { try { await setDoc(doc(db, "etablissements", ifsiId), { name: newName.trim() }, { merge: true }); } catch (error) { alert("Erreur : " + error.message); } } }
   async function handleArchiveIfsi(ifsiId, name, archiveStatus) { if (!window.confirm(`Voulez-vous vraiment ${archiveStatus?"archiver":"restaurer"} l'établissement "${name}" ?`)) return; try { await setDoc(doc(db, "etablissements", ifsiId), { archived: archiveStatus }, { merge: true }); } catch (e) { alert("Erreur : " + e.message); } }
@@ -261,11 +262,9 @@ function MainApp() {
   const currentIfsiName = currentIfsiObj?.name || "Chargement...";
   if (campaigns === null || activeCampaignId === null || ifsiList.length === 0) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700", background: "#f8fafc" }}>⏳ Chargement...</div>;
 
-  const auditDateObj = new Date(currentAuditDate);
-  const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
-  let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
-  if (daysToAudit < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` };
-  else if (daysToAudit <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` };
+  let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${Math.ceil((new Date(currentAuditDate) - today) / 86400000)} jour(s)` };
+  if (Math.ceil((new Date(currentAuditDate) - today) / 86400000) < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(Math.ceil((new Date(currentAuditDate) - today) / 86400000))} jour(s)` };
+  else if (Math.ceil((new Date(currentAuditDate) - today) / 86400000) <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${Math.ceil((new Date(currentAuditDate) - today) / 86400000)} jour(s) !` };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
@@ -286,19 +285,12 @@ function MainApp() {
         />
       )}
       
-      {/* -------------------- BARRE DE NAVIGATION -------------------- */}
+      {/* --- HEADER --- */}
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
-          
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <div onClick={() => { setActiveTab(userProfile?.role === "superadmin" ? "tour_controle" : "dashboard"); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} style={{ display: "flex", alignItems: "center", gap: "10px", cursor: "pointer" }} title="Retour à l'accueil" >
-              <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-                <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                  <defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs>
-                  <path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#grad)"/>
-                  <path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#grad)"/>
-                </svg>
-              </div>
+              <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}><svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="grad" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs><path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#grad)"/><path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#grad)"/></svg></div>
               <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</span>
               <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>V2.0</span>
             </div>
@@ -310,7 +302,6 @@ function MainApp() {
                   <option disabled>──────────</option><option value="NEW">➕ Nouvel établissement...</option>
                 </select>
               ) : (<span style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f" }}>{currentIfsiName}</span>)}
-              
               <select value={activeCampaignId || ""} onChange={handleNewCampaign} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 10px", fontSize: "12px", cursor: "pointer", fontWeight: "700", color: "#1d4ed8", borderColor: "#bfdbfe", outline: "none", marginLeft: "10px" }}>{campaigns.map(c => <option key={c.id} value={c.id}>{c.name} {c.locked ? "(Archive)" : ""}</option>)}<option disabled>──────────</option><option value="NEW">➕ Nouvelle certification...</option></select>
               {campaigns.length > 1 && <button onClick={handleDeleteCampaign} className="no-print" title="Supprimer" style={{ background: "white", border: "1px solid #fca5a5", borderRadius: "6px", cursor: "pointer", fontSize: "14px", color: "#ef4444", padding: "6px 8px" }}>🗑️</button>}
             </div>
@@ -322,7 +313,6 @@ function MainApp() {
             <button style={navBtn(activeTab === "criteres")} onClick={() => setActiveTab("criteres")}>Indicateurs</button>
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Axes prioritaires</button>
             <button style={navBtn(activeTab === "responsables")} onClick={() => setActiveTab("responsables")}>Responsables</button>
-            
             {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && <button style={{ ...navBtn(activeTab === "organigramme"), marginLeft: "8px", border: "1px solid #10b981", color: activeTab === "organigramme" ? "white" : "#059669", background: activeTab === "organigramme" ? "#10b981" : "#d1fae5" }} onClick={() => setActiveTab("organigramme")}>🌳 Organigramme</button>}
             {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && <button style={{ ...navBtn(activeTab === "equipe"), border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Comptes</button>}
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
@@ -341,44 +331,18 @@ function MainApp() {
         </div>
       </div>
       
-      {/* -------------------- AFFICHAGE DES ONGLETS DÉCOUPÉS -------------------- */}
+      {/* --- AFFICHAGE DES ONGLETS DÉCOUPÉS --- */}
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
-        {activeTab === "dashboard" && (
-          <DashboardTab bannerConfig={bannerConfig} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={handleEditAuditDate} stats={stats} urgents={urgents} criteres={criteres} />
-        )}
-
-        {activeTab === "tour_controle" && userProfile?.role === "superadmin" && (
-          <TourControleTab globalScore={globalScore} activeIfsis={activeIfsis} totalUsersInNetwork={totalUsersInNetwork} topAlerts={topAlerts} totalAlertsCount={totalAlertsCount} tourSort={tourSort} setTourSort={setTourSort} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} setActiveTab={setActiveTab} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} archivedIfsis={archivedIfsis} today={today} />
-        )}
-
-        {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
-          <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} applyDefaultRoles={applyDefaultRoles} handleDragOverOrg={handleDragOverOrg} handleDropOrg={handleDropOrg} deleteOrgRole={deleteOrgRole} allIfsiMembers={allIfsiMembers} handleDragStartOrg={handleDragStartOrg} editManualUser={editManualUser} deleteManualUser={deleteManualUser} getRoleColor={getRoleColor} newManualUserInput={newManualUserInput} setNewManualUserInput={setNewManualUserInput} addManualUser={addManualUser} removeRoleFromUser={removeRoleFromUser} editOrgRole={editOrgRole} newRoleInput={newRoleInput} setNewRoleInput={setNewRoleInput} addOrgRole={addOrgRole} />
-        )}
-
-        {activeTab === "livre_blanc" && (
-          <LivreBlancTab currentIfsiName={currentIfsiName} currentCampaign={currentCampaign} criteres={criteres} />
-        )}
-
-        {activeTab === "criteres" && (
-          <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} />
-        )}
-
-        {activeTab === "axes" && (
-          <AxesTab axes={axes} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} isAuditMode={isAuditMode} />
-        )}
-
-        {activeTab === "responsables" && (
-          <ResponsablesTab byPerson={byPerson} setModalCritere={setModalCritere} isArchive={isArchive} getRoleColor={getRoleColor} />
-        )}
-
-        {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
-          <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} />
-        )}
-
-        {activeTab === "compte" && (
-          <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={handleChangePassword} />
-        )}
+        {activeTab === "dashboard" && <DashboardTab bannerConfig={bannerConfig} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={handleEditAuditDate} stats={stats} urgents={urgents} criteres={criteres} />}
+        {activeTab === "tour_controle" && userProfile?.role === "superadmin" && <TourControleTab globalScore={globalScore} activeIfsis={activeIfsis} totalUsersInNetwork={totalUsersInNetwork} topAlerts={topAlerts} totalAlertsCount={totalAlertsCount} tourSort={tourSort} setTourSort={setTourSort} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} setActiveTab={setActiveTab} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} archivedIfsis={archivedIfsis} today={today} />}
+        {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} applyDefaultRoles={applyDefaultRoles} handleDragOverOrg={handleDragOverOrg} handleDropOrg={handleDropOrg} deleteOrgRole={deleteOrgRole} allIfsiMembers={allIfsiMembers} handleDragStartOrg={handleDragStartOrg} editManualUser={editManualUser} deleteManualUser={deleteManualUser} getRoleColor={getRoleColor} newManualUserInput={newManualUserInput} setNewManualUserInput={setNewManualUserInput} addManualUser={addManualUser} removeRoleFromUser={removeRoleFromUser} editOrgRole={editOrgRole} newRoleInput={newRoleInput} setNewRoleInput={setNewRoleInput} addOrgRole={addOrgRole} />}
+        {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} currentCampaign={currentCampaign} criteres={criteres} />}
+        {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} />}
+        {activeTab === "axes" && <AxesTab axes={axes} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} isAuditMode={isAuditMode} />}
+        {activeTab === "responsables" && <ResponsablesTab byPerson={byPerson} setModalCritere={setModalCritere} isArchive={isArchive} getRoleColor={getRoleColor} />}
+        {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} />}
+        {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={handleChangePassword} />}
 
       </div>
     </div>
