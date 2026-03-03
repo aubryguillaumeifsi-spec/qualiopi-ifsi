@@ -6,46 +6,35 @@ import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePass
 import { db, auth, secondaryAuth } from "./firebase";
 import { TODAY, DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
-// --- BOUCLIER ANTI-CRASH ---
+const DEFAULT_ROLES = ["Direction", "Qualité", "Secrétariat", "Pôle Stages", "Formateurs IFSI", "Formateurs IFAS"];
+
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
   static getDerivedStateFromError(error) { return { hasError: true, error }; }
   render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: "40px", fontFamily: "Outfit", color: "#1e3a5f", textAlign: "center" }}>
-          <h1 style={{ color: "#ef4444" }}>⚠️ L'application a rencontré une erreur</h1>
-          <p>Prenez une capture d'écran de ce message pour le diagnostic :</p>
-          <pre style={{ background: "#fef2f2", padding: "20px", border: "1px solid #fca5a5", borderRadius: "8px", color: "#991b1b", textAlign: "left", overflowX: "auto" }}>
-            {this.state.error?.toString()}
-          </pre>
-          <button onClick={() => window.location.reload()} style={{ padding: "10px 20px", background: "#1d4ed8", color: "white", borderRadius: "8px", border: "none", marginTop: "20px", cursor: "pointer" }}>Recharger l'application</button>
-        </div>
-      );
-    }
+    if (this.state.hasError) return (<div style={{ padding: "40px", textAlign: "center" }}><h1 style={{ color: "#ef4444" }}>⚠️ Erreur</h1><pre style={{ background: "#fef2f2", padding: "20px" }}>{this.state.error?.toString()}</pre><button onClick={() => window.location.reload()}>Recharger</button></div>);
     return this.props.children;
   }
 }
 
-// --- PALETTE DE COULEURS POUR LES RÔLES ---
 const ROLE_PALETTE = [
-  { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, // Bleu
-  { bg: "#dcfce7", border: "#86efac", text: "#166534" }, // Vert
-  { bg: "#fef3c7", border: "#fde68a", text: "#92400e" }, // Jaune/Orange
-  { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" }, // Violet
-  { bg: "#fee2e2", border: "#fca5a5", text: "#991b1b" }, // Rouge
-  { bg: "#ccfbf1", border: "#67e8f9", text: "#155e75" }, // Cyan
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, // Rose
-  { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" }  // Gris
+  { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, 
+  { bg: "#dcfce7", border: "#86efac", text: "#166534" }, 
+  { bg: "#fef3c7", border: "#fde68a", text: "#92400e" }, 
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" }, 
+  { bg: "#fee2e2", border: "#fca5a5", text: "#991b1b" }, 
+  { bg: "#ccfbf1", border: "#67e8f9", text: "#155e75" }, 
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, 
+  { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" }  
 ];
 
-function GaugeChart({ value, max, color }) {
-  const pct = max > 0 ? (value / max) * 100 : 0, r = 38, circ = 2 * Math.PI * r;
+function GaugeChart({ value, max, color, size = 96, fontSize = 15 }) {
+  const pct = max > 0 ? (value / max) * 100 : 0, r = (size/2) - 10, circ = 2 * Math.PI * r;
   return (
-    <svg width="96" height="96" viewBox="0 0 96 96">
-      <circle cx="48" cy="48" r={r} fill="none" stroke="#f1f5f9" strokeWidth="9" />
-      <circle cx="48" cy="48" r={r} fill="none" stroke={color} strokeWidth="9" strokeDasharray={circ} strokeDashoffset={circ - (pct / 100) * circ} strokeLinecap="round" transform="rotate(-90 48 48)" style={{ transition: "stroke-dashoffset 1s ease" }} />
-      <text x="48" y="52" textAnchor="middle" fill="#1e3a5f" fontSize="15" fontWeight="700" fontFamily="Outfit">{Math.round(pct)}%</text>
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`}>
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke="#f1f5f9" strokeWidth={size*0.09} />
+      <circle cx={size/2} cy={size/2} r={r} fill="none" stroke={color} strokeWidth={size*0.09} strokeDasharray={circ} strokeDashoffset={circ - (pct / 100) * circ} strokeLinecap="round" transform={`rotate(-90 ${size/2} ${size/2})`} style={{ transition: "stroke-dashoffset 1s ease" }} />
+      <text x={size/2} y={(size/2)+4} textAnchor="middle" fill="#1e3a5f" fontSize={fontSize} fontWeight="700" fontFamily="Outfit">{Math.round(pct)}%</text>
     </svg>
   );
 }
@@ -76,6 +65,7 @@ function MainApp() {
 
   const [ifsiList, setIfsiList] = useState([]);
   const [ifsiData, setIfsiData] = useState(null);
+  const [allQualiopiData, setAllQualiopiData] = useState({}); // Pour le Superadmin
 
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
@@ -89,7 +79,7 @@ function MainApp() {
     const unsubIfsi = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = [];
       snapshot.forEach(doc => list.push({ id: doc.id, name: doc.data().name }));
-      if (list.length === 0) setDoc(doc(db, "etablissements", "demo_ifps_cham"), { name: "IFPS du CHAM" });
+      if (list.length === 0) setDoc(doc(db, "etablissements", "demo_ifps_cham"), { name: "IFPS du CHAM", roles: DEFAULT_ROLES });
       else { list.sort((a, b) => a.name.localeCompare(b.name)); setIfsiList(list); }
     });
     return () => unsubIfsi();
@@ -107,6 +97,15 @@ function MainApp() {
              setUserProfile(profile);
              setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
              if (profile.role === "admin" || profile.role === "superadmin") loadTeamUsers(profile.role, profile.etablissementId);
+             
+             // Si c'est le superadmin, on charge toutes les données de tous les IFSI pour la Tour de Contrôle
+             if (profile.role === "superadmin") {
+                onSnapshot(collection(db, "qualiopi"), (snap) => {
+                  const data = {};
+                  snap.forEach(d => { data[d.id] = d.data(); });
+                  setAllQualiopiData(data);
+                });
+             }
           } else setUserProfile(profile);
         } catch (err) { console.error(err); }
       } else { setIsLoggedIn(false); setUserProfile(null); setSelectedIfsi(null); }
@@ -163,11 +162,14 @@ function MainApp() {
       if (nomEtablissement && nomEtablissement.trim() !== "") {
         const safeId = nomEtablissement.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 10000);
         try {
-          await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim(), roles: [], manualUsers: [] });
+          await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim(), roles: DEFAULT_ROLES, manualUsers: [] });
           setSelectedIfsi(safeId);
         } catch (error) { alert("Erreur."); }
       }
-    } else setSelectedIfsi(e.target.value);
+    } else {
+      setSelectedIfsi(e.target.value);
+      setActiveTab("dashboard");
+    }
   }
 
   async function loadTeamUsers(role, currentIfsi) {
@@ -194,7 +196,8 @@ function MainApp() {
   ].sort((a,b) => a.name.localeCompare(b.name));
 
   function getRoleColor(roleName) {
-    const index = orgRoles.indexOf(roleName);
+    if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; // VIP Noir/Bleu foncé
+    const index = orgRoles.filter(r => r !== "Direction").indexOf(roleName);
     if (index === -1) return ROLE_PALETTE[7];
     return ROLE_PALETTE[index % ROLE_PALETTE.length];
   }
@@ -270,6 +273,10 @@ function MainApp() {
     }
   }
 
+  function applyDefaultRoles() {
+    setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...new Set([...orgRoles, ...DEFAULT_ROLES])] }, { merge: true });
+  }
+
   async function handleCreateUser() {
     if (!newMember.email || !newMember.pwd) return alert("Requis.");
     if (newMember.pwd.length < 6) return alert("Mot de passe : 6 min.");
@@ -329,6 +336,25 @@ function MainApp() {
     }
   }
 
+  function getIfsiGlobalStats(ifsiId) {
+    const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
+    const data = allQualiopiData[docId];
+    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0 };
+    
+    let liste = [];
+    if (data.campaigns && data.campaigns.length > 0) liste = data.campaigns[data.campaigns.length - 1].liste;
+    else if (data.liste) liste = data.liste;
+    else return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0 };
+
+    const nbConcerne = liste.filter(c => c.statut !== "non-concerne").length;
+    const total = nbConcerne === 0 ? 1 : nbConcerne;
+    const conforme = liste.filter(c => c.statut === "conforme").length;
+    const nonConforme = liste.filter(c => c.statut === "non-conforme").length;
+    const enCours = liste.filter(c => c.statut === "en-cours").length;
+
+    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0 };
+  }
+
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
   if (userProfile?.role === "guest") return (<div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f8fafc", fontFamily: "Outfit" }}><div style={{ fontSize: "50px", marginBottom: "20px" }}>🔒</div><h2 style={{ color: "#1e3a5f" }}>Accès en attente</h2><p style={{ color: "#6b7280", marginBottom: "30px" }}>Votre compte a bien été authentifié, mais vous n'êtes rattaché à aucun établissement.</p><button onClick={handleLogout} style={{ padding: "10px 20px", background: "#ef4444", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Se déconnecter</button></div>);
@@ -346,15 +372,6 @@ function MainApp() {
     if (isArchive) return; 
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
     setModalCritere(null);
-  }
-
-  function handleEditAuditDate() {
-    if (isArchive) return;
-    const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
-    if (newDate) {
-      if (isNaN(new Date(newDate).getTime())) return alert("Format invalide.");
-      saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c));
-    }
   }
 
   const today = new Date();
@@ -424,6 +441,7 @@ function MainApp() {
         @media print { .no-print { display: none !important; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: portrait; margin: 10mm; } * { box-shadow: none !important; } .print-break-avoid { page-break-inside: avoid; } }
         .org-card { background: white; border: 1px solid #d1d5db; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; cursor: grab; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .org-card:active { cursor: grabbing; opacity: 0.7; }
+        .td-dash:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
       `}</style>
       
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} />}
@@ -458,6 +476,12 @@ function MainApp() {
             </div>
           </div>
           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
+            
+            {/* 👉 BOUTON TOUR DE CONTROLE (SUPERADMIN UNIQUEMENT) */}
+            {userProfile?.role === "superadmin" && (
+              <button style={{ ...navBtn(activeTab === "tour_controle"), marginRight: "8px", border: "1px solid #6366f1", color: activeTab === "tour_controle" ? "white" : "#4f46e5", background: activeTab === "tour_controle" ? "#6366f1" : "#e0e7ff" }} onClick={() => setActiveTab("tour_controle")}>🛸 Tour de Contrôle</button>
+            )}
+
             <button style={navBtn(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>Tableau de bord</button>
             <button style={navBtn(activeTab === "criteres")} onClick={() => setActiveTab("criteres")}>Indicateurs</button>
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Axes prioritaires</button>
@@ -467,7 +491,7 @@ function MainApp() {
               <button style={{ ...navBtn(activeTab === "organigramme"), marginLeft: "8px", border: "1px solid #10b981", color: activeTab === "organigramme" ? "white" : "#059669", background: activeTab === "organigramme" ? "#10b981" : "#d1fae5" }} onClick={() => setActiveTab("organigramme")}>🌳 Organigramme</button>
             )}
             {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
-              <button style={{ ...navBtn(activeTab === "equipe"), border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Créer un compte</button>
+              <button style={{ ...navBtn(activeTab === "equipe"), border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Comptes</button>
             )}
             
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
@@ -488,6 +512,52 @@ function MainApp() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
+        {/* ========================================================= */}
+        {/* 👉 NOUVEL ONGLET : TOUR DE CONTRÔLE (SUPERADMIN SEUL) */}
+        {/* ========================================================= */}
+        {activeTab === "tour_controle" && userProfile?.role === "superadmin" && (
+          <div>
+            <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
+              <div>
+                <h2 style={{ fontSize: "24px", fontWeight: "800", color: "#312e81", margin: "0 0 4px" }}>🛸 Tour de Contrôle Nationale</h2>
+                <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>Supervision en direct de l'avancement de tous les établissements.</p>
+              </div>
+            </div>
+
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(340px, 1fr))", gap: "20px" }}>
+              {ifsiList.map(ifsi => {
+                const s = getIfsiGlobalStats(ifsi.id);
+                return (
+                  <div key={ifsi.id} className="td-dash" style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #e0e7ff", background: "white", transition: "all 0.2s ease" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
+                      <div>
+                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px 0" }}>{ifsi.name}</h3>
+                        <span style={{ fontSize: "11px", color: "#9ca3af", fontFamily: "monospace" }}>ID: {ifsi.id}</span>
+                      </div>
+                      <GaugeChart value={s.conforme} max={s.total} color={s.pct >= 80 ? "#10b981" : s.pct >= 50 ? "#f59e0b" : "#ef4444"} size={64} fontSize={12} />
+                    </div>
+
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginBottom: "20px" }}>
+                      <div style={{ background: "#fef2f2", padding: "10px", borderRadius: "8px", border: "1px solid #fca5a5" }}>
+                         <div style={{ fontSize: "20px", fontWeight: "800", color: "#991b1b" }}>{s.nonConforme}</div>
+                         <div style={{ fontSize: "10px", textTransform: "uppercase", fontWeight: "700", color: "#ef4444" }}>Non conformes</div>
+                      </div>
+                      <div style={{ background: "#fef3c7", padding: "10px", borderRadius: "8px", border: "1px solid #fde68a" }}>
+                         <div style={{ fontSize: "20px", fontWeight: "800", color: "#92400e" }}>{s.enCours}</div>
+                         <div style={{ fontSize: "10px", textTransform: "uppercase", fontWeight: "700", color: "#d97706" }}>En cours</div>
+                      </div>
+                    </div>
+
+                    <button onClick={() => { setSelectedIfsi(ifsi.id); setActiveTab("dashboard"); }} style={{ width: "100%", padding: "10px", background: "linear-gradient(135deg, #4f46e5, #6366f1)", color: "white", borderRadius: "8px", border: "none", fontWeight: "700", cursor: "pointer", display: "flex", justifyContent: "center", alignItems: "center", gap: "8px" }}>
+                      <span>🔎 Accéder au portail</span>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* --- ONGLET : ORGANIGRAMME --- */}
         {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
@@ -496,9 +566,32 @@ function MainApp() {
               <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Glissez le personnel dans les colonnes. Une personne peut être glissée dans plusieurs colonnes (Double casquette).</p>
             </div>
 
+            {orgRoles.length === 0 && (
+              <button onClick={applyDefaultRoles} style={{ marginBottom: "20px", background: "#10b981", color: "white", padding: "10px 20px", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}>✨ Générer les rôles standards (Direction, Qualité...)</button>
+            )}
+
+            {/* 👉 LE BLOC VIP "DIRECTION" HORIZONTAL */}
+            {orgRoles.includes("Direction") && (
+              <div style={{ background: "#1e3a5f", borderRadius: "12px", padding: "16px", marginBottom: "24px", boxShadow: "0 4px 10px rgba(0,0,0,0.1)" }} onDragOver={handleDragOverOrg} onDrop={(e) => handleDropOrg(e, "Direction")}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px", borderBottom: "1px solid #334155", paddingBottom: "8px" }}>
+                  <span style={{ fontSize: "14px", fontWeight: "800", color: "white", textTransform: "uppercase" }}>👑 Direction de l'Institut</span>
+                  <button onClick={() => deleteOrgRole("Direction")} style={{ background:"transparent", border:"1px solid #475569", color: "#94a3b8", borderRadius:"6px", cursor:"pointer", padding:"2px 6px", fontSize:"10px" }}>Supprimer</button>
+                </div>
+                <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", minHeight: "45px" }}>
+                  {allIfsiMembers.filter(m => m.roles.includes("Direction")).map(m => (
+                    <div key={m.id} style={{ background: "white", border: "1px solid #e2e8f0", padding: "6px 12px", borderRadius: "8px", display: "flex", alignItems: "center", gap: "10px", fontSize: "13px", fontWeight: "700", color: "#1e3a5f" }}>
+                      <span>{m.type==="account"?"👤":"👻"} {m.name}</span>
+                      <button onClick={() => removeRoleFromUser(m.type, m.id, "Direction")} style={{ border: "none", background: "#fef2f2", color: "#ef4444", borderRadius: "50%", width: "18px", height: "18px", cursor: "pointer" }}>×</button>
+                    </div>
+                  ))}
+                  {allIfsiMembers.filter(m => m.roles.includes("Direction")).length === 0 && <span style={{ color: "#64748b", fontSize: "12px", fontStyle: "italic", alignSelf: "center" }}>Glissez le directeur / la directrice ici.</span>}
+                </div>
+              </div>
+            )}
+
             <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", overflowX: "auto", paddingBottom: "20px" }}>
-              <div style={{ width: "280px", flexShrink: 0, background: "#f8fafc", borderRadius: "12px", padding: "16px", border: "1px solid #e2e8f0", minHeight: "70vh" }}>
-                <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#475569", marginBottom: "16px", textTransform: "uppercase", borderBottom: "2px solid #cbd5e1", paddingBottom: "8px" }}>👥 Équipe de l'établissement</h3>
+              <div style={{ width: "280px", flexShrink: 0, background: "#f8fafc", borderRadius: "12px", padding: "16px", border: "1px solid #e2e8f0", minHeight: "60vh" }}>
+                <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#475569", marginBottom: "16px", textTransform: "uppercase", borderBottom: "2px solid #cbd5e1", paddingBottom: "8px" }}>👥 Équipe globale</h3>
                 
                 {allIfsiMembers.map(m => (
                   <div key={m.id} className="org-card" draggable onDragStart={(e) => handleDragStartOrg(e, m.type, m.id)} style={{ borderLeft: m.roles.length===0 ? "4px solid #f59e0b" : "1px solid #d1d5db" }}>
@@ -523,7 +616,8 @@ function MainApp() {
                 </div>
               </div>
 
-              {orgRoles.map((role) => {
+              {/* COLONNES DES RÔLES (SANS LA DIRECTION) */}
+              {orgRoles.filter(r => r !== "Direction").map((role) => {
                 const colConf = getRoleColor(role);
                 const peopleInRole = allIfsiMembers.filter(m => m.roles.includes(role));
 
@@ -549,7 +643,7 @@ function MainApp() {
 
               <div style={{ width: "260px", flexShrink: 0, background: "#f1f5f9", borderRadius: "12px", padding: "16px", border: "1px dashed #cbd5e1" }}>
                 <span style={{ fontSize: "12px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "12px" }}>+ NOUVEAU RÔLE / COLONNE</span>
-                <input type="text" value={newRoleInput} onChange={e => setNewRoleInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addOrgRole()} placeholder="Ex: Direction, Pôle Stage..." style={{ ...inp, padding: "8px", fontSize: "12px", marginBottom: "8px", width: "100%" }} />
+                <input type="text" value={newRoleInput} onChange={e => setNewRoleInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addOrgRole()} placeholder="Ex: Qualité..." style={{ ...inp, padding: "8px", fontSize: "12px", marginBottom: "8px", width: "100%" }} />
                 <button onClick={addOrgRole} disabled={!newRoleInput.trim()} style={{ width: "100%", background: "#1d4ed8", color: "white", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "bold", cursor: newRoleInput.trim() ? "pointer" : "not-allowed" }}>Créer la colonne</button>
               </div>
             </div>
@@ -741,7 +835,7 @@ function MainApp() {
           </div>
           
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
+            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /></div></div>
             <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
           </div>
         </>}
