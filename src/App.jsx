@@ -382,7 +382,7 @@ function MainApp() {
     items: criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(r)), 
   })).filter(r => r.items.length > 0);
 
-  // --- RESTAURATION COMPLÈTE DE LA FONCTION EXCEL ---
+  // --- FONCTION EXCEL RESTAURÉE ---
   async function exportToExcel() {
     if (!criteres) return;
     if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
@@ -473,6 +473,12 @@ function MainApp() {
 
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
             
+            {/* 👉 LES BOUTONS EXCEL ET PDF SONT DE RETOUR ICI ! */}
+            <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}>
+              <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px" }}><span>📊</span> Excel</button>
+              <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px" }}><span>📄</span> PDF</button>
+            </div>
+
             <div style={{ display: "flex", alignItems: "center", gap: "6px", marginLeft: "12px", paddingLeft: "12px", borderLeft: "2px solid #f1f5f9" }}>
                <button onClick={() => setActiveTab("compte")} style={{ ...navBtn(activeTab === "compte"), fontSize: "11px", border: "1px solid #d1d5db", background: "white", color: "#4b5563" }}>⚙️ Mon compte</button>
                <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444", fontSize: "11px", border: "1px solid #fca5a5", background: "#fef2f2" }}>Déconnexion</button>
