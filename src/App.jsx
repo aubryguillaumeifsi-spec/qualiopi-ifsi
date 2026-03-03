@@ -28,9 +28,9 @@ const ROLE_PALETTE = [
   { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" }  
 ];
 
-// Outils de dates mémorisés pour éviter les re-calculs
-const TODAY_DATE = new Date();
-const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - TODAY_DATE) / 86400000); };
+// 👉 CORRECTION ICI : la variable s'appelle bien "today" pour tout le monde
+const today = new Date();
+const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
 const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
 
 function GaugeChart({ value, max, color, size = 96, fontSize = 15 }) {
@@ -126,7 +126,6 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
-  // 👉 CORRECTION DE LA FUITE DE MÉMOIRE (Nettoyage de onSnapshot de l'équipe)
   useEffect(() => {
     let unsubUsers = null;
     if (selectedIfsi && userProfile && userProfile.role !== "guest") {
@@ -184,7 +183,6 @@ function MainApp() {
     } catch (e) { setSaveStatus("error"); setTimeout(() => setSaveStatus("idle"), 3000); }
   }
 
-  // 👉 OPTIMISATIONS USEMEMO (Arrête les recalculs intensifs)
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
@@ -300,7 +298,6 @@ function MainApp() {
 
   const totalUsersInNetwork = teamUsers.length; 
 
-  // --- FONCTIONS CLASSIQUES RESTANTES ---
   async function handleIfsiSwitch(e) {
     if (e.target.value === "NEW") {
       const nomEtablissement = prompt("Nom du nouvel établissement (ex: IFSI de Bordeaux) :");
@@ -528,12 +525,6 @@ function MainApp() {
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
   }
 
-  const handleSortTeam = (key) => {
-    let direction = "asc";
-    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc";
-    setTeamSortConfig({ key, direction });
-  };
-
   async function exportToExcel() {
     if (!criteres) return;
     if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
@@ -690,7 +681,9 @@ function MainApp() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
-        {/* --- ONGLET LIVRE BLANC --- */}
+        {/* ========================================================= */}
+        {/* 👉 ONGLET LIVRE BLANC                                     */}
+        {/* ========================================================= */}
         {activeTab === "livre_blanc" && (
           <div style={{ background: "white", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 10px rgba(0,0,0,0.05)", maxWidth: "900px", margin: "0 auto", color: "black", fontFamily: "Arial, sans-serif" }}>
             
@@ -1162,6 +1155,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- CRITERES --- */}
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -1188,6 +1182,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- AXES --- */}
         {activeTab === "axes" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
           {["non-conforme","en-cours"].map(st => {
@@ -1202,6 +1197,7 @@ function MainApp() {
           })}
         </>}
 
+        {/* --- RESPONSABLES --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
@@ -1243,6 +1239,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- COMPTE --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
