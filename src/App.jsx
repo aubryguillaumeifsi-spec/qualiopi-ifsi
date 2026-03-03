@@ -1,7 +1,8 @@
 import LoginPage from "./components/LoginPage";
 import DetailModal from "./components/DetailModal";
 import { useState, useEffect } from "react";
-import { getDoc, setDoc, doc, collection, getDocs } from "firebase/firestore";
+// 👉 AJOUT DE 'onSnapshot' ICI
+import { getDoc, setDoc, doc, collection, getDocs, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
@@ -49,7 +50,6 @@ export default function App() {
   const [modalCritere, setModalCritere] = useState(null);
   const [isAuditMode, setIsAuditMode] = useState(false);
 
-  // ÉTATS POUR LA GESTION D'ÉQUIPE
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
@@ -66,11 +66,9 @@ export default function App() {
           setUserProfile(profile);
           setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
           
-          // Si c'est un admin ou superadmin, on charge l'équipe de l'IFSI
           if (profile.role === "admin" || profile.role === "superadmin") {
             loadTeamUsers(profile.role, profile.etablissementId);
           }
-          
         } catch (err) {
           console.error("Erreur profil:", err);
           setSelectedIfsi("demo_ifps_cham");
@@ -85,47 +83,56 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  // 👉 LE NOUVEAU MOTEUR MULTI-JOUEUR EST ICI !
   useEffect(() => {
+    let unsubSnapshot = null; // Variable pour stocker la connexion en direct
+
     if (selectedIfsi) {
-      loadCampaigns(selectedIfsi);
-      // Met à jour la liste des utilisateurs si le superadmin change d'IFSI
       if (userProfile?.role === "superadmin") {
         loadTeamUsers("superadmin", selectedIfsi);
       }
+
+      setCampaigns(null); // Affichage du chargement lors d'un switch
+      const ref = getDocRef(selectedIfsi);
+      
+      // onSnapshot remplace getDoc : il écoute la BDD 24h/24 !
+      unsubSnapshot = onSnapshot(ref, (snap) => {
+        if (snap.exists()) {
+          const d = snap.data();
+          if (d.campaigns && d.campaigns.length > 0) {
+            setCampaigns(d.campaigns); 
+            // On s'assure de ne pas changer d'onglet si qqn d'autre sauvegarde
+            setActiveCampaignId(prev => {
+               if (prev && d.campaigns.some(c => c.id === prev)) return prev;
+               return d.campaigns[d.campaigns.length - 1].id;
+            });
+          } else if (d.liste) {
+            const mig = [{ id: Date.now().toString(), name: "Évaluation initiale", auditDate: "2026-10-15", liste: d.liste, locked: false }];
+            setCampaigns(mig); setActiveCampaignId(mig[0].id);
+          } else { initDefault(ref); }
+        } else { initDefault(ref); }
+      });
     }
-  }, [selectedIfsi]);
+
+    // Coupe la connexion en direct si on quitte l'IFSI pour éviter les bugs
+    return () => {
+      if (unsubSnapshot) unsubSnapshot();
+    };
+  }, [selectedIfsi, userProfile]);
 
   const getDocRef = (ifsiId) => {
     const docName = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
     return doc(db, "qualiopi", docName);
   };
 
-  async function loadCampaigns(ifsiId) {
-    setCampaigns(null); 
-    try {
-      const ref = getDocRef(ifsiId);
-      const snap = await getDoc(ref);
-      if (snap.exists()) {
-        const d = snap.data();
-        if (d.campaigns && d.campaigns.length > 0) {
-          setCampaigns(d.campaigns); setActiveCampaignId(d.campaigns[d.campaigns.length - 1].id);
-        } else if (d.liste) {
-          const mig = [{ id: Date.now().toString(), name: "Évaluation initiale", auditDate: "2026-10-15", liste: d.liste, locked: false }];
-          setCampaigns(mig); setActiveCampaignId(mig[0].id);
-        } else { initDefault(ref); }
-      } else { initDefault(ref); }
-    } catch (e) { initDefault(getDocRef(ifsiId)); }
-  }
-
   function initDefault(ref) {
     const def = [{ id: Date.now().toString(), name: "Évaluation initiale", auditDate: "2026-10-15", liste: DEFAULT_CRITERES, locked: false }];
-    setCampaigns(def); setActiveCampaignId(def[0].id);
     setDoc(ref, { campaigns: def, updatedAt: new Date().toISOString() }, { merge: true });
   }
 
   async function saveData(newCampaigns) {
     if (!selectedIfsi) return;
-    setCampaigns(newCampaigns); setSaveStatus("saving");
+    setSaveStatus("saving");
     try {
       await setDoc(getDocRef(selectedIfsi), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
       setSaveStatus("saved"); setTimeout(() => setSaveStatus("idle"), 2000);
@@ -134,15 +141,12 @@ export default function App() {
     }
   }
 
-  // --- FONCTIONS GESTION ÉQUIPE ---
   async function loadTeamUsers(role, currentIfsi) {
     try {
       const querySnapshot = await getDocs(collection(db, "users"));
       const usersList = [];
       querySnapshot.forEach((doc) => {
         const data = doc.data();
-        // Le superadmin voit l'équipe de l'IFSI qu'il est en train de consulter
-        // L'admin ne voit que son propre IFSI
         if (role === "superadmin" || data.etablissementId === currentIfsi) {
            if (data.etablissementId === currentIfsi || role === "superadmin") {
               usersList.push({ id: doc.id, ...data });
@@ -157,14 +161,10 @@ export default function App() {
     if (!newMember.email || !newMember.pwd) return alert("Email et mot de passe requis.");
     setIsCreatingUser(true);
     try {
-      // 1. Création silencieuse du compte (ne déconnecte pas l'admin)
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
       const newUid = userCredential.user.uid;
-
-      // 2. Définition de l'IFSI cible (forcé si on est juste admin)
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
 
-      // 3. Sauvegarde du profil dans Firestore
       await setDoc(doc(db, "users", newUid), {
         email: newMember.email,
         role: newMember.role,
@@ -173,9 +173,7 @@ export default function App() {
 
       alert(`✅ Le compte ${newMember.email} a été créé avec succès !`);
       setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
-      loadTeamUsers(userProfile.role, selectedIfsi); // Rafraîchit la liste
-      
-      // Déconnecte l'instance secondaire pour nettoyer
+      loadTeamUsers(userProfile.role, selectedIfsi); 
       secondaryAuth.signOut();
     } catch (error) {
       console.error(error);
@@ -291,7 +289,35 @@ export default function App() {
     items: criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(r)), 
   })).filter(r => r.items.length > 0);
 
-  async function exportToExcel() { /* ... function inchangée ... */ }
+  async function exportToExcel() {
+    if (!criteres) return;
+    if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
+    const workbook = new window.ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
+    worksheet.columns = [
+      { header: 'N°', key: 'num', width: 8 }, { header: 'Critère', key: 'critere', width: 12 }, { header: 'Indicateur', key: 'titre', width: 45 }, { header: 'Statut', key: 'statut', width: 18 },
+      { header: 'Échéance', key: 'delai', width: 14 }, { header: 'Responsable(s)', key: 'resp', width: 25 }, { header: 'Preuves finalisées', key: 'preuves', width: 50 },
+      { header: 'Preuves en cours', key: 'preuves_encours', width: 50 }, { header: 'Remarques Évaluateur', key: 'attendus', width: 45 }, { header: 'Notes internes', key: 'notes', width: 45 }
+    ];
+    const toArgb = (hex) => hex ? hex.replace('#', 'FF').toUpperCase() : 'FF000000';
+    criteres.forEach(c => {
+      const d = days(c.delai);
+      const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"];
+      const resps = Array.isArray(c.responsables) ? c.responsables : []; 
+      
+      const row = worksheet.addRow({
+        num: c.num || "", critere: `Critère ${c.critere || ""}`, titre: c.titre || "", statut: sConf.label, delai: c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR"),
+        resp: resps.map(r => String(r).split("(")[0].trim()).join("\n"), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || ""
+      });
+      const cConf = CRITERES_LABELS[c.critere] || { color: "#9ca3af" }; 
+      row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true }; row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' }; 
+      row.getCell('statut').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(sConf.bg) } }; row.getCell('statut').font = { color: { argb: toArgb(sConf.color) }, bold: true }; row.getCell('statut').alignment = { horizontal: 'center', vertical: 'middle' }; 
+      const cellDelai = row.getCell('delai'); if (!isNaN(d) && d < 0 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFDC2626' }, bold: true }; } else if (!isNaN(d) && d < 30 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFD97706' }, bold: true }; }
+    });
+    const headerRow = worksheet.getRow(1); headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; headerRow.alignment = { vertical: 'middle', horizontal: 'center' }; worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+    worksheet.eachRow((row, rowNumber) => { row.eachCell((cell) => { cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } }; if (rowNumber > 1) { if (!cell.alignment) { cell.alignment = { vertical: 'top', wrapText: true }; } else { cell.alignment.wrapText = true; } } }); });
+    const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  }
 
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", fontFamily: "Outfit,sans-serif", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap" });
   const card = { background: "white", border: "1px solid #e2e8f0", borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
@@ -347,13 +373,12 @@ export default function App() {
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Axes prioritaires</button>
             <button style={navBtn(activeTab === "responsables")} onClick={() => setActiveTab("responsables")}>Responsables</button>
             
-            {/* L'ONGLET ÉQUIPE APPARAIT SEULEMENT POUR LES ADMINS ET SUPERADMINS */}
             {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
               <button style={{ ...navBtn(activeTab === "equipe"), marginLeft: "8px", border: "1px dashed #bfdbfe", color: activeTab === "equipe" ? "white" : "#1d4ed8", background: activeTab === "equipe" ? "#1d4ed8" : "#eff6ff" }} onClick={() => setActiveTab("equipe")}>👥 Équipe IFSI</button>
             )}
 
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
-            <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}><button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px" }}><span>📄</span> PDF</button></div>
+            <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}><button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px" }}><span>📊</span> Excel</button><button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px" }}><span>📄</span> PDF</button></div>
             <button onClick={handleLogout} style={{ ...navBtn(false), color: "#9ca3af", fontSize: "12px", marginLeft: "8px", border: "1px solid #e2e8f0" }}>Déconnexion</button>
           </div>
         </div>
@@ -364,7 +389,6 @@ export default function App() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
-        {/* --- NOUVEL ONGLET GESTION DE L'ÉQUIPE --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -373,21 +397,16 @@ export default function App() {
             </div>
 
             <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", alignItems: "start" }}>
-              
-              {/* FORMULAIRE DE CRÉATION */}
               <div style={{ ...card, background: "#f8fafc" }}>
                 <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Inviter un membre</h3>
-                
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Email</label>
                   <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="formateur@ifsi.fr" />
                 </div>
-
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Mot de passe provisoire</label>
                   <input type="text" value={newMember.pwd} onChange={e => setNewMember({...newMember, pwd: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="Ex: Qualiopi2026!" />
                 </div>
-
                 <div style={{ marginBottom: "16px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Rôle</label>
                   <select value={newMember.role} onChange={e => setNewMember({...newMember, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px", background: "white" }}>
@@ -395,7 +414,6 @@ export default function App() {
                     <option value="admin">Administrateur IFSI (Peut inviter des gens)</option>
                   </select>
                 </div>
-
                 {userProfile.role === "superadmin" && (
                    <div style={{ marginBottom: "16px", background: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px dashed #fcd34d" }}>
                      <label style={{ fontSize: "11px", fontWeight: "800", color: "#d97706", textTransform: "uppercase" }}>👑 Choix IFSI (Mode Superadmin)</label>
@@ -404,18 +422,14 @@ export default function App() {
                      </select>
                    </div>
                 )}
-
                 <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ width: "100%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", padding: "10px", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: isCreatingUser ? "wait" : "pointer" }}>
                   {isCreatingUser ? "Création en cours..." : "Créer le compte"}
                 </button>
               </div>
 
-              {/* LISTE DES UTILISATEURS */}
               <div style={{ ...card, padding: 0, overflow: "hidden" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead>
-                    <tr><th style={th}>Email</th><th style={th}>Rôle</th>{userProfile.role === "superadmin" && <th style={th}>IFSI Attaché</th>}</tr>
-                  </thead>
+                  <thead><tr><th style={th}>Email</th><th style={th}>Rôle</th>{userProfile.role === "superadmin" && <th style={th}>IFSI Attaché</th>}</tr></thead>
                   <tbody>
                     {teamUsers.map(u => (
                       <tr key={u.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
@@ -425,21 +439,17 @@ export default function App() {
                           {u.role === "admin" && <span style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fed7aa" }}>ADMIN IFSI</span>}
                           {(u.role === "user" || !u.role) && <span style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #d1d5db" }}>FORMATEUR</span>}
                         </td>
-                        {userProfile.role === "superadmin" && (
-                          <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{IFSI_LIST.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>
-                        )}
+                        {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{IFSI_LIST.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
                       </tr>
                     ))}
                     {teamUsers.length === 0 && <tr><td colSpan="3" style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontStyle: "italic", fontSize: "13px" }}>Aucun utilisateur trouvé pour cet établissement.</td></tr>}
                   </tbody>
                 </table>
               </div>
-
             </div>
           </div>
         )}
 
-        {/* ... LE RESTE DU CODE (Dashboard, Kanban, etc...) RESTE EXACTEMENT LE MÊME ... */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -449,9 +459,7 @@ export default function App() {
                 <div style={{ fontSize: "12px", color: bannerConfig.color, opacity: 0.8, marginTop: "2px", fontWeight: "600" }}>Date officielle visée : {new Date(currentAuditDate).toLocaleDateString("fr-FR")}</div>
               </div>
             </div>
-            {!isArchive && (
-              <button onClick={handleEditAuditDate} style={{ background: "transparent", border: `1px solid ${bannerConfig.color}`, color: bannerConfig.color, padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", opacity: 0.7, transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>Modifier la date</button>
-            )}
+            {!isArchive && <button onClick={handleEditAuditDate} style={{ background: "transparent", border: `1px solid ${bannerConfig.color}`, color: bannerConfig.color, padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", opacity: 0.7, transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>Modifier la date</button>}
           </div>
 
           <div className="print-break-avoid no-print" style={{ ...card, marginBottom: "24px", padding: "20px 24px" }}>
@@ -459,14 +467,12 @@ export default function App() {
               <span>🚀 État d'avancement global</span>
               <span style={{ fontSize: "15px", color: "#1d4ed8", fontWeight: "800", background: "#eff6ff", padding: "4px 10px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>{Math.round((stats.conforme / stats.total) * 100) || 0}% Achevé</span>
             </h3>
-            
             <div style={{ display: "flex", height: "26px", borderRadius: "13px", overflow: "hidden", background: "#f1f5f9", gap: "3px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)" }}>
               <div style={{ width: `${(stats.conforme / stats.total) * 100}%`, background: "#10b981", transition: "width 0.8s ease" }} title={`Conforme: ${stats.conforme}`} />
               <div style={{ width: `${(stats.enCours / stats.total) * 100}%`, background: "#f59e0b", transition: "width 0.8s ease" }} title={`En cours: ${stats.enCours}`} />
               <div style={{ width: `${(stats.nonConforme / stats.total) * 100}%`, background: "#ef4444", transition: "width 0.8s ease" }} title={`Non conforme: ${stats.nonConforme}`} />
               <div style={{ width: `${(stats.nonEvalue / stats.total) * 100}%`, background: "#d1d5db", transition: "width 0.8s ease" }} title={`Non évalué: ${stats.nonEvalue}`} />
             </div>
-            
             <div style={{ display: "flex", gap: "20px", marginTop: "14px", fontSize: "12px", fontWeight: "700", flexWrap: "wrap", justifyContent: "center" }}>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#10b981" }}></span><span style={{ color: "#065f46" }}>{stats.conforme} Conformes ({Math.round((stats.conforme / stats.total) * 100) || 0}%)</span></div>
               <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#f59e0b" }}></span><span style={{ color: "#92400e" }}>{stats.enCours} En cours ({Math.round((stats.enCours / stats.total) * 100) || 0}%)</span></div>
