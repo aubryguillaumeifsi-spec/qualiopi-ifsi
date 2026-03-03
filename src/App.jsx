@@ -347,7 +347,7 @@ function MainApp() {
   }
 
   function deleteManualUser(idToDelete) {
-    if (window.confirm("Supprimer ce profil manuel ?")) {
+    if (window.confirm("Supprimer ce profil manuel de l'IFSI ?")) {
       setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true });
     }
   }
@@ -527,6 +527,34 @@ function MainApp() {
        newLogs.push({ date: now, user: userEmail, msg: `🚧 A modifié le texte de la zone de chantier` });
     }
 
+    const oldFiles = oldCritere.fichiers || [];
+    const newFiles = updated.fichiers || [];
+    newFiles.forEach(nf => {
+      const of = oldFiles.find(o => o.url === nf.url);
+      if (!of) newLogs.push({ date: now, user: userEmail, msg: `📎 A importé le fichier : ${nf.name}` });
+      else if (of.validated !== nf.validated) {
+        if (nf.validated) newLogs.push({ date: now, user: userEmail, msg: `✅ A validé le document comme preuve officielle : ${nf.name}` });
+        else newLogs.push({ date: now, user: userEmail, msg: `❌ A repassé en chantier le document : ${nf.name}` });
+      }
+    });
+    oldFiles.forEach(of => {
+      if (!newFiles.find(nf => nf.url === of.url)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le fichier : ${of.name}` });
+    });
+
+    const oldChemins = oldCritere.chemins_reseau || [];
+    const newChemins = updated.chemins_reseau || [];
+    newChemins.forEach(nc => {
+      const oc = oldChemins.find(o => o.chemin === nc.chemin);
+      if (!oc) newLogs.push({ date: now, user: userEmail, msg: `🔗 A ajouté le lien réseau : ${nc.nom}` });
+      else if (oc.validated !== nc.validated) {
+        if (nc.validated) newLogs.push({ date: now, user: userEmail, msg: `✅ A validé le lien réseau comme preuve officielle : ${nc.nom}` });
+        else newLogs.push({ date: now, user: userEmail, msg: `❌ A repassé en chantier le lien réseau : ${nc.nom}` });
+      }
+    });
+    oldChemins.forEach(oc => {
+      if (!newChemins.find(nc => nc.chemin === oc.chemin)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le lien réseau : ${oc.nom}` });
+    });
+
     let finalUpdated = { ...updated };
     if (newLogs.length > 0) {
       finalUpdated.historique = [...(oldCritere.historique || []), ...newLogs];
@@ -617,6 +645,10 @@ function MainApp() {
   const sel = { background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 10px", fontSize: "12px", cursor: "pointer" };
   const inp = { background: "white", border: "1px solid #d1d5db", borderRadius: "8px", outline: "none", boxSizing: "border-box", fontFamily: "Outfit, sans-serif" };
 
+  // 👉 LES LIGNES VITALES SONT DE RETOUR ICI !
+  const activeIfsis = ifsiList.filter(i => !i.archived);
+  const archivedIfsis = ifsiList.filter(i => i.archived);
+  
   const activeIfsisStats = activeIfsis.map(i => ({ id: i.id, name: i.name, ...getIfsiGlobalStats(i.id) }));
   
   const sortedTourIfsis = [...activeIfsisStats].sort((a, b) => {
@@ -742,7 +774,6 @@ function MainApp() {
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginLeft: "auto" }}>
             <div style={{ display: "flex", gap: "6px" }}>
               <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
-              {/* 👉 NOUVEAU BOUTON LIVRE BLANC */}
               <button onClick={() => setActiveTab("livre_blanc")} style={{ ...navBtn(activeTab === "livre_blanc"), color: activeTab === "livre_blanc" ? "white" : "#4f46e5", background: activeTab === "livre_blanc" ? "#4f46e5" : "#e0e7ff", fontSize: "12px", border: "1px solid #6366f1", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📘</span> Livre Blanc</button>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: "6px", paddingLeft: "10px", borderLeft: "2px solid #f1f5f9" }}>
@@ -761,7 +792,7 @@ function MainApp() {
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
         {/* ========================================================= */}
-        {/* 👉 NOUVEAU : ONGLET LIVRE BLANC                           */}
+        {/* 👉 ONGLET LIVRE BLANC                                     */}
         {/* ========================================================= */}
         {activeTab === "livre_blanc" && (
           <div style={{ background: "white", padding: "40px", borderRadius: "12px", boxShadow: "0 4px 10px rgba(0,0,0,0.05)", maxWidth: "900px", margin: "0 auto", color: "black", fontFamily: "Arial, sans-serif" }}>
@@ -780,13 +811,13 @@ function MainApp() {
             </div>
 
             {/* Liste des critères */}
-            {criteres.sort((a,b) => parseInt(a.num) - parseInt(b.num)).map(c => {
+            {criteres.slice().sort((a,b) => parseInt(a.num) - parseInt(b.num)).map(c => {
                const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
                const validFiles = (c.fichiers || []).filter(f => f.validated);
                const validChemins = (c.chemins_reseau || []).filter(ch => ch.validated);
                const hasPreuves = validFiles.length > 0 || validChemins.length > 0 || (c.preuves && c.preuves.trim());
                
-               // Optionnel : ne pas afficher les "non-concernés" pour épurer le PDF
+               // Optionnel : masquer les "non-concernés" pour épurer le PDF
                if (c.statut === "non-concerne") return null; 
 
                return (
