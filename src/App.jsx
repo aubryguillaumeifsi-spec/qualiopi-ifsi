@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import LoginPage from "./components/LoginPage";
 import DetailModal from "./components/DetailModal";
 import { getDoc, setDoc, deleteDoc, doc, collection, getDocs, onSnapshot } from "firebase/firestore";
@@ -27,6 +27,11 @@ const ROLE_PALETTE = [
   { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, 
   { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" }  
 ];
+
+// Outils de dates mémorisés pour éviter les re-calculs
+const TODAY_DATE = new Date();
+const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - TODAY_DATE) / 86400000); };
+const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
 
 function GaugeChart({ value, max, color, size = 96, fontSize = 15 }) {
   const pct = max > 0 ? (value / max) * 100 : 0, r = (size/2) - 10, circ = 2 * Math.PI * r;
@@ -77,6 +82,7 @@ function MainApp() {
 
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
+
   const [tourSort, setTourSort] = useState("urgence");
 
   useEffect(() => {
@@ -104,7 +110,6 @@ function MainApp() {
              profile = userSnap.data();
              setUserProfile(profile);
              setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
-             if (profile.role === "admin" || profile.role === "superadmin") loadTeamUsers(profile.role, profile.etablissementId);
              
              if (profile.role === "superadmin") {
                 onSnapshot(collection(db, "qualiopi"), (snap) => {
@@ -121,12 +126,28 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
+  // 👉 CORRECTION DE LA FUITE DE MÉMOIRE (Nettoyage de onSnapshot de l'équipe)
+  useEffect(() => {
+    let unsubUsers = null;
+    if (selectedIfsi && userProfile && userProfile.role !== "guest") {
+      unsubUsers = onSnapshot(collection(db, "users"), (snapshot) => {
+         const usersList = [];
+         snapshot.forEach((doc) => {
+           const data = doc.data();
+           if (data.etablissementId === selectedIfsi || userProfile.role === "superadmin") {
+             usersList.push({ id: doc.id, ...data });
+           }
+         });
+         setTeamUsers(usersList.filter(u => userProfile.role === "superadmin" ? true : u.etablissementId === selectedIfsi));
+      });
+    }
+    return () => { if (unsubUsers) unsubUsers(); };
+  }, [selectedIfsi, userProfile]);
+
   useEffect(() => {
     let unsubSnapshot = null; let unsubIfsiDoc = null;
     if (selectedIfsi && userProfile?.role !== "guest" && !userProfile?.mustChangePassword) {
-      if (userProfile?.role === "superadmin") loadTeamUsers("superadmin", selectedIfsi);
       setCampaigns(null); 
-      
       unsubSnapshot = onSnapshot(getDocRef(selectedIfsi), (snap) => {
         if (snap.exists()) {
           const d = snap.data();
@@ -163,72 +184,152 @@ function MainApp() {
     } catch (e) { setSaveStatus("error"); setTimeout(() => setSaveStatus("idle"), 3000); }
   }
 
+  // 👉 OPTIMISATIONS USEMEMO (Arrête les recalculs intensifs)
+  const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
+  const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
+  const isArchive = currentCampaign?.locked || false;
+  const currentAuditDate = currentCampaign?.auditDate || "2026-10-15"; 
+
+  const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
+  const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
+  const orgAccounts = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" && u.etablissementId === selectedIfsi), [teamUsers, selectedIfsi]);
+
+  const allIfsiMembers = useMemo(() => {
+    return [
+      ...orgAccounts.map(u => ({ id: u.id, name: u.email.split('@')[0], roles: Array.isArray(u.orgRoles) ? u.orgRoles : (u.orgRole ? [u.orgRole] : []), type: 'account', email: u.email })),
+      ...manualUsers.map(u => ({ id: u.id, name: u.name, roles: Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []), type: 'manual' }))
+    ].sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""))); 
+  }, [orgAccounts, manualUsers]);
+
+  const { stats, urgents, filtered, axes } = useMemo(() => {
+    const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
+    const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; 
+
+    const st = { total: baseTotal, conforme: criteres.filter(c => c.statut === "conforme").length, enCours: criteres.filter(c => c.statut === "en-cours").length, nonConforme: criteres.filter(c => c.statut === "non-conforme").length, nonEvalue: criteres.filter(c => c.statut === "non-evalue").length, nonConcerne: criteres.filter(c => c.statut === "non-concerne").length };
+    const urg = criteres.filter(c => { const d = days(c.delai); return !isNaN(d) && d <= 30 && c.statut !== "conforme" && c.statut !== "non-evalue" && c.statut !== "non-concerne"; });
+    const filt = criteres.filter(c => { if (filterStatut !== "tous" && c.statut !== filterStatut) return false; if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false; if (searchTerm) { const s = searchTerm.toLowerCase(); return String(c.titre||"").toLowerCase().includes(s) || String(c.num||"").toLowerCase().includes(s); } return true; });
+    const ax = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]));
+    return { stats: st, urgents: urg, filtered: filt, axes: ax };
+  }, [criteres, filterStatut, filterCritere, searchTerm]);
+
+  const byPerson = useMemo(() => {
+    return allIfsiMembers.map(m => {
+      const myCriteres = criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(m.name));
+      return { ...m, items: myCriteres };
+    }).filter(p => p.items.length > 0 || p.roles.length > 0);
+  }, [allIfsiMembers, criteres]);
+
+  const getIfsiGlobalStats = useCallback((ifsiId) => {
+    const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
+    const data = allQualiopiData[docId];
+    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate: "2026-10-15", liste: [] };
+    
+    let liste = [];
+    let auditDate = "2026-10-15";
+
+    if (data.campaigns && data.campaigns.length > 0) {
+      const currentCamp = data.campaigns[data.campaigns.length - 1];
+      liste = currentCamp.liste;
+      auditDate = currentCamp.auditDate || "2026-10-15";
+    } else if (data.liste) {
+      liste = data.liste;
+    } else return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate, liste: [] };
+
+    const nbConcerne = liste.filter(c => c.statut !== "non-concerne").length;
+    const total = nbConcerne === 0 ? 1 : nbConcerne;
+    const conforme = liste.filter(c => c.statut === "conforme").length;
+    const nonConforme = liste.filter(c => c.statut === "non-conforme").length;
+    const enCours = liste.filter(c => c.statut === "en-cours").length;
+
+    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate, liste };
+  }, [allQualiopiData]);
+
+  const { activeIfsisStats, globalScore, topAlerts, activeIfsis, archivedIfsis } = useMemo(() => {
+    const active = ifsiList.filter(i => !i.archived);
+    const archived = ifsiList.filter(i => i.archived);
+    
+    const statsArr = active.map(i => ({ id: i.id, name: i.name, ...getIfsiGlobalStats(i.id) }));
+    const score = statsArr.length > 0 ? Math.round(statsArr.reduce((acc, curr) => acc + curr.pct, 0) / statsArr.length) : 0;
+    
+    let alerts = [];
+    statsArr.forEach(ifsiStat => {
+      if (ifsiStat.liste) {
+        ifsiStat.liste.forEach(c => {
+          if (c.statut === "non-conforme") alerts.push({ ifsiId: ifsiStat.id, ifsiName: ifsiStat.name, critere: c, type: "non-conforme" });
+          else if (c.statut !== "conforme" && c.statut !== "non-concerne") {
+            const daysLeft = days(c.delai);
+            if (!isNaN(daysLeft) && daysLeft < 0) alerts.push({ ifsiId: ifsiStat.id, ifsiName: ifsiStat.name, critere: c, type: "depasse", days: Math.abs(daysLeft) });
+          }
+        });
+      }
+    });
+    return { activeIfsis: active, archivedIfsis: archived, activeIfsisStats: statsArr, globalScore: score, topAlerts: alerts.slice(0, 12) };
+  }, [ifsiList, getIfsiGlobalStats]);
+
+  const sortedTourIfsis = useMemo(() => {
+    return [...activeIfsisStats].sort((a, b) => {
+      if (tourSort === "urgence") return (new Date(a.auditDate).getTime() || 0) - (new Date(b.auditDate).getTime() || 0);
+      if (tourSort === "score_desc") return b.pct - a.pct;
+      if (tourSort === "score_asc") return a.pct - b.pct;
+      if (tourSort === "alpha") return String(a.name || "").localeCompare(String(b.name || ""));
+      return 0;
+    });
+  }, [activeIfsisStats, tourSort]);
+
+  const sortedTeamUsers = useMemo(() => {
+    const filteredUsers = teamUsers.filter(u => {
+      if (!teamSearchTerm) return true;
+      const sLower = teamSearchTerm.toLowerCase();
+      const eMatch = (u.email || "").toLowerCase().includes(sLower);
+      const ifsiName = ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId || "";
+      return eMatch || ifsiName.toLowerCase().includes(sLower);
+    });
+    return filteredUsers.sort((a, b) => {
+      let valA = ""; let valB = "";
+      if (teamSortConfig.key === "email") { valA = a.email || ""; valB = b.email || ""; }
+      else if (teamSortConfig.key === "role") { valA = a.role || "user"; valB = b.role || "user"; }
+      else if (teamSortConfig.key === "ifsi") { 
+        valA = ifsiList.find(i => i.id === a.etablissementId)?.name || a.etablissementId || ""; 
+        valB = ifsiList.find(i => i.id === b.etablissementId)?.name || b.etablissementId || ""; 
+      }
+      if (valA < valB) return teamSortConfig.direction === "asc" ? -1 : 1;
+      if (valA > valB) return teamSortConfig.direction === "asc" ? 1 : -1;
+      return 0;
+    });
+  }, [teamUsers, teamSearchTerm, teamSortConfig, ifsiList]);
+
+  const totalUsersInNetwork = teamUsers.length; 
+
+  // --- FONCTIONS CLASSIQUES RESTANTES ---
   async function handleIfsiSwitch(e) {
     if (e.target.value === "NEW") {
       const nomEtablissement = prompt("Nom du nouvel établissement (ex: IFSI de Bordeaux) :");
       if (nomEtablissement && nomEtablissement.trim() !== "") {
         const safeId = nomEtablissement.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 10000);
-        try {
-          await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim(), roles: DEFAULT_ROLES, manualUsers: [], archived: false });
-          setSelectedIfsi(safeId);
-          setActiveTab("dashboard");
-        } catch (error) { alert("Erreur."); }
+        try { await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim(), roles: DEFAULT_ROLES, manualUsers: [], archived: false }); setSelectedIfsi(safeId); setActiveTab("dashboard"); } catch (error) { alert("Erreur."); }
       }
-    } else {
-      setSelectedIfsi(e.target.value);
-      setActiveTab("dashboard");
-    }
+    } else { setSelectedIfsi(e.target.value); setActiveTab("dashboard"); }
   }
 
   async function handleRenameIfsi(ifsiId, currentName) {
     const newName = prompt(`Renommer l'établissement "${currentName}" :`, currentName);
     if (newName && newName.trim() !== "" && newName !== currentName) {
-      try {
-        await setDoc(doc(db, "etablissements", ifsiId), { name: newName.trim() }, { merge: true });
-      } catch (error) { alert("Erreur : " + error.message); }
+      try { await setDoc(doc(db, "etablissements", ifsiId), { name: newName.trim() }, { merge: true }); } catch (error) { alert("Erreur : " + error.message); }
     }
   }
 
   async function handleArchiveIfsi(ifsiId, name, archiveStatus) {
     const action = archiveStatus ? "archiver" : "restaurer";
     if (!window.confirm(`Voulez-vous vraiment ${action} l'établissement "${name}" ?`)) return;
-    try { await setDoc(doc(db, "etablissements", ifsiId), { archived: archiveStatus }, { merge: true }); } 
-    catch (e) { alert("Erreur : " + e.message); }
+    try { await setDoc(doc(db, "etablissements", ifsiId), { archived: archiveStatus }, { merge: true }); } catch (e) { alert("Erreur : " + e.message); }
   }
 
   async function handleHardDeleteIfsi(ifsiId, name) {
     const confirmText = prompt(`⚠️ ATTENTION DANGER DÉFINITIF ⚠️\n\nVous êtes sur le point de détruire "${name}".\nToutes les données seront perdues à jamais.\n\nPour confirmer, tapez le mot "SUPPRIMER" en majuscules :`);
     if (confirmText === "SUPPRIMER") {
-      try {
-        await deleteDoc(doc(db, "etablissements", ifsiId));
-        await deleteDoc(doc(db, "qualiopi", ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId));
-        if (selectedIfsi === ifsiId) setSelectedIfsi("demo_ifps_cham");
-        alert("L'établissement a été supprimé.");
-      } catch (e) { alert("Erreur : " + e.message); }
+      try { await deleteDoc(doc(db, "etablissements", ifsiId)); await deleteDoc(doc(db, "qualiopi", ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId)); if (selectedIfsi === ifsiId) setSelectedIfsi("demo_ifps_cham"); alert("L'établissement a été supprimé."); } catch (e) { alert("Erreur : " + e.message); }
     } else if (confirmText !== null) { alert("Annulé. Le mot de sécurité était incorrect."); }
   }
-
-  async function loadTeamUsers(role, currentIfsi) {
-    try {
-      onSnapshot(collection(db, "users"), (snapshot) => {
-         const usersList = [];
-         snapshot.forEach((doc) => {
-           const data = doc.data();
-           if (data.etablissementId === currentIfsi || role === "superadmin") usersList.push({ id: doc.id, ...data });
-         });
-         setTeamUsers(usersList.filter(u => role === "superadmin" ? true : u.etablissementId === currentIfsi));
-      });
-    } catch (e) { console.error(e); }
-  }
-
-  const orgRoles = ifsiData?.roles || [];
-  const manualUsers = ifsiData?.manualUsers || [];
-  const orgAccounts = teamUsers.filter(u => u.role !== "superadmin" && u.etablissementId === selectedIfsi);
-
-  const allIfsiMembers = [
-    ...orgAccounts.map(u => ({ id: u.id, name: u.email.split('@')[0], roles: Array.isArray(u.orgRoles) ? u.orgRoles : (u.orgRole ? [u.orgRole] : []), type: 'account', email: u.email })),
-    ...manualUsers.map(u => ({ id: u.id, name: u.name, roles: Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []), type: 'manual' }))
-  ].sort((a,b) => String(a.name || "").localeCompare(String(b.name || ""))); 
 
   function getRoleColor(roleName) {
     if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; 
@@ -310,37 +411,11 @@ function MainApp() {
     }
   }
 
-  function addOrgRole() {
-    const r = newRoleInput.trim();
-    if (r && !orgRoles.includes(r)) { setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, r] }, { merge: true }); setNewRoleInput(""); }
-  }
-
-  function deleteOrgRole(roleToDelete) {
-    const hasPeople = allIfsiMembers.some(m => m.roles.includes(roleToDelete));
-    if (hasPeople) return alert("⚠️ Impossible : Des personnes ont encore cette casquette. Retirez-les d'abord.");
-    if (window.confirm(`Supprimer la colonne "${roleToDelete}" ?`)) {
-      setDoc(doc(db, "etablissements", selectedIfsi), { roles: orgRoles.filter(r => r !== roleToDelete) }, { merge: true });
-    }
-  }
-
-  function addManualUser() {
-    const n = newManualUserInput.trim();
-    if (n) {
-      const newUser = { id: 'm_' + Date.now(), name: n, roles: [] };
-      setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
-      setNewManualUserInput("");
-    }
-  }
-
-  function deleteManualUser(idToDelete) {
-    if (window.confirm("Supprimer ce profil manuel ?")) {
-      setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true });
-    }
-  }
-
-  function applyDefaultRoles() {
-    setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...new Set([...orgRoles, ...DEFAULT_ROLES])] }, { merge: true });
-  }
+  function addOrgRole() { const r = newRoleInput.trim(); if (r && !orgRoles.includes(r)) { setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, r] }, { merge: true }); setNewRoleInput(""); } }
+  function deleteOrgRole(roleToDelete) { if (allIfsiMembers.some(m => m.roles.includes(roleToDelete))) return alert("⚠️ Impossible : Des personnes ont encore cette casquette."); if (window.confirm(`Supprimer la colonne "${roleToDelete}" ?`)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: orgRoles.filter(r => r !== roleToDelete) }, { merge: true }); }
+  function addManualUser() { const n = newManualUserInput.trim(); if (n) { setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, { id: 'm_' + Date.now(), name: n, roles: [] }] }, { merge: true }); setNewManualUserInput(""); } }
+  function deleteManualUser(idToDelete) { if (window.confirm("Supprimer ce profil manuel ?")) setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true }); }
+  function applyDefaultRoles() { setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...new Set([...orgRoles, ...DEFAULT_ROLES])] }, { merge: true }); }
 
   async function handleCreateUser() {
     if (!newMember.email || !newMember.pwd) return alert("Requis.");
@@ -350,29 +425,20 @@ function MainApp() {
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
       await setDoc(doc(db, "users", userCredential.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true });
-      alert(`✅ Compte créé !`);
-      setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
-      secondaryAuth.signOut();
+      alert(`✅ Compte créé !`); setNewMember({ email: "", pwd: "", role: "user", ifsi: "" }); secondaryAuth.signOut();
     } catch (error) { alert("Erreur : " + error.message); }
     setIsCreatingUser(false);
   }
 
-  async function handleDeleteUser(userId) {
-    if (!window.confirm(`Révoquer cet accès ?`)) return;
-    try { await deleteDoc(doc(db, "users", userId)); } catch (e) { alert(e.message); }
-  }
+  async function handleDeleteUser(userId) { if (!window.confirm(`Révoquer cet accès ?`)) return; try { await deleteDoc(doc(db, "users", userId)); } catch (e) { alert(e.message); } }
 
   async function handleChangePassword(e, isForced) {
-    e.preventDefault();
-    setPwdUpdate({ ...pwdUpdate, error: "", success: "", loading: true });
+    e.preventDefault(); setPwdUpdate({ ...pwdUpdate, error: "", success: "", loading: true });
     if (pwdUpdate.p1 !== pwdUpdate.p2) return setPwdUpdate({ ...pwdUpdate, error: "Ne correspond pas.", loading: false });
     if (pwdUpdate.p1.length < 8 || !/[A-Z]/.test(pwdUpdate.p1) || !/[0-9]/.test(pwdUpdate.p1)) return setPwdUpdate({ ...pwdUpdate, error: "8 car., 1 maj, 1 chiffre.", loading: false });
     try {
       await updatePassword(auth.currentUser, pwdUpdate.p1);
-      if (isForced) {
-        await setDoc(doc(db, "users", auth.currentUser.uid), { mustChangePassword: false }, { merge: true });
-        setUserProfile({ ...userProfile, mustChangePassword: false }); 
-      }
+      if (isForced) { await setDoc(doc(db, "users", auth.currentUser.uid), { mustChangePassword: false }, { merge: true }); setUserProfile({ ...userProfile, mustChangePassword: false }); }
       setPwdUpdate({ p1: "", p2: "", loading: false, error: "", success: "Succès !" });
     } catch (err) { setPwdUpdate({ ...pwdUpdate, error: err.message, loading: false }); }
   }
@@ -382,10 +448,7 @@ function MainApp() {
   function handleEditAuditDate() {
     if (isArchive) return;
     const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
-    if (newDate) {
-      if (isNaN(new Date(newDate).getTime())) return alert("Format invalide.");
-      saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c));
-    }
+    if (newDate && !isNaN(new Date(newDate).getTime())) saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c));
   }
 
   function handleNewCampaign(e) {
@@ -404,82 +467,8 @@ function MainApp() {
 
   function handleDeleteCampaign() {
     if (campaigns.length <= 1) return alert("Impossible de supprimer la dernière.");
-    if (window.confirm(`Supprimer cette évaluation ? IRRÉVERSIBLE.`)) {
-      const u = campaigns.filter(c => c.id !== activeCampaignId);
-      saveData(u); setActiveCampaignId(u[u.length - 1].id);
-    }
+    if (window.confirm(`Supprimer cette évaluation ? IRRÉVERSIBLE.`)) { const u = campaigns.filter(c => c.id !== activeCampaignId); saveData(u); setActiveCampaignId(u[u.length - 1].id); }
   }
-
-  const today = new Date();
-  const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
-  const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
-
-  function getIfsiGlobalStats(ifsiId) {
-    const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
-    const data = allQualiopiData[docId];
-    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate: "2026-10-15", liste: [] };
-    
-    let liste = [];
-    let auditDate = "2026-10-15";
-
-    if (data.campaigns && data.campaigns.length > 0) {
-      const currentCamp = data.campaigns[data.campaigns.length - 1];
-      liste = currentCamp.liste;
-      auditDate = currentCamp.auditDate || "2026-10-15";
-    } else if (data.liste) {
-      liste = data.liste;
-    } else {
-      return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate, liste: [] };
-    }
-
-    const nbConcerne = liste.filter(c => c.statut !== "non-concerne").length;
-    const total = nbConcerne === 0 ? 1 : nbConcerne;
-    const conforme = liste.filter(c => c.statut === "conforme").length;
-    const nonConforme = liste.filter(c => c.statut === "non-conforme").length;
-    const enCours = liste.filter(c => c.statut === "en-cours").length;
-
-    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate, liste };
-  }
-
-  if (!authChecked) return null;
-  if (!isLoggedIn) return <LoginPage />;
-  
-  if (userProfile?.role === "guest") return (<div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f8fafc", fontFamily: "Outfit" }}><div style={{ fontSize: "50px", marginBottom: "20px" }}>🔒</div><h2 style={{ color: "#1e3a5f" }}>Accès en attente</h2><p style={{ color: "#6b7280", marginBottom: "30px" }}>Votre compte a bien été authentifié, mais vous n'êtes rattaché à aucun établissement.</p><button onClick={handleLogout} style={{ padding: "10px 20px", background: "#ef4444", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Se déconnecter</button></div>);
-  if (userProfile?.mustChangePassword) return (<div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#f0f4ff,#e8f0fe)", fontFamily: "Outfit" }}><div style={{ background: "white", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 40px rgba(0,0,0,0.08)", maxWidth: "400px", width: "100%", textAlign: "center" }}><div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div><h2 style={{ color: "#1e3a5f", margin: "0 0 10px 0", fontSize: "22px", fontWeight: "800" }}>Sécurisez votre compte</h2><p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", lineHeight: "1.5" }}>Veuillez remplacer le mot de passe provisoire.</p><form onSubmit={e => handleChangePassword(e, true)}><input type="password" placeholder="Nouveau (8 car., 1 maj., 1 chiffre)" onChange={e=>setPwdUpdate({...pwdUpdate, p1: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "12px", boxSizing: "border-box" }} required /><input type="password" placeholder="Confirmer" onChange={e=>setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "16px", boxSizing: "border-box" }} required />{pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600" }}>{pwdUpdate.error}</div>}<button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: pwdUpdate.loading ? "wait" : "pointer" }}>{pwdUpdate.loading ? "Mise à jour..." : "Valider"}</button></form><button onClick={handleLogout} style={{ marginTop: "20px", background: "none", border: "none", color: "#9ca3af", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Se déconnecter</button></div></div>);
-
-  const currentIfsiObj = ifsiList.find(i => i.id === selectedIfsi);
-  if (currentIfsiObj?.archived && userProfile?.role !== "superadmin") {
-    return (
-      <div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f8fafc", fontFamily: "Outfit" }}>
-        <div style={{ fontSize: "50px", marginBottom: "20px" }}>📦</div>
-        <h2 style={{ color: "#1e3a5f" }}>Établissement Archivé</h2>
-        <p style={{ color: "#6b7280", marginBottom: "30px" }}>Cet espace a été suspendu par la direction.</p>
-        <button onClick={handleLogout} style={{ padding: "10px 20px", background: "#ef4444", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Se déconnecter</button>
-      </div>
-    );
-  }
-
-  const currentIfsiName = currentIfsiObj?.name || "Chargement...";
-  if (campaigns === null || activeCampaignId === null || ifsiList.length === 0) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700", background: "#f8fafc" }}>⏳ Chargement...</div>;
-
-  const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
-  const criteres = currentCampaign.liste || [];
-  const isArchive = currentCampaign.locked || false;
-  const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
-
-  const auditDateObj = new Date(currentAuditDate);
-  const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
-  let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
-  if (daysToAudit < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` };
-  else if (daysToAudit <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` };
-  
-  const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
-  const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; 
-
-  const stats = { total: baseTotal, conforme: criteres.filter(c => c.statut === "conforme").length, enCours: criteres.filter(c => c.statut === "en-cours").length, nonConforme: criteres.filter(c => c.statut === "non-conforme").length, nonEvalue: criteres.filter(c => c.statut === "non-evalue").length, nonConcerne: criteres.filter(c => c.statut === "non-concerne").length };
-  const urgents = criteres.filter(c => { const d = days(c.delai); return !isNaN(d) && d <= 30 && c.statut !== "conforme" && c.statut !== "non-evalue" && c.statut !== "non-concerne"; });
-  const filtered = criteres.filter(c => { if (filterStatut !== "tous" && c.statut !== filterStatut) return false; if (filterCritere !== "tous" && c.critere !== parseInt(filterCritere)) return false; if (searchTerm) { const s = searchTerm.toLowerCase(); return String(c.titre||"").toLowerCase().includes(s) || String(c.num||"").toLowerCase().includes(s); } return true; });
-  const axes = criteres.filter(c => c.statut === "non-conforme" || c.statut === "en-cours").sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]));
 
   function saveModal(updated, action) {
     if (isArchive) {
@@ -502,21 +491,28 @@ function MainApp() {
     
     const oldResps = Array.isArray(oldCritere.responsables) ? oldCritere.responsables.slice().sort().join(", ") : "";
     const newResps = Array.isArray(updated.responsables) ? updated.responsables.slice().sort().join(", ") : "";
-    if (oldResps !== newResps) {
-      newLogs.push({ date: now, user: userEmail, msg: `Responsables mis à jour : ${newResps || "Aucun"}` });
-    }
+    if (oldResps !== newResps) newLogs.push({ date: now, user: userEmail, msg: `Responsables mis à jour : ${newResps || "Aucun"}` });
+    if ((oldCritere.preuves || "") !== (updated.preuves || "")) newLogs.push({ date: now, user: userEmail, msg: `📝 A modifié le texte des justifications / liens publics` });
+    if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) newLogs.push({ date: now, user: userEmail, msg: `🚧 A modifié le texte de la zone de chantier` });
 
-    if ((oldCritere.preuves || "") !== (updated.preuves || "")) {
-       newLogs.push({ date: now, user: userEmail, msg: `📝 A modifié le texte des justifications / liens publics` });
-    }
-    if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) {
-       newLogs.push({ date: now, user: userEmail, msg: `🚧 A modifié le texte de la zone de chantier` });
-    }
+    const oldFiles = oldCritere.fichiers || []; const newFiles = updated.fichiers || [];
+    newFiles.forEach(nf => {
+      const of = oldFiles.find(o => o.url === nf.url);
+      if (!of) newLogs.push({ date: now, user: userEmail, msg: `📎 A importé le fichier : ${nf.name}` });
+      else if (of.validated !== nf.validated) newLogs.push({ date: now, user: userEmail, msg: nf.validated ? `✅ A validé le document comme preuve officielle : ${nf.name}` : `❌ A repassé en chantier le document : ${nf.name}` });
+    });
+    oldFiles.forEach(of => { if (!newFiles.find(nf => nf.url === of.url)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le fichier : ${of.name}` }); });
+
+    const oldChemins = oldCritere.chemins_reseau || []; const newChemins = updated.chemins_reseau || [];
+    newChemins.forEach(nc => {
+      const oc = oldChemins.find(o => o.chemin === nc.chemin);
+      if (!oc) newLogs.push({ date: now, user: userEmail, msg: `🔗 A ajouté le lien réseau : ${nc.nom}` });
+      else if (oc.validated !== nc.validated) newLogs.push({ date: now, user: userEmail, msg: nc.validated ? `✅ A validé le lien réseau comme preuve officielle : ${nc.nom}` : `❌ A repassé en chantier le lien réseau : ${nc.nom}` });
+    });
+    oldChemins.forEach(oc => { if (!newChemins.find(nc => nc.chemin === oc.chemin)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le lien réseau : ${oc.nom}` }); });
 
     let finalUpdated = { ...updated };
-    if (newLogs.length > 0) {
-      finalUpdated.historique = [...(oldCritere.historique || []), ...newLogs];
-    }
+    if (newLogs.length > 0) finalUpdated.historique = [...(oldCritere.historique || []), ...newLogs];
 
     const newCriteres = criteres.map(c => c.id === finalUpdated.id ? finalUpdated : c);
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
@@ -529,36 +525,8 @@ function MainApp() {
 
   function handleAutoSave(updated) {
     if (isArchive) return;
-    const newCriteres = criteres.map(c => c.id === updated.id ? updated : c);
-    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
+    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
   }
-
-  const byPerson = allIfsiMembers.map(m => {
-    const myCriteres = criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(m.name));
-    return { ...m, items: myCriteres };
-  }).filter(p => p.items.length > 0 || p.roles.length > 0);
-
-  const filteredTeamUsers = teamUsers.filter(u => {
-    if (!teamSearchTerm) return true;
-    const sLower = teamSearchTerm.toLowerCase();
-    const eMatch = (u.email || "").toLowerCase().includes(sLower);
-    const ifsiName = ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId || "";
-    const iMatch = ifsiName.toLowerCase().includes(sLower);
-    return eMatch || iMatch;
-  });
-
-  const sortedTeamUsers = [...filteredTeamUsers].sort((a, b) => {
-    let valA = ""; let valB = "";
-    if (teamSortConfig.key === "email") { valA = a.email || ""; valB = b.email || ""; }
-    else if (teamSortConfig.key === "role") { valA = a.role || "user"; valB = b.role || "user"; }
-    else if (teamSortConfig.key === "ifsi") { 
-      valA = ifsiList.find(i => i.id === a.etablissementId)?.name || a.etablissementId || ""; 
-      valB = ifsiList.find(i => i.id === b.etablissementId)?.name || b.etablissementId || ""; 
-    }
-    if (valA < valB) return teamSortConfig.direction === "asc" ? -1 : 1;
-    if (valA > valB) return teamSortConfig.direction === "asc" ? 1 : -1;
-    return 0;
-  });
 
   const handleSortTeam = (key) => {
     let direction = "asc";
@@ -603,42 +571,20 @@ function MainApp() {
   const sel = { background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 10px", fontSize: "12px", cursor: "pointer" };
   const inp = { background: "white", border: "1px solid #d1d5db", borderRadius: "8px", outline: "none", boxSizing: "border-box", fontFamily: "Outfit, sans-serif" };
 
-  const activeIfsis = ifsiList.filter(i => !i.archived);
-  const archivedIfsis = ifsiList.filter(i => i.archived);
-  
-  const activeIfsisStats = activeIfsis.map(i => ({ id: i.id, name: i.name, ...getIfsiGlobalStats(i.id) }));
-  
-  const sortedTourIfsis = [...activeIfsisStats].sort((a, b) => {
-    if (tourSort === "urgence") {
-      const dateA = new Date(a.auditDate).getTime() || 0;
-      const dateB = new Date(b.auditDate).getTime() || 0;
-      return dateA - dateB;
-    }
-    if (tourSort === "score_desc") return b.pct - a.pct;
-    if (tourSort === "score_asc") return a.pct - b.pct;
-    if (tourSort === "alpha") return String(a.name || "").localeCompare(String(b.name || ""));
-    return 0;
-  });
+  if (!authChecked) return null;
+  if (!isLoggedIn) return <LoginPage />;
+  if (userProfile?.role === "guest") return (<div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f8fafc", fontFamily: "Outfit" }}><div style={{ fontSize: "50px", marginBottom: "20px" }}>🔒</div><h2 style={{ color: "#1e3a5f" }}>Accès en attente</h2><p style={{ color: "#6b7280", marginBottom: "30px" }}>Votre compte a bien été authentifié, mais vous n'êtes rattaché à aucun établissement.</p><button onClick={handleLogout} style={{ padding: "10px 20px", background: "#ef4444", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Se déconnecter</button></div>);
+  if (userProfile?.mustChangePassword) return (<div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#f0f4ff,#e8f0fe)", fontFamily: "Outfit" }}><div style={{ background: "white", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 40px rgba(0,0,0,0.08)", maxWidth: "400px", width: "100%", textAlign: "center" }}><div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div><h2 style={{ color: "#1e3a5f", margin: "0 0 10px 0", fontSize: "22px", fontWeight: "800" }}>Sécurisez votre compte</h2><p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", lineHeight: "1.5" }}>Veuillez remplacer le mot de passe provisoire.</p><form onSubmit={e => handleChangePassword(e, true)}><input type="password" placeholder="Nouveau (8 car., 1 maj., 1 chiffre)" onChange={e=>setPwdUpdate({...pwdUpdate, p1: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "12px", boxSizing: "border-box" }} required /><input type="password" placeholder="Confirmer" onChange={e=>setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "16px", boxSizing: "border-box" }} required />{pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600" }}>{pwdUpdate.error}</div>}<button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: pwdUpdate.loading ? "wait" : "pointer" }}>{pwdUpdate.loading ? "Mise à jour..." : "Valider"}</button></form><button onClick={handleLogout} style={{ marginTop: "20px", background: "none", border: "none", color: "#9ca3af", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Se déconnecter</button></div></div>);
 
-  const globalScore = activeIfsisStats.length > 0 ? Math.round(activeIfsisStats.reduce((acc, curr) => acc + curr.pct, 0) / activeIfsisStats.length) : 0;
-  const totalUsersInNetwork = teamUsers.length; 
+  const currentIfsiObj = ifsiList.find(i => i.id === selectedIfsi);
+  if (currentIfsiObj?.archived && userProfile?.role !== "superadmin") return (<div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f8fafc", fontFamily: "Outfit" }}><div style={{ fontSize: "50px", marginBottom: "20px" }}>📦</div><h2 style={{ color: "#1e3a5f" }}>Établissement Archivé</h2><p style={{ color: "#6b7280", marginBottom: "30px" }}>Cet espace a été suspendu par la direction.</p><button onClick={handleLogout} style={{ padding: "10px 20px", background: "#ef4444", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Se déconnecter</button></div>);
 
-  let globalAlerts = [];
-  activeIfsisStats.forEach(ifsiStat => {
-    if (ifsiStat.liste) {
-      ifsiStat.liste.forEach(c => {
-        if (c.statut === "non-conforme") {
-          globalAlerts.push({ ifsiId: ifsiStat.id, ifsiName: ifsiStat.name, critere: c, type: "non-conforme" });
-        } else if (c.statut !== "conforme" && c.statut !== "non-concerne") {
-          const daysLeft = days(c.delai);
-          if (!isNaN(daysLeft) && daysLeft < 0) {
-            globalAlerts.push({ ifsiId: ifsiStat.id, ifsiName: ifsiStat.name, critere: c, type: "depasse", days: Math.abs(daysLeft) });
-          }
-        }
-      });
-    }
-  });
-  const topAlerts = globalAlerts.slice(0, 12);
+  const currentIfsiName = currentIfsiObj?.name || "Chargement...";
+  if (campaigns === null || activeCampaignId === null || ifsiList.length === 0) return <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700", background: "#f8fafc" }}>⏳ Chargement...</div>;
+
+  let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${Math.ceil((new Date(currentAuditDate) - today) / 86400000)} jour(s)` };
+  if (Math.ceil((new Date(currentAuditDate) - today) / 86400000) < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(Math.ceil((new Date(currentAuditDate) - today) / 86400000))} jour(s)` };
+  else if (Math.ceil((new Date(currentAuditDate) - today) / 86400000) <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${Math.ceil((new Date(currentAuditDate) - today) / 86400000)} jour(s) !` };
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
@@ -741,10 +687,6 @@ function MainApp() {
 
         </div>
       </div>
-      
-      {currentIfsiObj?.archived && <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>⚠️ ATTENTION : Cet établissement est actuellement ARCHIVÉ. Il est invisible pour les utilisateurs normaux.</div>}
-      {isArchive && <div className="no-print" style={{ background: "#fef2f2", borderBottom: "1px solid #fca5a5", color: "#991b1b", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>🔒 Mode Lecture Seule : Cette évaluation est une archive historique.</div>}
-      {isAuditMode && !isArchive && <div className="no-print" style={{ background: "#d1fae5", borderBottom: "1px solid #6ee7b7", color: "#065f46", padding: "10px", textAlign: "center", fontSize: "13px", fontWeight: "700" }}>✅ Mode Audit Activé : Les notes internes et preuves en cours sont masquées.</div>}
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
@@ -1176,7 +1118,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- DASHBOARD --- */}
+        {/* --- DASHBOARD, CRITERES, AXES, RESPONSABLES, COMPTE --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -1220,7 +1162,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- CRITERES --- */}
         {activeTab === "criteres" && <>
           <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
           <div style={{ ...card, padding: 0, overflow: "hidden" }}>
@@ -1247,7 +1188,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- AXES --- */}
         {activeTab === "axes" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
           {["non-conforme","en-cours"].map(st => {
@@ -1262,7 +1202,6 @@ function MainApp() {
           })}
         </>}
 
-        {/* --- RESPONSABLES --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
@@ -1304,7 +1243,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- COMPTE --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
