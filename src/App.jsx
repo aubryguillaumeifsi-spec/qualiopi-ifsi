@@ -424,6 +424,7 @@ function MainApp() {
     }
   }
 
+  // 👉 DEFINITION DES DATES / COULEURS POUR LE DASHBOARD (Remis dans le bon ordre !)
   const today = new Date();
   const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
   const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
@@ -481,6 +482,13 @@ function MainApp() {
   const isArchive = currentCampaign.locked || false;
   const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
 
+  // 👉 DEFINITIONS DASHBOARD / FILTRES
+  const auditDateObj = new Date(currentAuditDate);
+  const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
+  let bannerConfig = { bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: `Audit Qualiopi dans ${daysToAudit} jour(s)` };
+  if (daysToAudit < 0) bannerConfig = { bg: "#f3f4f6", border: "#d1d5db", color: "#4b5563", icon: "🏁", text: `L'audit a eu lieu il y a ${Math.abs(daysToAudit)} jour(s)` };
+  else if (daysToAudit <= 30) bannerConfig = { bg: "#fee2e2", border: "#fca5a5", color: "#991b1b", icon: "🚨", text: `URGENT : Audit Qualiopi dans ${daysToAudit} jour(s) !` };
+  
   const nbConcerne = criteres.filter(c => c.statut !== "non-concerne").length;
   const baseTotal = nbConcerne === 0 ? 1 : nbConcerne; 
 
@@ -492,7 +500,7 @@ function MainApp() {
   // 👉 LA NOUVELLE FONCTION SAVE MODAL (AVEC HISTORIQUE ET NAVIGATION)
   function saveModal(updated, action) {
     if (isArchive) {
-       if (action === "close") setModalCritere(null);
+       if (action === "close" || !action) setModalCritere(null);
        if (action === "next") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) + 1]);
        if (action === "prev") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) - 1]);
        return;
@@ -1186,6 +1194,7 @@ function MainApp() {
           })}
         </>}
 
+        {/* --- RESPONSABLES --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
@@ -1227,6 +1236,7 @@ function MainApp() {
           </div>
         </>}
 
+        {/* --- COMPTE --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
