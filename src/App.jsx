@@ -174,6 +174,8 @@ function MainApp() {
 
   async function handleCreateUser() {
     if (!newMember.email || !newMember.pwd) return alert("Email et mot de passe requis.");
+    if (newMember.pwd.length < 6) return alert("Le mot de passe provisoire doit contenir au moins 6 caractères.");
+    
     setIsCreatingUser(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
@@ -193,7 +195,12 @@ function MainApp() {
       secondaryAuth.signOut();
     } catch (error) {
       console.error(error);
-      alert("Erreur lors de la création : " + error.message);
+      // 👉 TRADUCTION DES ERREURS FIREBASE EN FRANÇAIS
+      let msg = "Une erreur est survenue lors de la création du compte.";
+      if (error.code === "auth/email-already-in-use") msg = "Cette adresse email est déjà utilisée par un autre compte.";
+      if (error.code === "auth/invalid-email") msg = "Le format de l'adresse email est invalide.";
+      if (error.code === "auth/weak-password") msg = "Le mot de passe doit contenir au moins 6 caractères.";
+      alert("Erreur : " + msg);
     }
     setIsCreatingUser(false);
   }
@@ -382,7 +389,6 @@ function MainApp() {
     items: criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(r)), 
   })).filter(r => r.items.length > 0);
 
-  // --- FONCTION EXCEL RESTAURÉE ---
   async function exportToExcel() {
     if (!criteres) return;
     if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
@@ -473,7 +479,6 @@ function MainApp() {
 
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
             
-            {/* 👉 LES BOUTONS EXCEL ET PDF SONT DE RETOUR ICI ! */}
             <div style={{ display: "flex", gap: "6px", marginLeft: "8px" }}>
               <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px" }}><span>📊</span> Excel</button>
               <button onClick={() => window.print()} style={{ ...navBtn(false), color: "#1d4ed8", background: "#eff6ff", fontSize: "12px", border: "1px solid #bfdbfe", display: "flex", gap: "6px" }}><span>📄</span> PDF</button>
@@ -542,9 +547,6 @@ function MainApp() {
             <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", alignItems: "start" }}>
               <div style={{ ...card, background: "#f8fafc" }}>
                 <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Inviter un membre</h3>
-                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px", borderRadius: "6px", fontSize: "11px", color: "#1d4ed8", marginBottom: "16px", lineHeight: "1.4" }}>
-                  ℹ️ L'utilisateur sera forcé de modifier son mot de passe provisoire lors de sa première connexion.
-                </div>
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Email</label>
                   <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="formateur@ifsi.fr" />
@@ -552,6 +554,7 @@ function MainApp() {
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Mot de passe provisoire</label>
                   <input type="text" value={newMember.pwd} onChange={e => setNewMember({...newMember, pwd: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="Ex: Qualiopi2026!" />
+                  <div style={{ fontSize: "10px", color: "#6b7280", marginTop: "6px", lineHeight: "1.4" }}>👉 Minimum 6 caractères. L'utilisateur devra modifier ce mot de passe à sa première connexion.</div>
                 </div>
                 <div style={{ marginBottom: "16px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Rôle</label>
