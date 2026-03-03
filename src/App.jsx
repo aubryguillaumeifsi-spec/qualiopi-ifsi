@@ -280,7 +280,6 @@ function MainApp() {
     }
   }
 
-  // 👉 NOUVEAU : Édition d'une colonne (rôle) avec mise à jour en cascade
   async function editOrgRole(oldRole) {
     const newRole = prompt("Renommer la colonne :", oldRole);
     if (newRole && newRole.trim() !== "" && newRole !== oldRole) {
@@ -303,17 +302,13 @@ function MainApp() {
     }
   }
 
-  // 👉 NOUVEAU : Édition d'une entité manuelle avec mise à jour en cascade
   async function editManualUser(id, currentName) {
     const newName = prompt("Modifier le nom de l'entité :", currentName);
     if (newName && newName.trim() !== "" && newName !== currentName) {
       const finalName = newName.trim();
-      
-      // 1. MAJ de l'entité dans l'IFSI
       const updatedManuals = manualUsers.map(u => u.id === id ? { ...u, name: finalName } : u);
       await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true });
 
-      // 2. MAJ en cascade dans les indicateurs pour ne pas perdre l'historique
       if (campaigns && campaigns.length > 0) {
         const newCampaigns = campaigns.map(camp => {
           const newListe = camp.liste.map(c => {
@@ -706,7 +701,6 @@ function MainApp() {
               </div>
             </div>
 
-            {/* --- STATISTIQUES --- */}
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
               <div style={{ background: "linear-gradient(135deg, #4f46e5, #3b82f6)", borderRadius: "12px", padding: "20px", color: "white", boxShadow: "0 4px 10px rgba(79,70,229,0.2)" }}>
                 <div style={{ fontSize: "13px", fontWeight: "700", textTransform: "uppercase", opacity: 0.9 }}>Score National Moyen</div>
@@ -722,7 +716,6 @@ function MainApp() {
               </div>
             </div>
 
-            {/* --- ALERTES ROUGES --- */}
             {topAlerts.length > 0 && (
               <div style={{ marginBottom: "32px" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#991b1b", margin: "0 0 10px 0", display: "flex", alignItems: "center", gap: "6px" }}>🚨 Alertes Urgentes sur le réseau</h3>
@@ -745,7 +738,6 @@ function MainApp() {
               </div>
             )}
 
-            {/* --- LISTE DES IFSI --- */}
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #86efac", paddingBottom: "8px", marginBottom: "16px" }}>
               <h3 style={{ fontSize: "16px", color: "#10b981", margin: 0 }}>✅ Établissements Actifs ({activeIfsis.length})</h3>
               <select value={tourSort} onChange={e => setTourSort(e.target.value)} style={{ ...sel, borderColor: "#cbd5e1", fontWeight: "600", padding: "6px 12px" }}>
@@ -767,7 +759,6 @@ function MainApp() {
                   <div key={s.id} className="td-dash" style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #e0e7ff", background: "white", transition: "all 0.2s ease" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
                       <div>
-                        {/* 👉 BOUTON RENOMMER INTÉGRÉ ICI */}
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                           <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: 0 }}>{s.name}</h3>
                           <button onClick={() => handleRenameIfsi(s.id, s.name)} style={{ border: "none", background: "#f1f5f9", borderRadius: "4px", padding: "2px 6px", cursor: "pointer", fontSize: "10px", color: "#64748b" }} title="Renommer">✏️</button>
@@ -806,7 +797,6 @@ function MainApp() {
               {sortedTourIfsis.length === 0 && <div style={{ color: "#9ca3af", fontStyle: "italic" }}>Aucun établissement actif.</div>}
             </div>
 
-            {/* --- ÉTABLISSEMENTS ARCHIVÉS --- */}
             {archivedIfsis.length > 0 && (
               <>
                 <h3 style={{ fontSize: "16px", color: "#991b1b", borderBottom: "2px solid #fca5a5", paddingBottom: "8px", marginBottom: "16px", marginTop: "40px" }}>📦 Établissements Archivés ({archivedIfsis.length})</h3>
@@ -815,7 +805,6 @@ function MainApp() {
                     return (
                       <div key={ifsi.id} style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px dashed #fca5a5", background: "#fef2f2", opacity: 0.9 }}>
                         <div style={{ marginBottom: "16px" }}>
-                          {/* 👉 BOUTON RENOMMER INTÉGRÉ ICI AUSSI */}
                           <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
                             <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#991b1b", margin: 0 }}>{ifsi.name}</h3>
                             <button onClick={() => handleRenameIfsi(ifsi.id, ifsi.name)} style={{ border: "none", background: "white", borderRadius: "4px", padding: "2px 6px", cursor: "pointer", fontSize: "10px", color: "#64748b" }} title="Renommer">✏️</button>
@@ -837,7 +826,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ORGANIGRAMME --- */}
+        {/* --- ORGANIGRAMME (AVEC FLEX WRAP) --- */}
         {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -867,7 +856,10 @@ function MainApp() {
               </div>
             )}
 
-            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", overflowX: "auto", paddingBottom: "20px" }}>
+            {/* 👉 ICI LE CONTENEUR PRINCIPAL AVEC FLEX-WRAP */}
+            <div style={{ display: "flex", gap: "24px", alignItems: "flex-start", paddingBottom: "20px" }}>
+              
+              {/* Le vivier reste à gauche et ne rétrécit pas */}
               <div style={{ width: "280px", flexShrink: 0, background: "#f8fafc", borderRadius: "12px", padding: "16px", border: "1px solid #e2e8f0", minHeight: "60vh" }}>
                 <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#475569", marginBottom: "16px", textTransform: "uppercase", borderBottom: "2px solid #cbd5e1", paddingBottom: "8px" }}>👥 Équipe globale</h3>
                 
@@ -875,7 +867,6 @@ function MainApp() {
                   <div key={m.id} className="org-card" draggable onDragStart={(e) => handleDragStartOrg(e, m.type, m.id)} style={{ borderLeft: m.roles.length===0 ? "4px solid #f59e0b" : "1px solid #d1d5db" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                        <span style={{ fontWeight: "700", color: "#1e3a5f" }}>{m.type==="account" ? "👤" : "👻"} {m.name}</span>
-                       {/* 👉 BOUTON EDITER DANS LE VIVIER */}
                        {m.type === "manual" && (
                          <div style={{ display: "flex", gap: "4px" }}>
                            <button onClick={() => editManualUser(m.id, m.name)} style={{ background:"none", border:"none", color:"#64748b", cursor:"pointer", padding:"0 2px" }} title="Renommer">✏️</button>
@@ -894,54 +885,55 @@ function MainApp() {
                 ))}
 
                 <div style={{ marginTop: "24px", background: "white", padding: "12px", borderRadius: "8px", border: "1px dashed #cbd5e1" }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", display: "block", marginBottom: "6px" }}>+ AJOUTER MANUELLEMENT (Sans Compte)</label>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", display: "block", marginBottom: "6px" }}>+ AJOUTER MANUELLEMENT</label>
                   <input type="text" value={newManualUserInput} onChange={e => setNewManualUserInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addManualUser()} placeholder="Ex: Secrétariat..." style={{ ...inp, padding: "8px", fontSize: "12px", marginBottom: "8px", width: "100%" }} />
                   <button onClick={addManualUser} disabled={!newManualUserInput.trim()} style={{ width: "100%", background: "#f59e0b", color: "white", border: "none", padding: "6px", borderRadius: "6px", fontWeight: "bold", cursor: newManualUserInput.trim() ? "pointer" : "not-allowed" }}>Créer l'entité</button>
                 </div>
               </div>
 
-              {orgRoles.filter(r => r !== "Direction").map((role) => {
-                const colConf = getRoleColor(role);
-                const peopleInRole = allIfsiMembers.filter(m => m.roles.includes(role));
+              {/* 👉 LA ZONE DE DROITE DEVIENT UNE GRILLE QUI REVIENT À LA LIGNE */}
+              <div style={{ display: "flex", gap: "16px", flexWrap: "wrap", flex: 1, alignContent: "flex-start" }}>
+                {orgRoles.filter(r => r !== "Direction").map((role) => {
+                  const colConf = getRoleColor(role);
+                  const peopleInRole = allIfsiMembers.filter(m => m.roles.includes(role));
 
-                return (
-                  <div key={role} style={{ width: "260px", flexShrink: 0, background: "white", borderRadius: "12px", border: `2px solid ${colConf.border}`, boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }} onDragOver={handleDragOverOrg} onDrop={(e) => handleDropOrg(e, role)}>
-                    <div style={{ background: colConf.bg, padding: "12px 16px", borderRadius: "10px 10px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${colConf.border}` }}>
-                      <span style={{ fontSize: "14px", fontWeight: "800", color: colConf.text, textTransform: "uppercase" }}>{role}</span>
-                      <div>
-                        {/* 👉 BOUTON EDITER POUR LE ROLE */}
-                        <button onClick={() => editOrgRole(role)} style={{ background:"white", border:`1px solid ${colConf.border}`, color: colConf.text, borderRadius:"6px", cursor:"pointer", padding:"2px 6px", fontSize:"10px", fontWeight:"bold", marginRight: "4px" }} title="Renommer la colonne">✏️</button>
-                        <button onClick={() => deleteOrgRole(role)} style={{ background:"white", border:`1px solid ${colConf.border}`, color: colConf.text, borderRadius:"6px", cursor:"pointer", padding:"2px 6px", fontSize:"10px", fontWeight:"bold" }}>X</button>
+                  return (
+                    <div key={role} style={{ width: "260px", background: "white", borderRadius: "12px", border: `2px solid ${colConf.border}`, boxShadow: "0 4px 6px rgba(0,0,0,0.05)" }} onDragOver={handleDragOverOrg} onDrop={(e) => handleDropOrg(e, role)}>
+                      <div style={{ background: colConf.bg, padding: "12px 16px", borderRadius: "10px 10px 0 0", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${colConf.border}` }}>
+                        <span style={{ fontSize: "14px", fontWeight: "800", color: colConf.text, textTransform: "uppercase" }}>{role}</span>
+                        <div>
+                          <button onClick={() => editOrgRole(role)} style={{ background:"white", border:`1px solid ${colConf.border}`, color: colConf.text, borderRadius:"6px", cursor:"pointer", padding:"2px 6px", fontSize:"10px", fontWeight:"bold", marginRight: "4px" }} title="Renommer la colonne">✏️</button>
+                          <button onClick={() => deleteOrgRole(role)} style={{ background:"white", border:`1px solid ${colConf.border}`, color: colConf.text, borderRadius:"6px", cursor:"pointer", padding:"2px 6px", fontSize:"10px", fontWeight:"bold" }}>X</button>
+                        </div>
+                      </div>
+                      
+                      <div style={{ padding: "16px", minHeight: "150px" }}>
+                        {peopleInRole.map(m => (
+                          <div key={m.id} style={{ background: "white", border: "1px solid #e2e8f0", padding: "8px 12px", borderRadius: "8px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", fontWeight: "600", color: "#1e3a5f" }}>
+                            <span>{m.type==="account"?"👤":"👻"} {m.name}</span>
+                            <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
+                              {m.type === "manual" && <button onClick={() => editManualUser(m.id, m.name)} style={{ border: "none", background: "transparent", color: "#64748b", cursor: "pointer", fontSize: "12px" }} title="Renommer">✏️</button>}
+                              <button onClick={() => removeRoleFromUser(m.type, m.id, role)} style={{ border: "none", background: "#fef2f2", color: "#ef4444", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "12px" }}>×</button>
+                            </div>
+                          </div>
+                        ))}
+                        {peopleInRole.length === 0 && <div style={{ fontSize: "11px", color: "#9ca3af", fontStyle: "italic", textAlign: "center", marginTop: "20px" }}>Glissez une personne ici</div>}
                       </div>
                     </div>
-                    
-                    <div style={{ padding: "16px", minHeight: "150px" }}>
-                      {peopleInRole.map(m => (
-                        <div key={m.id} style={{ background: "white", border: "1px solid #e2e8f0", padding: "8px 12px", borderRadius: "8px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: "13px", fontWeight: "600", color: "#1e3a5f" }}>
-                          <span>{m.type==="account"?"👤":"👻"} {m.name}</span>
-                          <div style={{ display: "flex", gap: "6px", alignItems: "center" }}>
-                            {/* 👉 BOUTON EDITER POUR LE FANTOME DANS LA COLONNE */}
-                            {m.type === "manual" && <button onClick={() => editManualUser(m.id, m.name)} style={{ border: "none", background: "transparent", color: "#64748b", cursor: "pointer", fontSize: "12px" }} title="Renommer">✏️</button>}
-                            <button onClick={() => removeRoleFromUser(m.type, m.id, role)} style={{ border: "none", background: "#fef2f2", color: "#ef4444", borderRadius: "50%", width: "20px", height: "20px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "12px" }}>×</button>
-                          </div>
-                        </div>
-                      ))}
-                      {peopleInRole.length === 0 && <div style={{ fontSize: "11px", color: "#9ca3af", fontStyle: "italic", textAlign: "center", marginTop: "20px" }}>Glissez une personne ici</div>}
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
 
-              <div style={{ width: "260px", flexShrink: 0, background: "#f1f5f9", borderRadius: "12px", padding: "16px", border: "1px dashed #cbd5e1" }}>
-                <span style={{ fontSize: "12px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "12px" }}>+ NOUVEAU RÔLE / COLONNE</span>
-                <input type="text" value={newRoleInput} onChange={e => setNewRoleInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addOrgRole()} placeholder="Ex: Qualité..." style={{ ...inp, padding: "8px", fontSize: "12px", marginBottom: "8px", width: "100%" }} />
-                <button onClick={addOrgRole} disabled={!newRoleInput.trim()} style={{ width: "100%", background: "#1d4ed8", color: "white", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "bold", cursor: newRoleInput.trim() ? "pointer" : "not-allowed" }}>Créer la colonne</button>
+                <div style={{ width: "260px", background: "#f1f5f9", borderRadius: "12px", padding: "16px", border: "1px dashed #cbd5e1" }}>
+                  <span style={{ fontSize: "12px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", display: "block", marginBottom: "12px" }}>+ NOUVEAU RÔLE / COLONNE</span>
+                  <input type="text" value={newRoleInput} onChange={e => setNewRoleInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && addOrgRole()} placeholder="Ex: Qualité..." style={{ ...inp, padding: "8px", fontSize: "12px", marginBottom: "8px", width: "100%" }} />
+                  <button onClick={addOrgRole} disabled={!newRoleInput.trim()} style={{ width: "100%", background: "#1d4ed8", color: "white", border: "none", padding: "8px", borderRadius: "6px", fontWeight: "bold", cursor: newRoleInput.trim() ? "pointer" : "not-allowed" }}>Créer la colonne</button>
+                </div>
               </div>
             </div>
           </div>
         )}
 
-        {/* --- ONGLET ÉQUIPE (COMPTES AVEC TRI & FILTRES) --- */}
+        {/* --- ONGLET ÉQUIPE --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -1042,7 +1034,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- RESTE DES ONGLETS (Dashboard, Responsables, Mon Compte, etc.) INCHANGÉS --- */}
+        {/* --- DASHBOARD --- */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
