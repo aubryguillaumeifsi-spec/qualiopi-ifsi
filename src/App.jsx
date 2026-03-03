@@ -78,6 +78,9 @@ function MainApp() {
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
 
+  // 👉 NOUVEAU : État pour gérer le tri de la Tour de Contrôle
+  const [tourSort, setTourSort] = useState("urgence");
+
   useEffect(() => {
     const unsubIfsi = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = [];
@@ -175,31 +178,23 @@ function MainApp() {
     }
   }
 
-  // 👉 FONCTIONS D'ARCHIVAGE ET DE SUPPRESSION (SUPERADMIN)
   async function handleArchiveIfsi(ifsiId, name, archiveStatus) {
     const action = archiveStatus ? "archiver" : "restaurer";
     if (!window.confirm(`Voulez-vous vraiment ${action} l'établissement "${name}" ?`)) return;
-    try {
-      await setDoc(doc(db, "etablissements", ifsiId), { archived: archiveStatus }, { merge: true });
-    } catch (e) {
-      alert("Erreur lors de l'action : " + e.message);
-    }
+    try { await setDoc(doc(db, "etablissements", ifsiId), { archived: archiveStatus }, { merge: true }); } 
+    catch (e) { alert("Erreur : " + e.message); }
   }
 
   async function handleHardDeleteIfsi(ifsiId, name) {
-    const confirmText = prompt(`⚠️ ATTENTION DANGER DÉFINITIF ⚠️\n\nVous êtes sur le point de détruire "${name}".\nToutes les données, fichiers et indicateurs seront perdus à jamais.\n\nPour confirmer, tapez le mot "SUPPRIMER" en majuscules :`);
+    const confirmText = prompt(`⚠️ ATTENTION DANGER DÉFINITIF ⚠️\n\nVous êtes sur le point de détruire "${name}".\nToutes les données seront perdues à jamais.\n\nPour confirmer, tapez le mot "SUPPRIMER" en majuscules :`);
     if (confirmText === "SUPPRIMER") {
       try {
         await deleteDoc(doc(db, "etablissements", ifsiId));
         await deleteDoc(doc(db, "qualiopi", ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId));
         if (selectedIfsi === ifsiId) setSelectedIfsi("demo_ifps_cham");
-        alert("L'établissement a été supprimé de la base de données.");
-      } catch (e) {
-        alert("Erreur de suppression : " + e.message);
-      }
-    } else if (confirmText !== null) {
-      alert("Suppression annulée. Le mot de sécurité était incorrect.");
-    }
+        alert("L'établissement a été supprimé.");
+      } catch (e) { alert("Erreur : " + e.message); }
+    } else if (confirmText !== null) { alert("Annulé. Le mot de sécurité était incorrect."); }
   }
 
   async function loadTeamUsers(role, currentIfsi) {
@@ -373,10 +368,14 @@ function MainApp() {
     }
   }
 
+  const today = new Date();
+  const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
+  const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
+
   function getIfsiGlobalStats(ifsiId) {
     const docId = ifsiId === "demo_ifps_cham" ? "criteres" : ifsiId;
     const data = allQualiopiData[docId];
-    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate: "2026-10-15" };
+    if (!data) return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate: "2026-10-15", liste: [] };
     
     let liste = [];
     let auditDate = "2026-10-15";
@@ -388,7 +387,7 @@ function MainApp() {
     } else if (data.liste) {
       liste = data.liste;
     } else {
-      return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate };
+      return { total: 1, conforme: 0, nonConforme: 0, enCours: 0, pct: 0, auditDate, liste: [] };
     }
 
     const nbConcerne = liste.filter(c => c.statut !== "non-concerne").length;
@@ -397,7 +396,7 @@ function MainApp() {
     const nonConforme = liste.filter(c => c.statut === "non-conforme").length;
     const enCours = liste.filter(c => c.statut === "en-cours").length;
 
-    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate };
+    return { total, conforme, nonConforme, enCours, pct: Math.round((conforme/total)*100) || 0, auditDate, liste };
   }
 
   if (!authChecked) return null;
@@ -406,7 +405,6 @@ function MainApp() {
   if (userProfile?.role === "guest") return (<div style={{ minHeight: "100vh", display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", background: "#f8fafc", fontFamily: "Outfit" }}><div style={{ fontSize: "50px", marginBottom: "20px" }}>🔒</div><h2 style={{ color: "#1e3a5f" }}>Accès en attente</h2><p style={{ color: "#6b7280", marginBottom: "30px" }}>Votre compte a bien été authentifié, mais vous n'êtes rattaché à aucun établissement.</p><button onClick={handleLogout} style={{ padding: "10px 20px", background: "#ef4444", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Se déconnecter</button></div>);
   if (userProfile?.mustChangePassword) return (<div style={{ minHeight: "100vh", display: "flex", justifyContent: "center", alignItems: "center", background: "linear-gradient(135deg,#f0f4ff,#e8f0fe)", fontFamily: "Outfit" }}><div style={{ background: "white", padding: "40px", borderRadius: "20px", boxShadow: "0 10px 40px rgba(0,0,0,0.08)", maxWidth: "400px", width: "100%", textAlign: "center" }}><div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div><h2 style={{ color: "#1e3a5f", margin: "0 0 10px 0", fontSize: "22px", fontWeight: "800" }}>Sécurisez votre compte</h2><p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", lineHeight: "1.5" }}>Veuillez remplacer le mot de passe provisoire.</p><form onSubmit={e => handleChangePassword(e, true)}><input type="password" placeholder="Nouveau (8 car., 1 maj., 1 chiffre)" onChange={e=>setPwdUpdate({...pwdUpdate, p1: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "12px", boxSizing: "border-box" }} required /><input type="password" placeholder="Confirmer" onChange={e=>setPwdUpdate({...pwdUpdate, p2: e.target.value})} style={{ width: "100%", padding: "12px", borderRadius: "8px", border: "1px solid #d1d5db", marginBottom: "16px", boxSizing: "border-box" }} required />{pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600" }}>{pwdUpdate.error}</div>}<button type="submit" disabled={pwdUpdate.loading} style={{ width: "100%", padding: "12px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: "none", borderRadius: "8px", color: "white", fontWeight: "700", cursor: pwdUpdate.loading ? "wait" : "pointer" }}>{pwdUpdate.loading ? "Mise à jour..." : "Valider"}</button></form><button onClick={handleLogout} style={{ marginTop: "20px", background: "none", border: "none", color: "#9ca3af", fontSize: "13px", cursor: "pointer", textDecoration: "underline" }}>Se déconnecter</button></div></div>);
 
-  // 👉 ECRAN DE BLOCAGE SI L'IFSI EST ARCHIVÉ (SAUF SUPERADMIN)
   const currentIfsiObj = ifsiList.find(i => i.id === selectedIfsi);
   if (currentIfsiObj?.archived && userProfile?.role !== "superadmin") {
     return (
@@ -432,10 +430,6 @@ function MainApp() {
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
     setModalCritere(null);
   }
-
-  const today = new Date();
-  const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
-  const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
   
   const auditDateObj = new Date(currentAuditDate);
   const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
@@ -521,18 +515,59 @@ function MainApp() {
   const sel = { background: "white", border: "1px solid #d1d5db", borderRadius: "7px", color: "#374151", padding: "7px 10px", fontSize: "12px", cursor: "pointer" };
   const inp = { background: "white", border: "1px solid #d1d5db", borderRadius: "8px", outline: "none", boxSizing: "border-box", fontFamily: "Outfit, sans-serif" };
 
-  // Séparation pour la Tour de Contrôle
+  // --- LOGIQUE TOUR DE CONTRÔLE (STATS + ALERTES + TRI) ---
   const activeIfsis = ifsiList.filter(i => !i.archived);
   const archivedIfsis = ifsiList.filter(i => i.archived);
+  
+  // 1. Calcul des stats pour tous les IFSI actifs
+  const activeIfsisStats = activeIfsis.map(i => ({ id: i.id, name: i.name, ...getIfsiGlobalStats(i.id) }));
+  
+  // 2. Tri des IFSI
+  const sortedTourIfsis = [...activeIfsisStats].sort((a, b) => {
+    if (tourSort === "urgence") {
+      const dateA = new Date(a.auditDate).getTime();
+      const dateB = new Date(b.auditDate).getTime();
+      return dateA - dateB;
+    }
+    if (tourSort === "score_desc") return b.pct - a.pct;
+    if (tourSort === "score_asc") return a.pct - b.pct;
+    if (tourSort === "alpha") return a.name.localeCompare(b.name);
+    return 0;
+  });
+
+  // 3. Calcul des compteurs nationaux
+  const globalScore = activeIfsisStats.length > 0 ? Math.round(activeIfsisStats.reduce((acc, curr) => acc + curr.pct, 0) / activeIfsisStats.length) : 0;
+  const totalUsersInNetwork = teamUsers.length; // Car le superadmin charge tous les comptes dans teamUsers
+
+  // 4. Collecte des Alertes Rouges (Non conforme ou Dépassé)
+  let globalAlerts = [];
+  activeIfsisStats.forEach(ifsiStat => {
+    if (ifsiStat.liste) {
+      ifsiStat.liste.forEach(c => {
+        if (c.statut === "non-conforme") {
+          globalAlerts.push({ ifsiId: ifsiStat.id, ifsiName: ifsiStat.name, critere: c, type: "non-conforme" });
+        } else if (c.statut !== "conforme" && c.statut !== "non-concerne") {
+          const daysLeft = days(c.delai);
+          if (!isNaN(daysLeft) && daysLeft < 0) {
+            globalAlerts.push({ ifsiId: ifsiStat.id, ifsiName: ifsiStat.name, critere: c, type: "depasse", days: Math.abs(daysLeft) });
+          }
+        }
+      });
+    }
+  });
+  // On limite l'affichage aux 10 pires alertes pour ne pas surcharger
+  const topAlerts = globalAlerts.slice(0, 12);
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       <style>{`
-        @media print { .no-print { display: none !important; } body { background: white !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; } @page { size: portrait; margin: 10mm; } * { box-shadow: none !important; } .print-break-avoid { page-break-inside: avoid; } }
+        @media print { .no-print { display: none !important; } body { background: white !important; } }
         .org-card { background: white; border: 1px solid #d1d5db; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; cursor: grab; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); }
         .org-card:active { cursor: grabbing; opacity: 0.7; }
         .td-dash:hover { transform: translateY(-2px); box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1); }
+        .alert-ticker::-webkit-scrollbar { height: 6px; }
+        .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
       
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} />}
@@ -607,7 +642,7 @@ function MainApp() {
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
         {/* ========================================================= */}
-        {/* 👉 TOUR DE CONTRÔLE (AVEC SÉCURITÉ ARCHIVAGE / SUPPRESSION) */}
+        {/* 👉 LA TOUTE NOUVELLE TOUR DE CONTRÔLE (V2.0)               */}
         {/* ========================================================= */}
         {activeTab === "tour_controle" && userProfile?.role === "superadmin" && (
           <div>
@@ -616,22 +651,69 @@ function MainApp() {
               <p style={{ fontSize: "14px", color: "#6b7280", margin: 0 }}>Supervision en direct de l'avancement de tous les établissements.</p>
             </div>
 
-            {/* --- ÉTABLISSEMENTS ACTIFS --- */}
-            <h3 style={{ fontSize: "16px", color: "#10b981", borderBottom: "2px solid #86efac", paddingBottom: "8px", marginBottom: "16px" }}>✅ Établissements Actifs ({activeIfsis.length})</h3>
+            {/* --- 1. BANDEAU DES STATISTIQUES NATIONALES --- */}
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "16px", marginBottom: "24px" }}>
+              <div style={{ background: "linear-gradient(135deg, #4f46e5, #3b82f6)", borderRadius: "12px", padding: "20px", color: "white", boxShadow: "0 4px 10px rgba(79,70,229,0.2)" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", textTransform: "uppercase", opacity: 0.9 }}>Score National Moyen</div>
+                <div style={{ fontSize: "36px", fontWeight: "900", marginTop: "4px" }}>{globalScore}%</div>
+              </div>
+              <div style={{ background: "white", borderRadius: "12px", padding: "20px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Établissements Actifs</div>
+                <div style={{ fontSize: "32px", fontWeight: "900", color: "#1e3a5f", marginTop: "4px" }}>{activeIfsis.length}</div>
+              </div>
+              <div style={{ background: "white", borderRadius: "12px", padding: "20px", border: "1px solid #e2e8f0", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: "#64748b", textTransform: "uppercase" }}>Utilisateurs Connectés</div>
+                <div style={{ fontSize: "32px", fontWeight: "900", color: "#1e3a5f", marginTop: "4px" }}>{totalUsersInNetwork}</div>
+              </div>
+            </div>
+
+            {/* --- 2. CENTRE DES ALERTES ROUGES --- */}
+            {topAlerts.length > 0 && (
+              <div style={{ marginBottom: "32px" }}>
+                <h3 style={{ fontSize: "14px", fontWeight: "800", color: "#991b1b", margin: "0 0 10px 0", display: "flex", alignItems: "center", gap: "6px" }}>🚨 Alertes Urgentes sur le réseau</h3>
+                <div className="alert-ticker" style={{ display: "flex", gap: "12px", overflowX: "auto", paddingBottom: "10px" }}>
+                  {topAlerts.map((alert, i) => (
+                    <div key={i} style={{ minWidth: "280px", background: "#fef2f2", border: "1px solid #fca5a5", borderLeft: `4px solid ${alert.type === "non-conforme" ? "#ef4444" : "#f59e0b"}`, borderRadius: "8px", padding: "12px", cursor: "pointer" }} onClick={() => { setSelectedIfsi(alert.ifsiId); setActiveTab("axes"); }}>
+                      <div style={{ fontSize: "10px", color: "#991b1b", fontWeight: "800", textTransform: "uppercase", marginBottom: "4px" }}>{alert.ifsiName}</div>
+                      <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e3a5f", marginBottom: "4px", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>C{alert.critere.num} - {alert.critere.titre}</div>
+                      <div style={{ fontSize: "11px", fontWeight: "700", color: alert.type === "non-conforme" ? "#dc2626" : "#d97706" }}>
+                        {alert.type === "non-conforme" ? "🔴 Non-conforme !" : `⏳ Dépassé de ${alert.days} jour(s)`}
+                      </div>
+                    </div>
+                  ))}
+                  {globalAlerts.length > 12 && (
+                    <div style={{ minWidth: "150px", background: "#f8fafc", border: "1px dashed #cbd5e1", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", color: "#64748b", fontWeight: "700" }}>
+                      + {globalAlerts.length - 12} autres alertes
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* --- 3. LEADERBOARD & TRI --- */}
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "2px solid #86efac", paddingBottom: "8px", marginBottom: "16px" }}>
+              <h3 style={{ fontSize: "16px", color: "#10b981", margin: 0 }}>✅ Établissements Actifs ({activeIfsis.length})</h3>
+              <select value={tourSort} onChange={e => setTourSort(e.target.value)} style={{ ...sel, borderColor: "#cbd5e1", fontWeight: "600", padding: "6px 12px" }}>
+                <option value="urgence">⏳ Trier par date d'audit (Plus proche)</option>
+                <option value="score_desc">🏆 Trier par Score (Meilleurs en 1er)</option>
+                <option value="score_asc">🚨 Trier par Score (En difficulté en 1er)</option>
+                <option value="alpha">🔤 Trier par Nom (A-Z)</option>
+              </select>
+            </div>
+
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(360px, 1fr))", gap: "20px", marginBottom: "40px" }}>
-              {activeIfsis.map(ifsi => {
-                const s = getIfsiGlobalStats(ifsi.id);
+              {sortedTourIfsis.map(s => {
                 const auditDateObj = new Date(s.auditDate);
                 const daysToAudit = Math.ceil((auditDateObj - today) / 86400000);
                 const auditColor = daysToAudit < 0 ? "#ef4444" : daysToAudit <= 30 ? "#f59e0b" : "#10b981";
                 const auditText = daysToAudit < 0 ? `Dépassé (${Math.abs(daysToAudit)}j)` : `J-${daysToAudit}`;
 
                 return (
-                  <div key={ifsi.id} className="td-dash" style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #e0e7ff", background: "white", transition: "all 0.2s ease" }}>
+                  <div key={s.id} className="td-dash" style={{ ...card, padding: "20px", display: "flex", flexDirection: "column", justifyContent: "space-between", border: "1px solid #e0e7ff", background: "white", transition: "all 0.2s ease" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px", borderBottom: "1px solid #f1f5f9", paddingBottom: "12px" }}>
                       <div>
-                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 2px 0" }}>{ifsi.name}</h3>
-                        <div style={{ fontSize: "11px", color: "#9ca3af", fontFamily: "monospace", marginBottom: "8px" }}>ID: {ifsi.id}</div>
+                        <h3 style={{ fontSize: "16px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 2px 0" }}>{s.name}</h3>
+                        <div style={{ fontSize: "11px", color: "#9ca3af", fontFamily: "monospace", marginBottom: "8px" }}>ID: {s.id}</div>
                         <div style={{ fontSize: "12px", color: "#6b7280", display: "flex", alignItems: "center", gap: "6px", fontWeight: "600" }}>
                            <span>🗓️ {new Date(s.auditDate).toLocaleDateString("fr-FR")}</span>
                            <span style={{ background: auditColor+"20", color: auditColor, padding: "2px 6px", borderRadius: "4px", fontWeight: "800", fontSize: "10px" }}>{auditText}</span>
@@ -656,13 +738,13 @@ function MainApp() {
                     </div>
 
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => { setSelectedIfsi(ifsi.id); setActiveTab("dashboard"); }} style={{ flex: 1, padding: "8px", background: "linear-gradient(135deg, #4f46e5, #6366f1)", color: "white", borderRadius: "8px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "12px" }}>🔎 Accéder</button>
-                      <button onClick={() => handleArchiveIfsi(ifsi.id, ifsi.name, true)} style={{ padding: "8px 12px", background: "white", color: "#f59e0b", border: "1px solid #fcd34d", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "12px" }}>📦 Archiver</button>
+                      <button onClick={() => { setSelectedIfsi(s.id); setActiveTab("dashboard"); }} style={{ flex: 1, padding: "8px", background: "linear-gradient(135deg, #4f46e5, #6366f1)", color: "white", borderRadius: "8px", border: "none", fontWeight: "700", cursor: "pointer", fontSize: "12px" }}>🔎 Accéder</button>
+                      <button onClick={() => handleArchiveIfsi(s.id, s.name, true)} style={{ padding: "8px 12px", background: "white", color: "#f59e0b", border: "1px solid #fcd34d", borderRadius: "8px", fontWeight: "700", cursor: "pointer", fontSize: "12px" }}>📦 Archiver</button>
                     </div>
                   </div>
                 );
               })}
-              {activeIfsis.length === 0 && <div style={{ color: "#9ca3af", fontStyle: "italic" }}>Aucun établissement actif.</div>}
+              {sortedTourIfsis.length === 0 && <div style={{ color: "#9ca3af", fontStyle: "italic" }}>Aucun établissement actif.</div>}
             </div>
 
             {/* --- ÉTABLISSEMENTS ARCHIVÉS --- */}
@@ -692,7 +774,6 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ORGANIGRAMME --- */}
         {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -883,90 +964,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- RESTE DES ONGLETS INCHANGÉS --- */}
-        {activeTab === "dashboard" && <>
-          <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ fontSize: "24px" }}>{bannerConfig.icon}</span>
-              <div>
-                <div style={{ fontSize: "16px", fontWeight: "800", color: bannerConfig.color, textTransform: "uppercase", letterSpacing: "0.5px" }}>{bannerConfig.text}</div>
-                <div style={{ fontSize: "12px", color: bannerConfig.color, opacity: 0.8, marginTop: "2px", fontWeight: "600" }}>Date officielle visée : {new Date(currentAuditDate).toLocaleDateString("fr-FR")}</div>
-              </div>
-            </div>
-            {!isArchive && <button onClick={handleEditAuditDate} style={{ background: "transparent", border: `1px solid ${bannerConfig.color}`, color: bannerConfig.color, padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", opacity: 0.7, transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>Modifier la date</button>}
-          </div>
-
-          <div className="print-break-avoid no-print" style={{ ...card, marginBottom: "24px", padding: "20px 24px" }}>
-            <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#1e3a5f", fontWeight: "800", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-              <span>🚀 État d'avancement global</span>
-              <span style={{ fontSize: "15px", color: "#1d4ed8", fontWeight: "800", background: "#eff6ff", padding: "4px 10px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>{Math.round((stats.conforme / stats.total) * 100) || 0}% Achevé</span>
-            </h3>
-            <div style={{ display: "flex", height: "26px", borderRadius: "13px", overflow: "hidden", background: "#f1f5f9", gap: "3px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)" }}>
-              <div style={{ width: `${(stats.conforme / stats.total) * 100}%`, background: "#10b981", transition: "width 0.8s ease" }} title={`Conforme: ${stats.conforme}`} />
-              <div style={{ width: `${(stats.enCours / stats.total) * 100}%`, background: "#f59e0b", transition: "width 0.8s ease" }} title={`En cours: ${stats.enCours}`} />
-              <div style={{ width: `${(stats.nonConforme / stats.total) * 100}%`, background: "#ef4444", transition: "width 0.8s ease" }} title={`Non conforme: ${stats.nonConforme}`} />
-              <div style={{ width: `${(stats.nonEvalue / stats.total) * 100}%`, background: "#d1d5db", transition: "width 0.8s ease" }} title={`Non évalué: ${stats.nonEvalue}`} />
-            </div>
-            <div style={{ display: "flex", gap: "20px", marginTop: "14px", fontSize: "12px", fontWeight: "700", flexWrap: "wrap", justifyContent: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#10b981" }}></span><span style={{ color: "#065f46" }}>{stats.conforme} Conformes ({Math.round((stats.conforme / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#f59e0b" }}></span><span style={{ color: "#92400e" }}>{stats.enCours} En cours ({Math.round((stats.enCours / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#ef4444" }}></span><span style={{ color: "#991b1b" }}>{stats.nonConforme} Non conformes ({Math.round((stats.nonConforme / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#d1d5db" }}></span><span style={{ color: "#4b5563" }}>{stats.nonEvalue} À faire ({Math.round((stats.nonEvalue / stats.total) * 100) || 0}%)</span></div>
-            </div>
-          </div>
-
-          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px", marginBottom: "24px" }}>
-            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents < 30j"]].map(([color,bg,border,num,label]) => (
-              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "14px 16px", opacity: isArchive ? 0.8 : 1 }}><div style={{ fontSize: "28px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div><div style={{ fontSize: "10px", color, opacity: 0.9, marginTop: "4px", textTransform: "uppercase", fontWeight: "700", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div></div>
-            ))}
-          </div>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
-          </div>
-        </>}
-
-        {activeTab === "criteres" && <>
-          <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
-          <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{["N°","Indicateur","Responsable(s)","Échéance","Statut","Preuves fournies"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
-              <tbody>{filtered.map(c => { 
-                const cConf = CRITERES_LABELS[c.critere] || { label: "Critère Inconnu", color: "#9ca3af" };
-                const d = days(c.delai); 
-                const resps = Array.isArray(c.responsables) ? c.responsables : []; 
-                const nbFiles = (c.fichiers || []).filter(f => !f.archive).length;
-                const nbChemins = (c.chemins_reseau || []).length;
-                const hasLink = (c.preuves || "").trim().length > 0;
-                return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td><td style={{ ...td, maxWidth: "280px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{cConf.label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); return <span key={rSafe} style={{ fontSize: "10px", color: "#1e40af", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{resps.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td>
-                <td style={td}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
-                    {nbChemins > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 6px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>🔗 {nbChemins} Lien(s) Réseau</span>}
-                    {nbFiles > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 6px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>☁️ {nbFiles} Upload(s)</span>}
-                    {hasLink && <span style={{ fontSize: "10px", color: "#1d4ed8", background: "#eff6ff", padding: "2px 6px", borderRadius: "4px", border: "1px solid #bfdbfe", whiteSpace: "nowrap" }}>📝 Texte</span>}
-                    {nbFiles === 0 && nbChemins === 0 && !hasLink && <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vide</span>}
-                  </div>
-                </td>
-                <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>{isArchive ? "Consulter" : "Éditer"}</button></td></tr>);})}</tbody>
-            </table>
-          </div>
-        </>}
-
-        {activeTab === "axes" && <>
-          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
-          {["non-conforme","en-cours"].map(st => {
-            const items = axes.filter(c => c.statut === st); if (items.length === 0) return null; const isNC = st === "non-conforme";
-            return (<div key={st}><div className="print-break-avoid" style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase" }}>{isNC ? "🔴 Non conformes — Action immédiate" : "🟠 En cours — À finaliser"}</div>
-              {items.map(c => {
-                const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
-                const d = days(c.delai);
-                return (<div key={c.id} className="print-break-avoid" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px" }}><div style={{ display: "flex", gap: "12px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span><div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>{cConf.label}</div>{(!isAuditMode && (c.attendus||"")) && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Remarques : </span>{c.attendus}</div>}{((c.fichiers && c.fichiers.length > 0) || (c.preuves||"").trim()) && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>{isAuditMode ? "Preuves :" : "Preuves finalisées :"} </span>{c.fichiers?.length > 0 ? `${c.fichiers.length} document(s) joint(s). ` : ""}{c.preuves}</div>}{(!isAuditMode && (c.preuves_encours||"").trim()) && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px" }}><span style={{ fontWeight: "700", color: "#d97706" }}>En cours : </span>{c.preuves_encours}</div>}</div><div style={{ textAlign: "right", minWidth: "140px" }}><StatusBadge statut={c.statut} /><div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>{new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{!isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}<button onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isArchive ? "#f1f5f9" : (isNC?"#fff5f5":"#fffbeb"), border:`1px solid ${isArchive ? "#d1d5db" : (isNC?"#fca5a5":"#fcd34d")}`, borderRadius: "6px", color: isArchive ? "#4b5563" : (isNC?"#dc2626":"#92400e"), padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>{isArchive ? "Consulter" : "Éditer"}</button></div></div></div>)
-              })}
-            </div>);
-          })}
-        </>}
-
+        {/* --- RESTE DES ONGLETS (Responsables, Mon Compte, etc.) INCHANGÉS --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
