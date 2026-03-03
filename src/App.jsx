@@ -75,6 +75,10 @@ function MainApp() {
   const [newRoleInput, setNewRoleInput] = useState("");
   const [newManualUserInput, setNewManualUserInput] = useState("");
 
+  // 👉 NOUVEAUX ÉTATS POUR LE TRI DE L'ÉQUIPE
+  const [teamSearchTerm, setTeamSearchTerm] = useState("");
+  const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
+
   useEffect(() => {
     const unsubIfsi = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = [];
@@ -185,6 +189,7 @@ function MainApp() {
     } catch (e) { console.error(e); }
   }
 
+  // --- TRAITEMENT DES DONNÉES D'ÉQUIPE ---
   const orgRoles = ifsiData?.roles || [];
   const manualUsers = ifsiData?.manualUsers || [];
   const orgAccounts = teamUsers.filter(u => u.role !== "superadmin" && u.etablissementId === selectedIfsi);
@@ -389,7 +394,6 @@ function MainApp() {
     setModalCritere(null);
   }
 
-  // 👉 LA FONCTION MISSING EST DE RETOUR ICI !
   const today = new Date();
   const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
   const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
@@ -412,6 +416,35 @@ function MainApp() {
     const myCriteres = criteres.filter(c => (Array.isArray(c.responsables) ? c.responsables : []).includes(m.name));
     return { ...m, items: myCriteres };
   }).filter(p => p.items.length > 0 || p.roles.length > 0);
+
+  // 👉 LOGIQUE DE FILTRAGE ET TRI POUR LA TABLE DES COMPTES (EQUIPE)
+  const filteredTeamUsers = teamUsers.filter(u => {
+    if (!teamSearchTerm) return true;
+    const sLower = teamSearchTerm.toLowerCase();
+    const eMatch = (u.email || "").toLowerCase().includes(sLower);
+    const ifsiName = ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId || "";
+    const iMatch = ifsiName.toLowerCase().includes(sLower);
+    return eMatch || iMatch;
+  });
+
+  const sortedTeamUsers = [...filteredTeamUsers].sort((a, b) => {
+    let valA = ""; let valB = "";
+    if (teamSortConfig.key === "email") { valA = a.email || ""; valB = b.email || ""; }
+    else if (teamSortConfig.key === "role") { valA = a.role || "user"; valB = b.role || "user"; }
+    else if (teamSortConfig.key === "ifsi") { 
+      valA = ifsiList.find(i => i.id === a.etablissementId)?.name || a.etablissementId || ""; 
+      valB = ifsiList.find(i => i.id === b.etablissementId)?.name || b.etablissementId || ""; 
+    }
+    if (valA < valB) return teamSortConfig.direction === "asc" ? -1 : 1;
+    if (valA > valB) return teamSortConfig.direction === "asc" ? 1 : -1;
+    return 0;
+  });
+
+  const handleSortTeam = (key) => {
+    let direction = "asc";
+    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc";
+    setTeamSortConfig({ key, direction });
+  };
 
   async function exportToExcel() {
     if (!criteres) return;
@@ -463,9 +496,10 @@ function MainApp() {
       {modalCritere && <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} />}
       
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+        
+        {/* HAUT DE PAGE */}
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", gap: "20px", flexWrap: "wrap" }}>
           
-          {/* BLOC 1 : LOGO & SÉLECTEUR */}
           <div style={{ display: "flex", alignItems: "center", gap: "12px", flexWrap: "wrap" }}>
             <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
               <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -494,7 +528,6 @@ function MainApp() {
             </div>
           </div>
 
-          {/* BLOC 2 : MENUS DE NAVIGATION */}
           <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap", flex: 1, justifyContent: "center" }}>
             {userProfile?.role === "superadmin" && (
               <button style={{ ...navBtn(activeTab === "tour_controle"), marginRight: "8px", border: "1px solid #6366f1", color: activeTab === "tour_controle" ? "white" : "#4f46e5", background: activeTab === "tour_controle" ? "#6366f1" : "#e0e7ff" }} onClick={() => setActiveTab("tour_controle")}>🛸 Tour de Contrôle</button>
@@ -513,7 +546,6 @@ function MainApp() {
             <button onClick={() => setIsAuditMode(!isAuditMode)} style={{ ...navBtn(false), color: isAuditMode ? "#065f46" : "#4b5563", background: isAuditMode ? "#d1fae5" : "transparent", fontSize: "12px", marginLeft: "12px", border: `1px solid ${isAuditMode ? "#6ee7b7" : "#e2e8f0"}`, display: "flex", alignItems: "center", gap: "6px" }}><span>{isAuditMode ? "🕵️‍♂️ Mode Audit : ON" : "🕵️‍♂️ Mode Audit"}</span></button>
           </div>
 
-          {/* BLOC 3 : EXPORTS & PROFIL */}
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", marginLeft: "auto" }}>
             <div style={{ display: "flex", gap: "6px" }}>
               <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
@@ -533,9 +565,7 @@ function MainApp() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
-        {/* ========================================================= */}
-        {/* 👉 ONGLET : TOUR DE CONTRÔLE (AVEC CONFORMES + DATE)      */}
-        {/* ========================================================= */}
+        {/* --- TOUR DE CONTRÔLE --- */}
         {activeTab === "tour_controle" && userProfile?.role === "superadmin" && (
           <div>
             <div style={{ marginBottom: "24px", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
@@ -594,7 +624,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ONGLET : ORGANIGRAMME --- */}
+        {/* --- ORGANIGRAMME --- */}
         {activeTab === "organigramme" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
@@ -684,7 +714,113 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ONGLET RESPONSABLES (TRIÉ PAR PERSONNE) --- */}
+        {/* --- ONGLET ÉQUIPE (COMPTES AVEC TRI & FILTRES) --- */}
+        {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
+          <div>
+            <div style={{ marginBottom: "24px" }}>
+              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>👥 Création & Gestion des Comptes</h2>
+              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Créez les identifiants de connexion. Vous pourrez ensuite affecter ces personnes dans l'onglet "Organigramme".</p>
+            </div>
+            
+            <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", alignItems: "start" }}>
+              
+              {/* Création d'un compte */}
+              <div style={{ ...card, background: "#f8fafc" }}>
+                <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Nouveau compte</h3>
+                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px", borderRadius: "6px", fontSize: "11px", color: "#1d4ed8", marginBottom: "16px", lineHeight: "1.4" }}>
+                  ℹ️ L'utilisateur sera forcé de modifier son mot de passe provisoire lors de sa première connexion.
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Email</label>
+                  <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="formateur@ifsi.fr" />
+                </div>
+                <div style={{ marginBottom: "12px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Mot de passe provisoire</label>
+                  <input type="text" value={newMember.pwd} onChange={e => setNewMember({...newMember, pwd: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="Ex: Qualiopi2026!" />
+                  <div style={{ fontSize: "10px", color: "#6b7280", marginTop: "6px", lineHeight: "1.4" }}>👉 Minimum 6 caractères.</div>
+                </div>
+                <div style={{ marginBottom: "16px" }}>
+                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Rôle système</label>
+                  <select value={newMember.role} onChange={e => setNewMember({...newMember, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px", background: "white" }}>
+                    <option value="user">Formateur / Membre (Lecture & Écriture)</option>
+                    {userProfile.role === "superadmin" && <option value="admin">Administrateur IFSI (Peut inviter des gens)</option>}
+                  </select>
+                </div>
+                {userProfile.role === "superadmin" && (
+                   <div style={{ marginBottom: "16px", background: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px dashed #fcd34d" }}>
+                     <label style={{ fontSize: "11px", fontWeight: "800", color: "#d97706", textTransform: "uppercase" }}>👑 Choix IFSI (Mode Superadmin)</label>
+                     <select value={newMember.ifsi || selectedIfsi} onChange={e => setNewMember({...newMember, ifsi: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #fcd34d", marginTop: "4px", background: "white" }}>
+                       {ifsiList.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
+                     </select>
+                   </div>
+                )}
+                <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ width: "100%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", padding: "10px", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: isCreatingUser ? "wait" : "pointer" }}>
+                  {isCreatingUser ? "Création en cours..." : "Créer le compte"}
+                </button>
+              </div>
+
+              {/* Table avec recherche et tri */}
+              <div style={{ ...card, padding: 0, overflow: "hidden" }}>
+                
+                {/* Barre de recherche */}
+                <div style={{ padding: "16px", background: "#fafafa", borderBottom: "1px solid #e2e8f0" }}>
+                  <input 
+                    type="text" 
+                    placeholder="🔍 Rechercher par email ou nom d'établissement..." 
+                    value={teamSearchTerm}
+                    onChange={e => setTeamSearchTerm(e.target.value)}
+                    style={{ ...inp, width: "100%", maxWidth: "400px", padding: "8px 12px", fontSize: "13px" }}
+                  />
+                  {userProfile.role === "superadmin" && (
+                    <span style={{ fontSize: "12px", color: "#64748b", marginLeft: "12px", fontWeight: "600" }}>
+                      {sortedTeamUsers.length} compte(s) trouvé(s) au total
+                    </span>
+                  )}
+                </div>
+
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                  <thead>
+                    <tr>
+                      <th style={{...th, cursor: "pointer", userSelect: "none"}} onClick={() => handleSortTeam('email')} title="Trier par Email">
+                        Email {teamSortConfig.key === 'email' ? (teamSortConfig.direction === 'asc' ? '🔼' : '🔽') : '↕'}
+                      </th>
+                      <th style={{...th, cursor: "pointer", userSelect: "none"}} onClick={() => handleSortTeam('role')} title="Trier par Rôle">
+                        Rôle Système {teamSortConfig.key === 'role' ? (teamSortConfig.direction === 'asc' ? '🔼' : '🔽') : '↕'}
+                      </th>
+                      {userProfile.role === "superadmin" && (
+                        <th style={{...th, cursor: "pointer", userSelect: "none"}} onClick={() => handleSortTeam('ifsi')} title="Trier par Établissement">
+                          IFSI Attaché {teamSortConfig.key === 'ifsi' ? (teamSortConfig.direction === 'asc' ? '🔼' : '🔽') : '↕'}
+                        </th>
+                      )}
+                      <th style={th}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sortedTeamUsers.map(u => (
+                      <tr key={u.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
+                        <td style={{ ...td, fontWeight: "600", color: "#1e3a5f" }}>{u.email || u.id}</td>
+                        <td style={td}>
+                          {u.role === "superadmin" && <span style={{ background: "#fef2f2", color: "#991b1b", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fca5a5" }}>SUPERADMIN</span>}
+                          {u.role === "admin" && <span style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fed7aa" }}>ADMIN IFSI</span>}
+                          {(u.role === "user" || !u.role) && <span style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #d1d5db" }}>FORMATEUR</span>}
+                        </td>
+                        {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
+                        <td style={td}>
+                          {u.id !== auth.currentUser?.uid && u.role !== "superadmin" && (
+                            <button onClick={() => handleDeleteUser(u.id, u.email)} style={{ background: "white", color: "#ef4444", border: "1px solid #fca5a5", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold" }}>Supprimer</button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                    {sortedTeamUsers.length === 0 && <tr><td colSpan="4" style={{ padding: "20px", textAlign: "center", color: "#9ca3af", fontStyle: "italic", fontSize: "13px" }}>Aucun compte trouvé correspondant à la recherche.</td></tr>}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* --- RESTE DES ONGLETS (Responsables, Mon Compte, etc.) INCHANGÉS --- */}
         {activeTab === "responsables" && <>
           <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f" }}>Avancement par Membre de l'équipe</h2></div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(420px,1fr))", gap: "16px" }}>
@@ -726,7 +862,6 @@ function MainApp() {
           </div>
         </>}
 
-        {/* --- ONGLET "MON COMPTE" --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
@@ -760,161 +895,6 @@ function MainApp() {
             </div>
           </div>
         )}
-
-        {/* --- ONGLET ÉQUIPE (CRÉATION DE COMPTES) --- */}
-        {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
-          <div>
-            <div style={{ marginBottom: "24px" }}>
-              <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>👥 Création de comptes d'accès</h2>
-              <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Créez les identifiants de connexion. Vous pourrez ensuite affecter ces personnes dans l'onglet "Organigramme".</p>
-            </div>
-            <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", alignItems: "start" }}>
-              <div style={{ ...card, background: "#f8fafc" }}>
-                <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Nouveau compte</h3>
-                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px", borderRadius: "6px", fontSize: "11px", color: "#1d4ed8", marginBottom: "16px", lineHeight: "1.4" }}>
-                  ℹ️ L'utilisateur sera forcé de modifier son mot de passe provisoire lors de sa première connexion.
-                </div>
-                <div style={{ marginBottom: "12px" }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Email</label>
-                  <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="formateur@ifsi.fr" />
-                </div>
-                <div style={{ marginBottom: "12px" }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Mot de passe provisoire</label>
-                  <input type="text" value={newMember.pwd} onChange={e => setNewMember({...newMember, pwd: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="Ex: Qualiopi2026!" />
-                  <div style={{ fontSize: "10px", color: "#6b7280", marginTop: "6px", lineHeight: "1.4" }}>👉 Minimum 6 caractères.</div>
-                </div>
-                <div style={{ marginBottom: "16px" }}>
-                  <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Rôle système</label>
-                  <select value={newMember.role} onChange={e => setNewMember({...newMember, role: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px", background: "white" }}>
-                    <option value="user">Formateur / Membre (Lecture & Écriture)</option>
-                    {userProfile.role === "superadmin" && <option value="admin">Administrateur IFSI (Peut inviter des gens)</option>}
-                  </select>
-                </div>
-                {userProfile.role === "superadmin" && (
-                   <div style={{ marginBottom: "16px", background: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px dashed #fcd34d" }}>
-                     <label style={{ fontSize: "11px", fontWeight: "800", color: "#d97706", textTransform: "uppercase" }}>👑 Choix IFSI (Mode Superadmin)</label>
-                     <select value={newMember.ifsi || selectedIfsi} onChange={e => setNewMember({...newMember, ifsi: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #fcd34d", marginTop: "4px", background: "white" }}>
-                       {ifsiList.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
-                     </select>
-                   </div>
-                )}
-                <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ width: "100%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", padding: "10px", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: isCreatingUser ? "wait" : "pointer" }}>
-                  {isCreatingUser ? "Création en cours..." : "Créer le compte"}
-                </button>
-              </div>
-
-              <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-                <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                  <thead><tr><th style={th}>Email</th><th style={th}>Rôle Système</th>{userProfile.role === "superadmin" && <th style={th}>IFSI Attaché</th>}<th style={th}>Actions</th></tr></thead>
-                  <tbody>
-                    {teamUsers.map(u => (
-                      <tr key={u.id} style={{ borderBottom: "1px solid #f1f5f9" }}>
-                        <td style={{ ...td, fontWeight: "600", color: "#1e3a5f" }}>{u.email || u.id}</td>
-                        <td style={td}>
-                          {u.role === "superadmin" && <span style={{ background: "#fef2f2", color: "#991b1b", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fca5a5" }}>SUPERADMIN</span>}
-                          {u.role === "admin" && <span style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fed7aa" }}>ADMIN IFSI</span>}
-                          {(u.role === "user" || !u.role) && <span style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #d1d5db" }}>FORMATEUR</span>}
-                        </td>
-                        {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
-                        <td style={td}>
-                          {u.id !== auth.currentUser?.uid && u.role !== "superadmin" && (
-                            <button onClick={() => handleDeleteUser(u.id, u.email)} style={{ background: "white", color: "#ef4444", border: "1px solid #fca5a5", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold" }}>Supprimer</button>
-                          )}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* --- DASHBOARD --- */}
-        {activeTab === "dashboard" && <>
-          <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-              <span style={{ fontSize: "24px" }}>{bannerConfig.icon}</span>
-              <div>
-                <div style={{ fontSize: "16px", fontWeight: "800", color: bannerConfig.color, textTransform: "uppercase", letterSpacing: "0.5px" }}>{bannerConfig.text}</div>
-                <div style={{ fontSize: "12px", color: bannerConfig.color, opacity: 0.8, marginTop: "2px", fontWeight: "600" }}>Date officielle visée : {new Date(currentAuditDate).toLocaleDateString("fr-FR")}</div>
-              </div>
-            </div>
-            {!isArchive && <button onClick={handleEditAuditDate} style={{ background: "transparent", border: `1px solid ${bannerConfig.color}`, color: bannerConfig.color, padding: "6px 12px", borderRadius: "6px", fontSize: "11px", fontWeight: "700", cursor: "pointer", opacity: 0.7, transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.opacity=1} onMouseOut={e=>e.currentTarget.style.opacity=0.7}>Modifier la date</button>}
-          </div>
-
-          <div className="print-break-avoid no-print" style={{ ...card, marginBottom: "24px", padding: "20px 24px" }}>
-            <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#1e3a5f", fontWeight: "800", display: "flex", justifyContent: "space-between", alignItems: "flex-end" }}>
-              <span>🚀 État d'avancement global</span>
-              <span style={{ fontSize: "15px", color: "#1d4ed8", fontWeight: "800", background: "#eff6ff", padding: "4px 10px", borderRadius: "8px", border: "1px solid #bfdbfe" }}>{Math.round((stats.conforme / stats.total) * 100) || 0}% Achevé</span>
-            </h3>
-            <div style={{ display: "flex", height: "26px", borderRadius: "13px", overflow: "hidden", background: "#f1f5f9", gap: "3px", boxShadow: "inset 0 1px 3px rgba(0,0,0,0.1)" }}>
-              <div style={{ width: `${(stats.conforme / stats.total) * 100}%`, background: "#10b981", transition: "width 0.8s ease" }} title={`Conforme: ${stats.conforme}`} />
-              <div style={{ width: `${(stats.enCours / stats.total) * 100}%`, background: "#f59e0b", transition: "width 0.8s ease" }} title={`En cours: ${stats.enCours}`} />
-              <div style={{ width: `${(stats.nonConforme / stats.total) * 100}%`, background: "#ef4444", transition: "width 0.8s ease" }} title={`Non conforme: ${stats.nonConforme}`} />
-              <div style={{ width: `${(stats.nonEvalue / stats.total) * 100}%`, background: "#d1d5db", transition: "width 0.8s ease" }} title={`Non évalué: ${stats.nonEvalue}`} />
-            </div>
-            <div style={{ display: "flex", gap: "20px", marginTop: "14px", fontSize: "12px", fontWeight: "700", flexWrap: "wrap", justifyContent: "center" }}>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#10b981" }}></span><span style={{ color: "#065f46" }}>{stats.conforme} Conformes ({Math.round((stats.conforme / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#f59e0b" }}></span><span style={{ color: "#92400e" }}>{stats.enCours} En cours ({Math.round((stats.enCours / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#ef4444" }}></span><span style={{ color: "#991b1b" }}>{stats.nonConforme} Non conformes ({Math.round((stats.nonConforme / stats.total) * 100) || 0}%)</span></div>
-              <div style={{ display: "flex", alignItems: "center", gap: "6px" }}><span style={{ width: "12px", height: "12px", borderRadius: "50%", background: "#d1d5db" }}></span><span style={{ color: "#4b5563" }}>{stats.nonEvalue} À faire ({Math.round((stats.nonEvalue / stats.total) * 100) || 0}%)</span></div>
-            </div>
-          </div>
-
-          <div className="print-break-avoid" style={{ display: "grid", gridTemplateColumns: "repeat(5,1fr)", gap: "12px", marginBottom: "24px" }}>
-            {[["#6b7280","#f3f4f6","#d1d5db",stats.nonEvalue,"Non évalués"],["#065f46","#d1fae5","#6ee7b7",stats.conforme,"Conformes"],["#92400e","#fef3c7","#fcd34d",stats.enCours,"En cours"],["#991b1b","#fee2e2","#fca5a5",stats.nonConforme,"Non conformes"],["#b45309","#fef9c3","#fde68a",urgents.length,"Urgents < 30j"]].map(([color,bg,border,num,label]) => (
-              <div key={label} style={{ background: bg, border: `1px solid ${border}`, borderRadius: "10px", padding: "14px 16px", opacity: isArchive ? 0.8 : 1 }}><div style={{ fontSize: "28px", fontWeight: "900", color, lineHeight: 1 }}>{num}</div><div style={{ fontSize: "10px", color, opacity: 0.9, marginTop: "4px", textTransform: "uppercase", fontWeight: "700", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div></div>
-            ))}
-          </div>
-          
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "24px" }}>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Score de conformité (sur les {stats.total} concernés)</div><div style={{ display: "flex", gap: "20px" }}><GaugeChart value={stats.conforme} max={stats.total} color="#1d4ed8" /><div style={{ flex: 1 }}>{[["Non évalué",stats.nonEvalue,"#9ca3af"],["Conforme",stats.conforme,"#059669"],["En cours",stats.enCours,"#d97706"],["Non conforme",stats.nonConforme,"#dc2626"]].map(([l,v,col]) => (<div key={l} style={{ marginBottom: "8px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "12px", color: "#6b7280", marginBottom: "4px" }}><span>{l}</span><span style={{ fontWeight: "600", color: col }}>{v}/{stats.total}</span></div><ProgressBar value={v} max={stats.total} color={col} /></div>))}</div></div></div>
-            <div className="print-break-avoid" style={card}><div style={{ fontSize: "14px", fontWeight: "700", marginBottom: "18px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>Avancement par critère (hors non-concernés)</div>{Object.entries(CRITERES_LABELS).map(([num, cfg]) => { const cr = criteres.filter(c => c.critere === parseInt(num) && c.statut !== "non-concerne"); const ok = cr.filter(c => c.statut === "conforme").length; return (<div key={num} style={{ marginBottom: "11px" }}><div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: "#6b7280", marginBottom: "4px" }}><span style={{ fontWeight: "600" }}>C{num} — {cfg.label}</span><span style={{ color: cfg.color, fontWeight: "700" }}>{ok}/{cr.length}</span></div><ProgressBar value={ok} max={cr.length === 0 ? 1 : cr.length} color={cfg.color} /></div>); })}</div>
-          </div>
-        </>}
-
-        {/* --- CRITERES --- */}
-        {activeTab === "criteres" && <>
-          <div className="no-print" style={{ display: "flex", gap: "10px", marginBottom: "20px", flexWrap: "wrap", alignItems: "center" }}><input placeholder="Rechercher..." value={searchTerm} onChange={e => setSearchTerm(e.target.value)} style={{ background: "white", border: "1px solid #d1d5db", borderRadius: "7px", padding: "7px 12px", fontSize: "13px", width: "220px", outline: "none" }} /><select value={filterStatut} onChange={e => setFilterStatut(e.target.value)} style={sel}><option value="tous">Tous les statuts</option>{Object.entries(STATUT_CONFIG).map(([k,v]) => <option key={k} value={k}>{v.label}</option>)}</select><select value={filterCritere} onChange={e => setFilterCritere(e.target.value)} style={sel}><option value="tous">Tous les critères</option>{Object.entries(CRITERES_LABELS).map(([n,c]) => <option key={n} value={n}>C{n} — {c.label}</option>)}</select><span style={{ fontSize: "12px", color: "#9ca3af" }}>{filtered.length} indicateur(s)</span></div>
-          <div style={{ ...card, padding: 0, overflow: "hidden" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead><tr>{["N°","Indicateur","Responsable(s)","Échéance","Statut","Preuves fournies"].map(h => <th key={h} style={th}>{h}</th>)}<th style={th} className="no-print"></th></tr></thead>
-              <tbody>{filtered.map(c => { 
-                const cConf = CRITERES_LABELS[c.critere] || { label: "Critère Inconnu", color: "#9ca3af" };
-                const d = days(c.delai); 
-                const resps = Array.isArray(c.responsables) ? c.responsables : []; 
-                const nbFiles = (c.fichiers || []).filter(f => !f.archive).length;
-                const nbChemins = (c.chemins_reseau || []).length;
-                const hasLink = (c.preuves || "").trim().length > 0;
-                return (<tr key={c.id} className="print-break-avoid" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "110px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td><td style={{ ...td, maxWidth: "280px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af" }}>{cConf.label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "3px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); return <span key={rSafe} style={{ fontSize: "10px", color: "#1e40af", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: "4px", padding: "2px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "2px 6px" }}>+{resps.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "600" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td>
-                <td style={td}>
-                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
-                    {nbChemins > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 6px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>🔗 {nbChemins} Lien(s) Réseau</span>}
-                    {nbFiles > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "2px 6px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap" }}>☁️ {nbFiles} Upload(s)</span>}
-                    {hasLink && <span style={{ fontSize: "10px", color: "#1d4ed8", background: "#eff6ff", padding: "2px 6px", borderRadius: "4px", border: "1px solid #bfdbfe", whiteSpace: "nowrap" }}>📝 Texte</span>}
-                    {nbFiles === 0 && nbChemins === 0 && !hasLink && <span style={{ fontSize: "10px", color: "#9ca3af" }}>Vide</span>}
-                  </div>
-                </td>
-                <td className="no-print" style={{ ...td, width: "80px" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "5px 14px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}>{isArchive ? "Consulter" : "Éditer"}</button></td></tr>);})}</tbody>
-            </table>
-          </div>
-        </>}
-
-        {/* --- AXES --- */}
-        {activeTab === "axes" && <>
-          <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Axes prioritaires d'amélioration</h2></div>
-          {["non-conforme","en-cours"].map(st => {
-            const items = axes.filter(c => c.statut === st); if (items.length === 0) return null; const isNC = st === "non-conforme";
-            return (<div key={st}><div className="print-break-avoid" style={{ fontSize: "12px", color: isNC?"#991b1b":"#92400e", fontWeight: "700", marginBottom: "10px", textTransform: "uppercase" }}>{isNC ? "🔴 Non conformes — Action immédiate" : "🟠 En cours — À finaliser"}</div>
-              {items.map(c => {
-                const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
-                const d = days(c.delai);
-                return (<div key={c.id} className="print-break-avoid" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "10px" }}><div style={{ display: "flex", gap: "12px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span><div style={{ flex: 1 }}><div style={{ fontSize: "14px", fontWeight: "700" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "8px" }}>{cConf.label}</div>{(!isAuditMode && (c.attendus||"")) && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#92400e" }}>Remarques : </span>{c.attendus}</div>}{((c.fichiers && c.fichiers.length > 0) || (c.preuves||"").trim()) && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "8px 12px", marginBottom: "6px" }}><span style={{ fontWeight: "700", color: "#065f46" }}>{isAuditMode ? "Preuves :" : "Preuves finalisées :"} </span>{c.fichiers?.length > 0 ? `${c.fichiers.length} document(s) joint(s). ` : ""}{c.preuves}</div>}{(!isAuditMode && (c.preuves_encours||"").trim()) && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px solid #fde68a", borderRadius: "6px", padding: "8px 12px" }}><span style={{ fontWeight: "700", color: "#d97706" }}>En cours : </span>{c.preuves_encours}</div>}</div><div style={{ textAlign: "right", minWidth: "140px" }}><StatusBadge statut={c.statut} /><div style={{ fontSize: "12px", color: "#6b7280", marginTop: "6px" }}>{new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{!isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}<button onClick={() => setModalCritere(c)} style={{ marginTop: "8px", background: isArchive ? "#f1f5f9" : (isNC?"#fff5f5":"#fffbeb"), border:`1px solid ${isArchive ? "#d1d5db" : (isNC?"#fca5a5":"#fcd34d")}`, borderRadius: "6px", color: isArchive ? "#4b5563" : (isNC?"#dc2626":"#92400e"), padding: "4px 12px", fontSize: "11px", cursor: "pointer", fontWeight: "600" }}>{isArchive ? "Consulter" : "Éditer"}</button></div></div></div>)
-              })}
-            </div>);
-          })}
-        </>}
 
       </div>
     </div>
