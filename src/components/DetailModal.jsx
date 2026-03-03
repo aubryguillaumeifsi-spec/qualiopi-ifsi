@@ -1,7 +1,7 @@
 import { useState, useRef, useEffect } from "react";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getBytes } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { storage } from "../firebase";
+import { storage, auth } from "../firebase";
 import { CRITERES_LABELS, STATUT_CONFIG, GUIDE_QUALIOPI } from "../data";
 
 function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalette, orgRoles }) {
@@ -59,7 +59,7 @@ function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalett
   );
 }
 
-export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles, hasNext, hasPrev }) {
+export default function DetailModal({ critere, onClose, onSave, onAutoSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles, hasNext, hasPrev }) {
   
   const rawChemins = Array.isArray(critere.chemins_reseau) ? critere.chemins_reseau : (critere.chemin_reseau ? [critere.chemin_reseau] : []);
   const initialChemins = rawChemins.map(c => {
@@ -67,7 +67,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     return { ...c, validated: c.validated !== false };
   });
 
-  // On initialise l'état dès que le critère change
   const [data, setData] = useState({});
   
   useEffect(() => {
@@ -80,7 +79,7 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       preuves_encours: critere.preuves_encours || "", 
       attendus: critere.attendus || "", 
       notes: critere.notes || "",
-      historique: critere.historique || [] // Charge l'historique
+      historique: critere.historique || [] 
     });
   }, [critere]);
   
@@ -95,6 +94,22 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
   const lbl = { display: "block", fontSize: "11px", color: "#6b7280", textTransform: "uppercase", fontWeight: "700", marginBottom: "5px" };
   const inp = { background: (isReadOnly || isAuditMode) ? "#f9fafb" : "white", border: "1px solid #d1d5db", borderRadius: "8px", padding: "10px", fontSize: "13px", width: "100%", outline: "none", boxSizing: "border-box" };
 
+  // 👉 FONCTION CENTRALE : AUTO-SAUVEGARDE + HISTORIQUE TEMPS RÉEL
+  const triggerAutoSave = (updatedData, logMsg) => {
+    const now = new Date().toISOString();
+    const userEmail = auth?.currentUser?.email || "Utilisateur";
+    const newLog = { date: now, user: userEmail, msg: logMsg };
+    
+    const finalData = { 
+      ...updatedData, 
+      historique: [...(updatedData.historique || []), newLog] 
+    };
+    
+    setData(finalData); // Met à jour l'écran immédiatement
+    if (onAutoSave) onAutoSave(finalData); // Sauvegarde en BDD en arrière-plan
+  };
+
+  // --- ACTIONS SUR LES FICHIERS CLOUD ---
   async function handleFileUpload(e) {
     const file = e.target.files[0];
     if (!file) return;
@@ -104,20 +119,55 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
       await uploadBytesResumable(fileRef, file);
       const url = await getDownloadURL(fileRef);
       const newFile = { name: file.name, url: url, path: fileRef.fullPath, validated: false };
-      setData(prev => ({ ...prev, fichiers: [...prev.fichiers, newFile] }));
+      
+      triggerAutoSave(
+        { ...data, fichiers: [...data.fichiers, newFile] }, 
+        `📎 A importé le fichier : ${file.name}`
+      );
     } catch (error) { alert("Erreur d'envoi : " + error.message); }
     setUploading(false);
   }
 
   const toggleValidation = (fileUrl) => {
-    setData(prev => ({ ...prev, fichiers: prev.fichiers.map(f => f.url === fileUrl ? { ...f, validated: !f.validated } : f) }));
+    const fileToToggle = data.fichiers.find(f => f.url === fileUrl);
+    const newFichiers = data.fichiers.map(f => f.url === fileUrl ? { ...f, validated: !f.validated } : f);
+    const logMsg = !fileToToggle.validated 
+      ? `✅ A validé le document comme preuve officielle : ${fileToToggle.name}` 
+      : `❌ A repassé en chantier le document : ${fileToToggle.name}`;
+    triggerAutoSave({ ...data, fichiers: newFichiers }, logMsg);
   };
 
   async function handleDeleteFile(fileToDelete) {
     if (!window.confirm(`Supprimer définitivement "${fileToDelete.name}" ?`)) return;
-    try { if (fileToDelete.path) await deleteObject(ref(storage, fileToDelete.path)); } catch (e) { console.warn("Introuvable"); }
-    setData(prev => ({ ...prev, fichiers: prev.fichiers.filter(f => f.url !== fileToDelete.url) }));
+    try { if (fileToDelete.path) await deleteObject(ref(storage, fileToDelete.path)); } catch (e) { console.warn("Introuvable sur le serveur"); }
+    const newFichiers = data.fichiers.filter(f => f.url !== fileToDelete.url);
+    triggerAutoSave({ ...data, fichiers: newFichiers }, `🗑️ A supprimé le fichier : ${fileToDelete.name}`);
   }
+
+  // --- ACTIONS SUR LES LIENS RÉSEAU ---
+  const addChemin = () => {
+    if (newCheminVal.trim() !== "") {
+      const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Lien réseau";
+      const newChemins = [...data.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim(), validated: false }];
+      triggerAutoSave({ ...data, chemins_reseau: newChemins }, `🔗 A ajouté le lien réseau : ${nomFinal}`);
+      setNewCheminNom(""); setNewCheminVal("");
+    }
+  };
+
+  const toggleCheminValidation = (index) => {
+    const link = data.chemins_reseau[index];
+    const newChemins = data.chemins_reseau.map((c, i) => i === index ? { ...c, validated: !c.validated } : c);
+    const logMsg = !link.validated 
+      ? `✅ A validé le lien réseau comme preuve officielle : ${link.nom}` 
+      : `❌ A repassé en chantier le lien réseau : ${link.nom}`;
+    triggerAutoSave({ ...data, chemins_reseau: newChemins }, logMsg);
+  };
+
+  const removeChemin = (index) => {
+    const link = data.chemins_reseau[index];
+    const newChemins = data.chemins_reseau.filter((_, i) => i !== index);
+    triggerAutoSave({ ...data, chemins_reseau: newChemins }, `🗑️ A supprimé le lien réseau : ${link.nom}`);
+  };
 
   const copyToClipboard = (chemin) => {
     if (!chemin) return;
@@ -125,27 +175,54 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
     alert("Copié ! Faites Ctrl+V dans votre explorateur.");
   };
 
-  const addChemin = () => {
-    if (newCheminVal.trim() !== "") {
-      const nomFinal = newCheminNom.trim() || newCheminVal.split('\\').pop() || "Lien réseau";
-      setData(prev => ({ ...prev, chemins_reseau: [...prev.chemins_reseau, { nom: nomFinal, chemin: newCheminVal.trim(), validated: false }] }));
-      setNewCheminNom(""); setNewCheminVal("");
+  // 👉 LE RETOUR DE L'INTELLIGENCE ARTIFICIELLE
+  async function handleAnalyze(file) {
+    if (!file.url) return;
+    setIsAnalyzing(true);
+    setAiReport("");
+    try {
+      const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
+      if (!apiKey) throw new Error("Clé API Gemini introuvable (VITE_GEMINI_API_KEY). Veuillez la configurer dans Vercel.");
+
+      const response = await fetch(file.url);
+      const blob = await response.blob();
+      
+      const reader = new FileReader();
+      reader.readAsDataURL(blob);
+      reader.onloadend = async () => {
+         try {
+             const base64data = reader.result.split(',')[1];
+             let mimeType = blob.type;
+             if (file.name.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+
+             const genAI = new GoogleGenerativeAI(apiKey);
+             const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
+
+             const prompt = `Tu es un auditeur Qualiopi bienveillant mais rigoureux. Analyse ce document pour le critère ${data.num} : "${data.titre}".
+              Voici le niveau attendu par le référentiel : ${guide.niveau}.
+              Fais un résumé très clair et concis (avec des emojis) :
+              1. 📄 Que contient ce document ?
+              2. 🎯 Est-il pertinent pour valider ce critère précis ?
+              3. ⚠️ Que manque-t-il pour être parfait ?`;
+
+             const result = await model.generateContent([
+               prompt,
+               { inlineData: { data: base64data, mimeType } }
+             ]);
+             setAiReport(result.response.text());
+         } catch (err) {
+             setAiReport("Erreur lors de l'analyse : " + err.message);
+         } finally {
+             setIsAnalyzing(false);
+         }
+      };
+    } catch (error) {
+      setAiReport("Erreur réseau : " + error.message);
+      setIsAnalyzing(false);
     }
-  };
+  }
 
-  const toggleCheminValidation = (index) => {
-    setData(prev => {
-      const updatedChemins = [...prev.chemins_reseau];
-      updatedChemins[index].validated = !updatedChemins[index].validated;
-      return { ...prev, chemins_reseau: updatedChemins };
-    });
-  };
-
-  const removeChemin = (index) => {
-    setData(prev => ({ ...prev, chemins_reseau: prev.chemins_reseau.filter((_, i) => i !== index) }));
-  };
-
-  if (!data.id) return null; // Sécurité de chargement
+  if (!data.id) return null;
 
   const chantierFiles = data.fichiers.filter(f => !f.validated);
   const validatedFiles = data.fichiers.filter(f => f.validated);
@@ -169,7 +246,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
 
         <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", flex: 1 }}>
           
-          {/* COLONNE GAUCHE (RÉFÉRENTIEL + HISTORIQUE) */}
           <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             <div style={{ background: "#f8fafc", padding: "20px", borderRadius: "12px", fontSize: "13px", border: "1px solid #e2e8f0" }}>
               <h3 style={{ ...lbl, color: "#1e3a5f", fontSize: "13px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px", marginBottom: "12px" }}>📘 Référentiel Officiel</h3>
@@ -183,7 +259,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
               )}
             </div>
 
-            {/* 👉 NOUVEAU : JOURNAL D'HISTORIQUE DE TRAÇABILITÉ */}
             {!isAuditMode && (
               <div style={{ background: "white", border: "1px solid #e2e8f0", padding: "20px", borderRadius: "12px", flex: 1, display: "flex", flexDirection: "column" }}>
                 <h3 style={{ ...lbl, color: "#1e3a5f", fontSize: "13px", borderBottom: "2px solid #e2e8f0", paddingBottom: "8px", marginBottom: "12px" }}>🕰️ Historique & Traçabilité</h3>
@@ -207,7 +282,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
             )}
           </div>
 
-          {/* COLONNE DROITE (FORMULAIRE) */}
           <div>
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "20px" }}>
               <div>
@@ -303,23 +377,38 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
                     </div>
                   )}
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginBottom: chantierFiles.length > 0 ? "16px" : "0" }}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "10px", marginBottom: chantierFiles.length > 0 ? "16px" : "0" }}>
                     {chantierFiles.map(f => (
-                      <div key={f.url} style={{ background: "white", padding: "6px 12px", borderRadius: "8px", border: "1px solid #fcd34d", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <div key={f.url} style={{ background: "white", padding: "10px 14px", borderRadius: "8px", border: "1px solid #fcd34d", fontSize: "13px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
                         <span style={{ color: "#92400e", fontWeight: "600" }}>☁️ {f.name}</span>
                         {!isReadOnly && (
-                          <><button onClick={() => toggleValidation(f.url)} style={{ background: "#d1fae5", border: "1px solid #6ee7b7", color: "#065f46", cursor: "pointer", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider ✅</button>
-                            <button onClick={() => handleDeleteFile(f)} style={{ color: "#ef4444", border: "none", background: "none", cursor: "pointer", fontSize: "14px" }}>🗑️</button></>
+                          <div style={{ display: "flex", gap: "8px" }}>
+                            {/* 👉 LE BOUTON IA DE RETOUR ICI */}
+                            <button onClick={() => handleAnalyze(f)} disabled={isAnalyzing} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", cursor: "pointer", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>
+                              {isAnalyzing ? "⏳ IA..." : "🤖 Analyse IA"}
+                            </button>
+                            <button onClick={() => toggleValidation(f.url)} style={{ background: "#d1fae5", border: "1px solid #6ee7b7", color: "#065f46", cursor: "pointer", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider ✅</button>
+                            <button onClick={() => handleDeleteFile(f)} style={{ color: "#ef4444", border: "none", background: "none", cursor: "pointer", fontSize: "14px" }}>🗑️</button>
+                          </div>
                         )}
                       </div>
                     ))}
                   </div>
 
+                  {/* Boîte d'affichage du rapport IA */}
+                  {aiReport && (
+                    <div style={{ background: "#f0fdfa", border: "1px solid #5eead4", padding: "16px", borderRadius: "8px", marginBottom: "16px", position: "relative" }}>
+                      <button onClick={() => setAiReport("")} style={{ position: "absolute", top: "10px", right: "10px", background: "none", border: "none", cursor: "pointer", fontSize: "14px" }}>❌</button>
+                      <strong style={{ color: "#0f766e", display: "block", marginBottom: "8px", fontSize: "13px" }}>🤖 Analyse de l'Assistant Qualiopi :</strong>
+                      <div style={{ fontSize: "12px", color: "#134e4a", whiteSpace: "pre-wrap", lineHeight: "1.5" }}>{aiReport}</div>
+                    </div>
+                  )}
+
                   {!isReadOnly && (
-                    <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                    <div style={{ display: "flex", gap: "12px", alignItems: "center", marginTop: "10px" }}>
                       <input type="file" accept="application/pdf,image/png,image/jpeg,image/webp" id="file-chantier" style={{ display: "none" }} onChange={handleFileUpload} disabled={uploading} />
                       <label htmlFor="file-chantier" style={{ background: "white", border: "1px dashed #d97706", color: "#d97706", padding: "8px 16px", borderRadius: "8px", cursor: uploading ? "wait" : "pointer", fontSize: "12px", fontWeight: "700", opacity: uploading ? 0.6 : 1 }}>
-                        {uploading ? "⏳ Upload..." : "📎 Importer (PDF/Image)"}
+                        {uploading ? "⏳ Upload en cours..." : "📎 Importer (PDF/Image)"}
                       </label>
                     </div>
                   )}
@@ -339,7 +428,6 @@ export default function DetailModal({ critere, onClose, onSave, isReadOnly, isAu
           </div>
         </div>
 
-        {/* 👉 NOUVEAU FOOTER AVEC NAVIGATION RAPIDE */}
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginTop: "24px", paddingTop: "20px", borderTop: "1px solid #e2e8f0" }}>
           
           <div style={{ display: "flex", gap: "10px" }}>
