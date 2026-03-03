@@ -175,7 +175,7 @@ function MainApp() {
     const active = ifsiList.filter(i => !i.archived).map(i => ({ ...i, ...getIfsiGlobalStats(i.id) }));
     const score = active.length ? Math.round(active.reduce((acc, curr) => acc + curr.pct, 0) / active.length) : 0;
     let alerts = [];
-    active.forEach(s => s.liste.forEach(c => {
+    active.forEach(s => (s.liste || []).forEach(c => {
       if (c.statut === "non-conforme") alerts.push({ ifsiName: s.name, critere: c, type: "non-conforme" });
       else if (days(c.delai) < 0 && c.statut !== "non-concerne" && c.statut !== "conforme") alerts.push({ ifsiName: s.name, critere: c, type: "depasse", days: Math.abs(days(c.delai)) });
     }));
@@ -190,7 +190,38 @@ function MainApp() {
 
   const totalUsersInNetwork = teamUsers.length;
 
-  // Handlers
+  // 👉 HANDLERS RÉINTRODUITS ICI
+  const handleIfsiSwitch = async (e) => {
+    if (e.target.value === "NEW") {
+      const nom = prompt("Nom de l'établissement :");
+      if (nom?.trim()) {
+        const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000);
+        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false });
+        setSelectedIfsi(id);
+      }
+    } else {
+      setSelectedIfsi(e.target.value);
+    }
+  };
+
+  const handleRenameIfsi = async (id, currentName) => {
+    const n = prompt("Nouveau nom :", currentName);
+    if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true });
+  };
+
+  const handleArchiveIfsi = async (id, name, status) => {
+    if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`))
+      await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true });
+  };
+
+  const handleHardDeleteIfsi = async (id, name) => {
+    if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") {
+      await deleteDoc(doc(db, "etablissements", id));
+      await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id));
+      if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham");
+    }
+  };
+
   const handleSortTeam = (key) => {
     let direction = "asc";
     if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc";
@@ -210,10 +241,33 @@ function MainApp() {
     saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
   };
 
+  const handleEditAuditDate = async () => {
+    const d = prompt("Date d'audit (AAAA-MM-JJ) :", currentAuditDate);
+    if (d) saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: d } : c));
+  };
+
+  const handleNewCampaign = (e) => {
+    if (e.target.value === "NEW") {
+      const nom = prompt("Nom de la campagne :");
+      if (nom) {
+        const newCamp = { id: Date.now().toString(), name: nom, auditDate: "2026-10-15", liste: DEFAULT_CRITERES, locked: false };
+        saveData([...campaigns.map(c => ({ ...c, locked: true })), newCamp]);
+      }
+    } else setActiveCampaignId(e.target.value);
+  };
+
+  const getRoleColor = (roleName) => {
+    if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" };
+    const idx = orgRoles.indexOf(roleName);
+    return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[7];
+  };
+
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap", transition: "all 0.2s" });
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
+
+  const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
@@ -238,8 +292,9 @@ function MainApp() {
         <div style={{ maxWidth: "1440px", margin: "0 auto", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
             <span style={{ fontSize: "20px", fontWeight: "800", color: "#1d4ed8", cursor: "pointer" }} onClick={() => setActiveTab("dashboard")}>QualiForma</span>
-            <select value={selectedIfsi} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db" }}>
+            <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db" }}>
               {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+              {userProfile?.role === "superadmin" && <option value="NEW">+ Nouvel établissement</option>}
             </select>
           </div>
 
@@ -261,14 +316,14 @@ function MainApp() {
 
       {/* CONTENU */}
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
-        {activeTab === "dashboard" && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit en vue" }} currentAuditDate={currentAuditDate} isArchive={isArchive} stats={stats} urgents={urgents} criteres={criteres} />}
-        {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={totalUsersInNetwork} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} />}
-        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} />}
+        {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit Qualiopi" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={handleEditAuditDate} stats={stats} urgents={urgents} criteres={criteres} />}
+        {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={totalUsersInNetwork} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={tourData.alerts.length} />}
+        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleDragOverOrg={handleDragOverOrg} handleDropOrg={handleDropOrg} handleDragStartOrg={handleDragStartOrg} removeRoleFromUser={removeRoleFromUser} editOrgRole={editOrgRole} editManualUser={editManualUser} deleteManualUser={deleteManualUser} addManualUser={addManualUser} addOrgRole={addOrgRole} newManualUserInput={newManualUserInput} setNewManualUserInput={setNewManualUserInput} newRoleInput={newRoleInput} setNewRoleInput={setNewRoleInput} deleteOrgRole={handleHardDeleteIfsi} applyDefaultRoles={applyDefaultRoles} />}
         {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} />}
         {activeTab === "axes" && <AxesTab axes={axes} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} isAuditMode={isAuditMode} />}
         {activeTab === "responsables" && <ResponsablesTab byPerson={byPerson} setModalCritere={setModalCritere} isArchive={isArchive} getRoleColor={getRoleColor} />}
         {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} currentCampaign={currentCampaign} criteres={criteres} />}
-        {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} auth={auth} />}
+        {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} />}
         {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={handleChangePassword} />}
       </div>
     </div>
