@@ -27,13 +27,6 @@ class ErrorBoundary extends React.Component {
   }
 }
 
-// --- LISTE DES ÉTABLISSEMENTS ---
-const IFSI_LIST = [
-  { id: "demo_ifps_cham", name: "IFPS du CHAM" },
-  { id: "ifsi_lyon", name: "IFSI de Lyon" },
-  { id: "ifsi_marseille", name: "IFSI de Marseille" }
-];
-
 function GaugeChart({ value, max, color }) {
   const pct = max > 0 ? (value / max) * 100 : 0, r = 38, circ = 2 * Math.PI * r;
   return (
@@ -69,11 +62,33 @@ function MainApp() {
   const [modalCritere, setModalCritere] = useState(null);
   const [isAuditMode, setIsAuditMode] = useState(false);
 
+  // 👉 NOUVEAU : L'état qui stocke la liste dynamique des IFSI
+  const [ifsiList, setIfsiList] = useState([]);
+  
   const [teamUsers, setTeamUsers] = useState([]);
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
 
+  // 1. ÉCOUTE DE LA LISTE DES IFSI EN TEMPS RÉEL
+  useEffect(() => {
+    const unsubIfsi = onSnapshot(collection(db, "etablissements"), (snapshot) => {
+      const list = [];
+      snapshot.forEach(doc => list.push({ id: doc.id, name: doc.data().name }));
+      
+      // Si la base est totalement vide, on recrée le CHAM par défaut pour ne pas bloquer
+      if (list.length === 0) {
+        setDoc(doc(db, "etablissements", "demo_ifps_cham"), { name: "IFPS du CHAM" });
+      } else {
+        // On trie la liste par ordre alphabétique
+        list.sort((a, b) => a.name.localeCompare(b.name));
+        setIfsiList(list);
+      }
+    });
+    return () => unsubIfsi();
+  }, []);
+
+  // 2. GESTION DE LA CONNEXION ET DU PROFIL
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -106,6 +121,7 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
+  // 3. CHARGEMENT DES DONNÉES QUALIOPI LORS DU CHANGEMENT D'IFSI
   useEffect(() => {
     let unsubSnapshot = null;
     if (selectedIfsi && userProfile?.role !== "guest" && !userProfile?.mustChangePassword) {
@@ -156,6 +172,27 @@ function MainApp() {
     }
   }
 
+  // 👉 NOUVEAU : FONCTION DE CRÉATION D'UN NOUVEL IFSI
+  async function handleIfsiSwitch(e) {
+    if (e.target.value === "NEW") {
+      const nomEtablissement = prompt("Nom du nouvel établissement (ex: IFSI de Bordeaux) :");
+      if (nomEtablissement && nomEtablissement.trim() !== "") {
+        // Crée un identifiant web propre (bordeaux_8452)
+        const safeId = nomEtablissement.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 10000);
+        try {
+          // Ajoute l'établissement dans la base de données
+          await setDoc(doc(db, "etablissements", safeId), { name: nomEtablissement.trim() });
+          // Bascule automatiquement dessus
+          setSelectedIfsi(safeId);
+        } catch (error) {
+          alert("Erreur lors de la création de l'établissement.");
+        }
+      }
+    } else {
+      setSelectedIfsi(e.target.value);
+    }
+  }
+
   async function loadTeamUsers(role, currentIfsi) {
     try {
       const querySnapshot = await getDocs(collection(db, "users"));
@@ -195,7 +232,6 @@ function MainApp() {
       secondaryAuth.signOut();
     } catch (error) {
       console.error(error);
-      // 👉 TRADUCTION DES ERREURS FIREBASE EN FRANÇAIS
       let msg = "Une erreur est survenue lors de la création du compte.";
       if (error.code === "auth/email-already-in-use") msg = "Cette adresse email est déjà utilisée par un autre compte.";
       if (error.code === "auth/invalid-email") msg = "Le format de l'adresse email est invalide.";
@@ -228,12 +264,10 @@ function MainApp() {
 
     try {
       await updatePassword(auth.currentUser, pwdUpdate.p1);
-      
       if (isForced) {
         await setDoc(doc(db, "users", auth.currentUser.uid), { mustChangePassword: false }, { merge: true });
         setUserProfile({ ...userProfile, mustChangePassword: false }); 
       }
-
       setPwdUpdate({ p1: "", p2: "", loading: false, error: "", success: "Votre mot de passe a été mis à jour avec succès !" });
     } catch (err) {
       let msg = "Erreur de mise à jour.";
@@ -293,7 +327,6 @@ function MainApp() {
           <div style={{ fontSize: "40px", marginBottom: "16px" }}>🔐</div>
           <h2 style={{ color: "#1e3a5f", margin: "0 0 10px 0", fontSize: "22px", fontWeight: "800" }}>Sécurisez votre compte</h2>
           <p style={{ color: "#6b7280", fontSize: "14px", marginBottom: "24px", lineHeight: "1.5" }}>Ceci est votre première connexion. Veuillez remplacer le mot de passe provisoire par un mot de passe personnel.</p>
-          
           <form onSubmit={(e) => handleChangePassword(e, true)}>
             <div style={{ textAlign: "left", marginBottom: "16px" }}>
               <label style={{ fontSize: "12px", color: "#374151", fontWeight: "700" }}>Nouveau mot de passe</label>
@@ -314,13 +347,15 @@ function MainApp() {
     );
   }
 
-  if (campaigns === null || activeCampaignId === null) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700" }}>⏳ Chargement de l'établissement...</div>;
+  // Permet d'attendre que ifsiList soit chargé pour afficher le bon nom
+  const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
+
+  if (campaigns === null || activeCampaignId === null || ifsiList.length === 0) return <div style={{ minHeight: "100vh", background: "#f8fafc", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "Outfit", color:"#1d4ed8", fontWeight: "700" }}>⏳ Chargement de l'établissement...</div>;
 
   const currentCampaign = campaigns.find(c => c.id === activeCampaignId) || campaigns[0];
   const criteres = currentCampaign.liste || [];
   const isArchive = currentCampaign.locked || false;
   const currentAuditDate = currentCampaign.auditDate || "2026-10-15"; 
-  const currentIfsiName = IFSI_LIST.find(i => i.id === selectedIfsi)?.name || "Établissement Inconnu";
 
   function saveModal(updated) {
     if (isArchive) return; 
@@ -452,9 +487,12 @@ function MainApp() {
               <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", padding: "2px 6px", borderRadius: "6px", border: "1px solid #e2e8f0" }}>V2.0</span>
               <span style={{ color: "#d1d5db" }}>—</span>
               
+              {/* 👉 LE MENU DYNAMIQUE EST ICI */}
               {userProfile?.role === "superadmin" ? (
-                <select value={selectedIfsi} onChange={(e) => setSelectedIfsi(e.target.value)} style={{ fontSize: "14px", fontWeight: "800", color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", padding: "4px 8px", cursor: "pointer", outline: "none" }}>
-                  {IFSI_LIST.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
+                <select value={selectedIfsi} onChange={handleIfsiSwitch} style={{ fontSize: "14px", fontWeight: "800", color: "#1d4ed8", background: "#eff6ff", border: "1px solid #bfdbfe", borderRadius: "6px", padding: "4px 8px", cursor: "pointer", outline: "none" }}>
+                  {ifsiList.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
+                  <option disabled>──────────</option>
+                  <option value="NEW">➕ Nouvel établissement...</option>
                 </select>
               ) : (
                 <span style={{ fontSize: "14px", fontWeight: "800", color: "#1e3a5f" }}>{currentIfsiName}</span>
@@ -497,14 +535,12 @@ function MainApp() {
       
       <div className={modalCritere ? "no-print" : ""} style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         
-        {/* --- ONGLET "MON COMPTE" --- */}
         {activeTab === "compte" && (
           <div style={{ maxWidth: "500px", margin: "0 auto" }}>
             <div style={{ marginBottom: "24px", textAlign: "center" }}>
               <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>⚙️ Mon compte personnel</h2>
               <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Gérez vos informations de sécurité.</p>
             </div>
-
             <div style={card}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: "1px solid #e2e8f0", paddingBottom: "12px", marginBottom: "16px" }}>
                  <div>
@@ -513,12 +549,9 @@ function MainApp() {
                  </div>
                  <span style={{ fontSize: "10px", fontWeight: "800", background: "#eff6ff", color: "#1d4ed8", padding: "4px 8px", borderRadius: "6px", border: "1px solid #bfdbfe", textTransform: "uppercase" }}>Rôle : {userProfile?.role}</span>
               </div>
-
               <h3 style={{ fontSize: "14px", fontWeight: "700", color: "#1e3a5f", marginBottom: "12px" }}>Changer mon mot de passe</h3>
-              
               {pwdUpdate.success && <div style={{ color: "#059669", background: "#d1fae5", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600", border: "1px solid #6ee7b7" }}>{pwdUpdate.success}</div>}
               {pwdUpdate.error && <div style={{ color: "#ef4444", background: "#fef2f2", padding: "10px", borderRadius: "6px", fontSize: "12px", marginBottom: "16px", fontWeight: "600", border: "1px solid #fca5a5" }}>{pwdUpdate.error}</div>}
-
               <form onSubmit={(e) => handleChangePassword(e, false)}>
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280" }}>Nouveau mot de passe</label>
@@ -536,17 +569,18 @@ function MainApp() {
           </div>
         )}
 
-        {/* --- ONGLET GESTION DE L'ÉQUIPE --- */}
         {activeTab === "equipe" && (userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
           <div>
             <div style={{ marginBottom: "24px" }}>
               <h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>👥 Gestion des accès pour {currentIfsiName}</h2>
               <p style={{ fontSize: "13px", color: "#6b7280", margin: 0 }}>Ajoutez des formateurs ou des membres de la direction. Ils ne verront que les données de cet IFSI.</p>
             </div>
-
             <div style={{ display: "grid", gridTemplateColumns: "350px 1fr", gap: "24px", alignItems: "start" }}>
               <div style={{ ...card, background: "#f8fafc" }}>
                 <h3 style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px 0", borderBottom: "2px solid #e2e8f0", paddingBottom: "10px" }}>➕ Inviter un membre</h3>
+                <div style={{ background: "#eff6ff", border: "1px solid #bfdbfe", padding: "10px", borderRadius: "6px", fontSize: "11px", color: "#1d4ed8", marginBottom: "16px", lineHeight: "1.4" }}>
+                  ℹ️ L'utilisateur sera forcé de modifier son mot de passe provisoire lors de sa première connexion.
+                </div>
                 <div style={{ marginBottom: "12px" }}>
                   <label style={{ fontSize: "11px", fontWeight: "700", color: "#6b7280", textTransform: "uppercase" }}>Email</label>
                   <input type="email" value={newMember.email} onChange={e => setNewMember({...newMember, email: e.target.value})} style={{ width: "100%", padding: "10px", borderRadius: "8px", border: "1px solid #d1d5db", marginTop: "4px" }} placeholder="formateur@ifsi.fr" />
@@ -563,14 +597,17 @@ function MainApp() {
                     {userProfile.role === "superadmin" && <option value="admin">Administrateur IFSI (Peut inviter des gens)</option>}
                   </select>
                 </div>
+                
+                {/* 👉 DYNAMISATION DU MENU DE CHOIX IFSI DANS L'ÉQUIPE */}
                 {userProfile.role === "superadmin" && (
                    <div style={{ marginBottom: "16px", background: "#fffbeb", padding: "10px", borderRadius: "8px", border: "1px dashed #fcd34d" }}>
                      <label style={{ fontSize: "11px", fontWeight: "800", color: "#d97706", textTransform: "uppercase" }}>👑 Choix IFSI (Mode Superadmin)</label>
                      <select value={newMember.ifsi || selectedIfsi} onChange={e => setNewMember({...newMember, ifsi: e.target.value})} style={{ width: "100%", padding: "8px", borderRadius: "6px", border: "1px solid #fcd34d", marginTop: "4px", background: "white" }}>
-                       {IFSI_LIST.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
+                       {ifsiList.map(ifsi => <option key={ifsi.id} value={ifsi.id}>{ifsi.name}</option>)}
                      </select>
                    </div>
                 )}
+                
                 <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ width: "100%", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", padding: "10px", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: isCreatingUser ? "wait" : "pointer" }}>
                   {isCreatingUser ? "Création en cours..." : "Créer le compte"}
                 </button>
@@ -588,7 +625,8 @@ function MainApp() {
                           {u.role === "admin" && <span style={{ background: "#fff7ed", color: "#c2410c", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #fed7aa" }}>ADMIN IFSI</span>}
                           {(u.role === "user" || !u.role) && <span style={{ background: "#f3f4f6", color: "#4b5563", padding: "4px 8px", borderRadius: "6px", fontSize: "10px", fontWeight: "bold", border: "1px solid #d1d5db" }}>FORMATEUR</span>}
                         </td>
-                        {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{IFSI_LIST.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
+                        {/* 👉 DYNAMISATION DU NOM DE L'IFSI DANS LE TABLEAU ÉQUIPE */}
+                        {userProfile.role === "superadmin" && <td style={{ ...td, fontSize: "11px", color: "#6b7280" }}>{ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</td>}
                         <td style={td}>
                           {u.id !== auth.currentUser?.uid && u.role !== "superadmin" && (
                             <button onClick={() => handleDeleteUser(u.id, u.email)} style={{ background: "white", color: "#ef4444", border: "1px solid #fca5a5", padding: "4px 8px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold" }}>Supprimer</button>
@@ -604,7 +642,7 @@ function MainApp() {
           </div>
         )}
 
-        {/* ... RESTE DES ONGLETS (Dashboard, Kanban, etc) ... */}
+        {/* ... RESTE DU DASHBOARD ... */}
         {activeTab === "dashboard" && <>
           <div className="print-break-avoid no-print" style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, borderRadius: "12px", padding: "16px 24px", marginBottom: "24px", display: "flex", alignItems: "center", justifyContent: "space-between" }}>
             <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
