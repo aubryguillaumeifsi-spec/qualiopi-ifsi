@@ -80,7 +80,6 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
   );
 }
 
-// 👉 ON AJOUTE LES PROPS DE THÈMES ICI
 export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleChangePassword, isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode }) {
   return (
     <div className="animate-fade-in" style={{ maxWidth: "500px", margin: "0 auto" }}>
@@ -112,7 +111,7 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
         </form>
       </div>
 
-      {/* 👉 NOUVEAU BLOC ACCESSIBILITÉ & INCLUSION */}
+      {/* BLOC ACCESSIBILITÉ & INCLUSION */}
       <div style={{ ...card, marginTop: "20px" }} className="theme-card">
         <h3 style={{ fontSize: "16px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }} className="theme-text">
           <span style={{ background: "#eff6ff", padding: "6px", borderRadius: "8px", fontSize: "18px" }}>🎨</span> Accessibilité & Inclusion
