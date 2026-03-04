@@ -4,7 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { storage, auth } from "../firebase";
 import { CRITERES_LABELS, STATUT_CONFIG, GUIDE_QUALIOPI } from "../data";
 
-function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalette, orgRoles, isDarkMode }) {
+function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalette, orgRoles }) {
   const [open, setOpen] = useState(false);
   const dropdownRef = useRef();
   
@@ -29,19 +29,19 @@ function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalett
 
   return (
     <div className="no-print" ref={dropdownRef} style={{ position: "relative" }}>
-      <button type="button" onClick={() => !disabled && setOpen(!open)} style={{ width: "100%", background: disabled ? (isDarkMode ? "#0f172a" : "#f9fafb") : (isDarkMode ? "#0f172a" : "white"), color: isDarkMode ? "#f8fafc" : "#1e3a5f", border: isDarkMode ? "1px solid #334155" : "1px solid #d1d5db", borderRadius: "8px", padding: "10px", textAlign: "left", cursor: disabled ? "not-allowed" : "pointer", fontSize: "13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <button type="button" onClick={() => !disabled && setOpen(!open)} style={{ width: "100%", background: disabled ? "#f9fafb" : "white", border: "1px solid #d1d5db", borderRadius: "8px", padding: "10px", textAlign: "left", cursor: disabled ? "not-allowed" : "pointer", fontSize: "13px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{display}</span>
         {!disabled && <span style={{ fontSize: "10px", color: "#9ca3af" }}>▼</span>}
       </button>
       
       {open && !disabled && (
-        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: isDarkMode ? "#1e293b" : "white", border: isDarkMode ? "1px solid #334155" : "1px solid #d1d5db", borderRadius: "10px", marginTop: "4px", zIndex: 300, maxHeight: "250px", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.1)" }}>
+        <div style={{ position: "absolute", top: "100%", left: 0, right: 0, background: "white", border: "1px solid #d1d5db", borderRadius: "10px", marginTop: "4px", zIndex: 300, maxHeight: "250px", overflowY: "auto", boxShadow: "0 10px 25px rgba(0,0,0,0.1)" }}>
           {allMembers.length === 0 && <div style={{ padding: "12px", fontSize: "12px", color: "#9ca3af", fontStyle: "italic", textAlign: "center" }}>L'organigramme est vide.</div>}
           {allMembers.map(m => (
-            <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", cursor: "pointer", borderBottom: isDarkMode ? "1px solid #334155" : "1px solid #f8fafc" }}>
+            <label key={m.id} style={{ display: "flex", alignItems: "center", gap: "10px", padding: "10px 12px", cursor: "pointer", borderBottom: "1px solid #f8fafc" }}>
               <input type="checkbox" checked={selected.includes(m.name)} onChange={() => toggle(m.name)} style={{ width: "16px", height: "16px" }} />
               <div style={{ flex: 1 }}>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: isDarkMode ? "#f8fafc" : "#1e3a5f" }}>{m.name}</div>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: "#1e3a5f" }}>{m.name}</div>
                 <div style={{ display: "flex", gap: "4px", marginTop: "4px", flexWrap: "wrap" }}>
                   {m.roles.length === 0 && <span style={{ fontSize: "9px", color: "#9ca3af" }}>Sans rôle</span>}
                   {m.roles.map(r => {
@@ -58,7 +58,7 @@ function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalett
   );
 }
 
-export default function DetailModal({ critere, onClose, onSave, onAutoSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles, hasNext, hasPrev, isDarkMode }) {
+export default function DetailModal({ critere, onClose, onSave, onAutoSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles, hasNext, hasPrev }) {
   
   const [data, setData] = useState(null);
   const [activeSubTab, setActiveSubTab] = useState("validation");
@@ -91,8 +91,8 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
 
   const cfg = CRITERES_LABELS[critere.critere] || { color: "#9ca3af" };
   const guide = GUIDE_QUALIOPI[critere.id] || { niveau: "Non défini", preuves: "Non défini", nonConformite: "Non défini" };
-  const lbl = { display: "block", fontSize: "11px", color: isDarkMode ? "#94a3b8" : "#6b7280", textTransform: "uppercase", fontWeight: "700", marginBottom: "6px" };
-  const inp = { background: (isReadOnly || isAuditMode) ? (isDarkMode ? "#1e293b" : "#f9fafb") : (isDarkMode ? "#0f172a" : "white"), color: isDarkMode ? "#f8fafc" : "#1e3a5f", border: isDarkMode ? "1px solid #334155" : "1px solid #d1d5db", borderRadius: "8px", padding: "12px", fontSize: "13px", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "Outfit, sans-serif" };
+  const lbl = { display: "block", fontSize: "11px", color: "#6b7280", textTransform: "uppercase", fontWeight: "700", marginBottom: "6px" };
+  const inp = { background: (isReadOnly || isAuditMode) ? "#f9fafb" : "white", border: "1px solid #d1d5db", borderRadius: "8px", padding: "12px", fontSize: "13px", width: "100%", outline: "none", boxSizing: "border-box", fontFamily: "Outfit, sans-serif" };
 
   const triggerAutoSave = (updatedData, logMsg) => {
     const now = new Date().toISOString();
@@ -187,28 +187,28 @@ Fais un résumé court (avec emojis) structuré ainsi :
 
   const tabBtnStyle = (tabId) => ({
     padding: "10px 18px", fontSize: "13px", fontWeight: "700", cursor: "pointer", border: "none", background: "transparent",
-    color: activeSubTab === tabId ? (isDarkMode ? "#60a5fa" : "#1d4ed8") : (isDarkMode ? "#94a3b8" : "#64748b"),
-    borderBottom: activeSubTab === tabId ? `3px solid ${isDarkMode ? "#60a5fa" : "#1d4ed8"}` : "3px solid transparent",
+    color: activeSubTab === tabId ? "#1d4ed8" : "#64748b",
+    borderBottom: activeSubTab === tabId ? "3px solid #1d4ed8" : "3px solid transparent",
     transition: "all 0.2s"
   });
 
   return (
     <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.8)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(4px)" }} onClick={onClose}>
-      <div className="modal-content" style={{ background: isDarkMode ? "#0f172a" : "#f8fafc", borderRadius: "16px", width: "100%", maxWidth: "850px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)" }} onClick={e => e.stopPropagation()}>
+      <div className="modal-content" style={{ background: "white", borderRadius: "16px", width: "100%", maxWidth: "850px", maxHeight: "90vh", overflow: "hidden", display: "flex", flexDirection: "column", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.5)" }} onClick={e => e.stopPropagation()}>
         
         {/* HEADER */}
-        <div style={{ background: isDarkMode ? "#1e293b" : "white", padding: "24px", borderBottom: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0" }}>
+        <div style={{ background: "white", padding: "24px", borderBottom: "1px solid #e2e8f0" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
             <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
                <span style={{ display: "flex", alignItems: "center", justifyContent: "center", minWidth: "48px", padding: "0 10px", height: "48px", background: `${cfg.color}15`, color: cfg.color, borderRadius: "12px", fontSize: "18px", fontWeight: "900", border: `1px solid ${cfg.color}30`, flexShrink: 0 }}>{data.num}</span>
                <div>
-                 <h2 style={{ margin: 0, fontSize: "18px", color: isDarkMode ? "#f8fafc" : "#1e3a5f", fontWeight: "800", lineHeight: "1.3" }}>{data.titre}</h2>
-                 <span style={{ fontSize: "13px", color: isDarkMode ? "#94a3b8" : "#64748b", fontWeight: "600" }}>{cfg.label}</span>
+                 <h2 style={{ margin: 0, fontSize: "18px", color: "#1e3a5f", fontWeight: "800", lineHeight: "1.3" }}>{data.titre}</h2>
+                 <span style={{ fontSize: "13px", color: "#64748b", fontWeight: "600" }}>{cfg.label}</span>
                </div>
             </div>
-            <button onClick={onClose} style={{ border: "none", background: isDarkMode ? "#334155" : "#f1f5f9", color: isDarkMode ? "#cbd5e1" : "#64748b", fontSize: "20px", cursor: "pointer", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
+            <button onClick={onClose} style={{ border: "none", background: "#f1f5f9", color: "#64748b", fontSize: "20px", cursor: "pointer", borderRadius: "50%", width: "36px", height: "36px", display: "flex", alignItems: "center", justifyContent: "center" }}>×</button>
           </div>
-          <div style={{ display: "flex", gap: "8px", borderBottom: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0" }}>
+          <div style={{ display: "flex", gap: "8px", borderBottom: "1px solid #e2e8f0" }}>
             <button onClick={() => setActiveSubTab("validation")} style={tabBtnStyle("validation")}>✅ Validation</button>
             {!isAuditMode && <button onClick={() => setActiveSubTab("chantier")} style={tabBtnStyle("chantier")}>🚧 Chantier & IA</button>}
             <button onClick={() => setActiveSubTab("referentiel")} style={tabBtnStyle("referentiel")}>📘 Référentiel</button>
@@ -221,7 +221,7 @@ Fais un résumé court (avec emojis) structuré ainsi :
           
           {activeSubTab === "validation" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", background: isDarkMode ? "#1e293b" : "white", padding: "20px", borderRadius: "12px", border: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", background: "white", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
                 <div>
                   <label style={lbl}>Statut actuel</label>
                   <select disabled={isAuditMode || isReadOnly} value={data.statut} onChange={e => setData({...data, statut: e.target.value})} style={{ ...inp, background: (STATUT_CONFIG[data.statut]||STATUT_CONFIG["non-evalue"]).bg, color: (STATUT_CONFIG[data.statut]||STATUT_CONFIG["non-evalue"]).color, fontWeight: "800", border: `1px solid ${(STATUT_CONFIG[data.statut]||STATUT_CONFIG["non-evalue"]).border}` }}>
@@ -230,66 +230,66 @@ Fais un résumé court (avec emojis) structuré ainsi :
                 </div>
                 <div>
                   <label style={lbl}>Responsable(s)</label>
-                  <OrganigramSelect isDarkMode={isDarkMode} disabled={isAuditMode || isReadOnly} selected={data.responsables} onChange={v => setData({...data, responsables: v})} allMembers={allMembers} rolePalette={rolePalette} orgRoles={orgRoles} />
+                  <OrganigramSelect disabled={isAuditMode || isReadOnly} selected={data.responsables} onChange={v => setData({...data, responsables: v})} allMembers={allMembers} rolePalette={rolePalette} orgRoles={orgRoles} />
                 </div>
               </div>
 
-              <div style={{ background: isDarkMode ? "#064e3b" : "#f0fdf4", border: isDarkMode ? "1px solid #047857" : "1px solid #86efac", padding: "20px", borderRadius: "12px" }}>
-                <label style={{ ...lbl, color: isDarkMode ? "#6ee7b7" : "#166534", borderBottom: isDarkMode ? "1px solid #047857" : "1px solid #bbf7d0", paddingBottom: "10px", marginBottom: "16px" }}>🏛️ Preuves Officielles (Audit)</label>
+              <div style={{ background: "#f0fdf4", border: "1px solid #86efac", padding: "20px", borderRadius: "12px" }}>
+                <label style={{ ...lbl, color: "#166534", borderBottom: "1px solid #bbf7d0", paddingBottom: "10px", marginBottom: "16px" }}>🏛️ Preuves Officielles (Audit)</label>
                 {data.chemins_reseau.filter(c => c.validated).map((item, index) => (
-                    <div key={index} style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "8px", background: isDarkMode ? "#0f172a" : "white", padding: "10px", borderRadius: "8px", border: isDarkMode ? "1px solid #047857" : "1px solid #6ee7b7" }}>
-                      <span style={{ flex: 1, fontSize: "13px", color: isDarkMode ? "#34d399" : "#065f46", fontWeight: "700" }}>📄 {item.nom}</span>
+                    <div key={index} style={{ display: "flex", gap: "10px", alignItems: "center", marginBottom: "8px", background: "white", padding: "10px", borderRadius: "8px", border: "1px solid #6ee7b7" }}>
+                      <span style={{ flex: 1, fontSize: "13px", color: "#065f46", fontWeight: "700" }}>📄 {item.nom}</span>
                       <button onClick={() => copyToClipboard(item.chemin)} style={{ background: "#10b981", color: "white", border: "none", padding: "6px 12px", borderRadius: "6px", cursor: "pointer", fontSize: "11px", fontWeight: "bold" }}>Lien</button>
-                      {!isAuditMode && !isReadOnly && (<button onClick={() => toggleCheminValidation(data.chemins_reseau.indexOf(item))} style={{ background: isDarkMode ? "#450a0a" : "#fee2e2", color: isDarkMode ? "#f87171" : "#991b1b", border: isDarkMode ? "1px solid #7f1d1d" : "1px solid #fca5a5", padding: "6px", borderRadius: "6px" }}>✖</button>)}
+                      {!isAuditMode && !isReadOnly && (<button onClick={() => toggleCheminValidation(data.chemins_reseau.indexOf(item))} style={{ background: "#fee2e2", color: "#991b1b", border: "1px solid #fca5a5", padding: "6px", borderRadius: "6px" }}>✖</button>)}
                     </div>
                 ))}
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "10px", marginTop: "10px" }}>
                   {data.fichiers.filter(f => f.validated).map(f => (
-                    <div key={f.url} style={{ background: isDarkMode ? "#0f172a" : "white", padding: "8px 12px", borderRadius: "8px", border: isDarkMode ? "1px solid #047857" : "1px solid #6ee7b7", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px" }}>
-                      <a href={f.url} target="_blank" rel="noreferrer" style={{ color: isDarkMode ? "#34d399" : "#059669", textDecoration: "none", fontWeight: "700" }}>☁️ {f.name}</a>
+                    <div key={f.url} style={{ background: "white", padding: "8px 12px", borderRadius: "8px", border: "1px solid #6ee7b7", fontSize: "13px", display: "flex", alignItems: "center", gap: "10px" }}>
+                      <a href={f.url} target="_blank" rel="noreferrer" style={{ color: "#059669", textDecoration: "none", fontWeight: "700" }}>☁️ {f.name}</a>
                       {!isAuditMode && !isReadOnly && (<button onClick={() => toggleValidation(f.url)} style={{ background: "none", border: "none", color: "#9ca3af", cursor: "pointer" }}>✖</button>)}
                     </div>
                   ))}
                 </div>
-                <textarea readOnly={isAuditMode || isReadOnly} value={data.preuves} onChange={e => setData({...data, preuves: e.target.value})} placeholder="Justifications textuelles..." style={{ ...inp, height: "100px", marginTop: "15px", border: isDarkMode ? "1px solid #047857" : "1px solid #6ee7b7", color: isDarkMode ? "#34d399" : "#166534" }} />
+                <textarea readOnly={isAuditMode || isReadOnly} value={data.preuves} onChange={e => setData({...data, preuves: e.target.value})} placeholder="Justifications textuelles..." style={{ ...inp, height: "100px", marginTop: "15px", border: "1px solid #6ee7b7", color: "#166534" }} />
               </div>
             </div>
           )}
 
           {activeSubTab === "chantier" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div style={{ background: isDarkMode ? "#451a03" : "#fffbeb", border: isDarkMode ? "1px solid #78350f" : "1px solid #fcd34d", padding: "20px", borderRadius: "12px" }}>
-                <label style={{ ...lbl, color: isDarkMode ? "#fcd34d" : "#b45309", borderBottom: isDarkMode ? "1px solid #78350f" : "1px solid #fde68a", paddingBottom: "10px", marginBottom: "16px" }}>🚧 Espace Travail (Privé)</label>
-                <textarea readOnly={isReadOnly} value={data.preuves_encours} onChange={e => setData({...data, preuves_encours: e.target.value})} placeholder="Notes de chantier..." style={{ ...inp, height: "80px", borderColor: isDarkMode ? "#78350f" : "#fde68a", marginBottom: "15px" }} />
+              <div style={{ background: "#fffbeb", border: "1px solid #fcd34d", padding: "20px", borderRadius: "12px" }}>
+                <label style={{ ...lbl, color: "#b45309", borderBottom: "1px solid #fde68a", paddingBottom: "10px", marginBottom: "16px" }}>🚧 Espace Travail (Privé)</label>
+                <textarea readOnly={isReadOnly} value={data.preuves_encours} onChange={e => setData({...data, preuves_encours: e.target.value})} placeholder="Notes de chantier..." style={{ ...inp, height: "80px", borderColor: "#fde68a", marginBottom: "15px" }} />
                 
                 {data.chemins_reseau.filter(c => !c.validated).map((item, index) => (
-                    <div key={index} style={{ background: isDarkMode ? "#0f172a" : "white", padding: "10px", borderRadius: "8px", border: isDarkMode ? "1px dashed #78350f" : "1px dashed #fcd34d", display: "flex", gap: "10px", marginBottom: "6px" }}>
-                      <span style={{ color: isDarkMode ? "#fbbf24" : "#92400e", fontWeight: "600", flex: 1 }}>🔗 {item.nom}</span>
-                      <button onClick={() => toggleCheminValidation(data.chemins_reseau.indexOf(item))} style={{ background: isDarkMode ? "#064e3b" : "#d1fae5", border: isDarkMode ? "1px solid #047857" : "1px solid #6ee7b7", color: isDarkMode ? "#34d399" : "#065f46", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider</button>
+                    <div key={index} style={{ background: "white", padding: "10px", borderRadius: "8px", border: "1px dashed #fcd34d", display: "flex", gap: "10px", marginBottom: "6px" }}>
+                      <span style={{ color: "#92400e", fontWeight: "600", flex: 1 }}>🔗 {item.nom}</span>
+                      <button onClick={() => toggleCheminValidation(data.chemins_reseau.indexOf(item))} style={{ background: "#d1fae5", border: "1px solid #6ee7b7", color: "#065f46", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider</button>
                       <button onClick={() => removeChemin(data.chemins_reseau.indexOf(item))} style={{ color: "#ef4444", border: "none", background: "none" }}>🗑️</button>
                     </div>
                 ))}
                 {data.fichiers.filter(f => !f.validated).map(f => (
-                    <div key={f.url} style={{ background: isDarkMode ? "#0f172a" : "white", padding: "10px", borderRadius: "8px", border: isDarkMode ? "1px solid #78350f" : "1px solid #fcd34d", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
-                      <span style={{ color: isDarkMode ? "#fbbf24" : "#92400e", fontWeight: "600" }}>☁️ {f.name}</span>
+                    <div key={f.url} style={{ background: "white", padding: "10px", borderRadius: "8px", border: "1px solid #fcd34d", display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "6px" }}>
+                      <span style={{ color: "#92400e", fontWeight: "600" }}>☁️ {f.name}</span>
                       <div style={{ display: "flex", gap: "8px" }}>
-                        <button onClick={() => handleAnalyze(f)} disabled={isAnalyzing} style={{ background: isDarkMode ? "#1e3a8a" : "#eff6ff", border: isDarkMode ? "1px solid #1e40af" : "1px solid #bfdbfe", color: isDarkMode ? "#93c5fd" : "#1d4ed8", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>{isAnalyzing ? "..." : "🤖 IA"}</button>
-                        <button onClick={() => toggleValidation(f.url)} style={{ background: isDarkMode ? "#064e3b" : "#d1fae5", border: isDarkMode ? "1px solid #047857" : "1px solid #6ee7b7", color: isDarkMode ? "#34d399" : "#065f46", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider</button>
+                        <button onClick={() => handleAnalyze(f)} disabled={isAnalyzing} style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", padding: "4px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "bold" }}>{isAnalyzing ? "..." : "🤖 IA"}</button>
+                        <button onClick={() => toggleValidation(f.url)} style={{ background: "#d1fae5", border: "1px solid #6ee7b7", color: "#065f46", padding: "4px 8px", borderRadius: "6px", fontWeight: "bold", fontSize: "11px" }}>Valider</button>
                         <button onClick={() => handleDeleteFile(f)} style={{ color: "#ef4444", border: "none", background: "none" }}>🗑️</button>
                       </div>
                     </div>
                 ))}
-                {aiReport && <div style={{ background: isDarkMode ? "#0f766e" : "#f0fdfa", border: isDarkMode ? "1px solid #115e59" : "1px solid #5eead4", padding: "15px", borderRadius: "8px", marginTop: "15px", fontSize: "13px", whiteSpace: "pre-wrap", color: isDarkMode ? "#ccfbf1" : "inherit" }}>🤖 <strong>Analyse QualiForma :</strong><br/>{aiReport}</div>}
+                {aiReport && <div style={{ background: "#f0fdfa", border: "1px solid #5eead4", padding: "15px", borderRadius: "8px", marginTop: "15px", fontSize: "13px", whiteSpace: "pre-wrap" }}>🤖 <strong>Analyse QualiForma :</strong><br/>{aiReport}</div>}
                 {!isReadOnly && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "15px" }}>
-                    <div style={{ background: isDarkMode ? "#0f172a" : "white", padding: "10px", borderRadius: "8px", border: isDarkMode ? "1px solid #78350f" : "1px solid #fcd34d" }}>
+                    <div style={{ background: "white", padding: "10px", borderRadius: "8px", border: "1px solid #fcd34d" }}>
                       <input type="text" value={newCheminNom} onChange={e => setNewCheminNom(e.target.value)} placeholder="Nom lien" style={{ ...inp, padding: "6px", marginBottom: "5px" }} />
                       <div style={{ display: "flex", gap: "5px" }}>
                         <input type="text" value={newCheminVal} onChange={e => setNewCheminVal(e.target.value)} placeholder="Z:\..." style={{ ...inp, padding: "6px" }} />
                         <button onClick={addChemin} style={{ background: "#d97706", color: "white", border: "none", borderRadius: "6px", padding: "0 10px" }}>+</button>
                       </div>
                     </div>
-                    <label style={{ background: isDarkMode ? "#0f172a" : "white", border: "2px dashed #d97706", color: "#d97706", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}>
+                    <label style={{ background: "white", border: "2px dashed #d97706", color: "#d97706", borderRadius: "8px", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", fontSize: "12px", fontWeight: "700" }}>
                       <input type="file" style={{ display: "none" }} onChange={handleFileUpload} /> {uploading ? "Chargement..." : "📎 Uploader PDF/Image"}
                     </label>
                   </div>
@@ -301,10 +301,10 @@ Fais un résumé court (avec emojis) structuré ainsi :
 
           {activeSubTab === "referentiel" && (
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-              <div style={{ background: isDarkMode ? "#1e293b" : "white", padding: "20px", borderRadius: "12px", border: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0" }}>
+              <div style={{ background: "white", padding: "20px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
                 <p><strong>Niveau attendu :</strong> {guide.niveau}</p>
                 <p><strong>Preuves suggérées :</strong> {guide.preuves}</p>
-                {!isAuditMode && <div style={{ background: isDarkMode ? "#450a0a" : "#fef2f2", padding: "15px", borderRadius: "8px", color: isDarkMode ? "#fca5a5" : "#991b1b", marginTop: "15px" }}>⚠️ <strong>Règle Non-Conformité :</strong> {guide.nonConformite}</div>}
+                {!isAuditMode && <div style={{ background: "#fef2f2", padding: "15px", borderRadius: "8px", color: "#991b1b", marginTop: "15px" }}>⚠️ <strong>Règle Non-Conformité :</strong> {guide.nonConformite}</div>}
               </div>
               <textarea readOnly={isReadOnly} value={data.attendus} onChange={e => setData({...data, attendus: e.target.value})} placeholder="Remarques précédents audits..." style={{ ...inp, height: "100px" }} />
             </div>
@@ -316,7 +316,7 @@ Fais un résumé court (avec emojis) structuré ainsi :
                 <div style={{ fontSize: "13px", color: "#9ca3af", fontStyle: "italic", textAlign: "center", padding: "20px" }}>Aucun historique disponible.</div>
               ) : (
                 [...data.historique].reverse().map((h, i) => (
-                  <div key={i} style={{ fontSize: "12px", background: isDarkMode ? "#1e293b" : "white", padding: "10px", borderLeft: "4px solid #3b82f6", borderRadius: "6px", display: "flex", justifyContent: "space-between" }}>
+                  <div key={i} style={{ fontSize: "12px", background: "white", padding: "10px", borderLeft: "4px solid #3b82f6", borderRadius: "6px", display: "flex", justifyContent: "space-between" }}>
                     <span>{h.msg}</span>
                     <span style={{ color: "#9ca3af" }}>{h.user.split('@')[0]} • {new Date(h.date).toLocaleDateString()}</span>
                   </div>
@@ -327,10 +327,10 @@ Fais un résumé court (avec emojis) structuré ainsi :
         </div>
 
         {/* FOOTER */}
-        <div style={{ padding: "20px 24px", background: isDarkMode ? "#1e293b" : "white", borderTop: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", display: "flex", justifyContent: "space-between" }}>
+        <div style={{ padding: "20px 24px", background: "white", borderTop: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between" }}>
           <div style={{ display: "flex", gap: "10px" }}>
-            <button disabled={!hasPrev} onClick={() => onSave(data, "prev")} style={{ padding: "10px 15px", borderRadius: "8px", border: isDarkMode ? "1px solid #475569" : "1px solid #cbd5e1", background: isDarkMode ? "#0f172a" : "white", cursor: "pointer", color: hasPrev ? (isDarkMode ? "#f1f5f9" : "#1e3a5f") : "#9ca3af" }}>⬅️ Précédent</button>
-            <button disabled={!hasNext} onClick={() => onSave(data, "next")} style={{ padding: "10px 15px", borderRadius: "8px", border: isDarkMode ? "1px solid #475569" : "1px solid #cbd5e1", background: isDarkMode ? "#0f172a" : "white", cursor: "pointer", color: hasNext ? (isDarkMode ? "#f1f5f9" : "#1e3a5f") : "#9ca3af" }}>Suivant ➡️</button>
+            <button disabled={!hasPrev} onClick={() => onSave(data, "prev")} style={{ padding: "10px 15px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", cursor: "pointer", color: hasPrev ? "#1e3a5f" : "#9ca3af" }}>⬅️ Précédent</button>
+            <button disabled={!hasNext} onClick={() => onSave(data, "next")} style={{ padding: "10px 15px", borderRadius: "8px", border: "1px solid #cbd5e1", background: "white", cursor: "pointer", color: hasNext ? "#1e3a5f" : "#9ca3af" }}>Suivant ➡️</button>
           </div>
           <button onClick={() => onSave(data, "close")} style={{ padding: "10px 30px", borderRadius: "8px", background: "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: "white", border: "none", fontWeight: "bold", cursor: "pointer" }}>{isReadOnly || isAuditMode ? "Fermer" : "Enregistrer & Fermer"}</button>
         </div>
