@@ -36,18 +36,17 @@ const today = new Date();
 const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
 const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
 
-// 👉 NOUVEAU CHANTIER 1 : LE FOOTER OFFICIEL
 function Footer() {
   return (
     <footer className="no-print" style={{ background: "white", borderTop: "1px solid #e2e8f0", padding: "20px 32px", marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", fontSize: "13px", color: "#64748b" }}>
       <div>
-        <strong style={{ color: "#1e3a5f", fontSize: "14px" }}>QualiForma</strong> 
+        <strong style={{ color: "#1e3a5f", fontSize: "14px" }} className="theme-text">QualiForma</strong> 
         <span style={{ background: "#eff6ff", color: "#1d4ed8", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "900", marginLeft: "8px" }}>V1.0 Bêta</span>
       </div>
       <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", justifyContent: "center", fontWeight: "600" }}>
-        <a href="#" onClick={e => {e.preventDefault(); alert("📄 Les mentions légales seront intégrées ici lors du lancement officiel (Éditeur, Hébergeur, etc.).");}} style={{ color: "#64748b", textDecoration: "none" }} onMouseOver={e=>e.target.style.color="#1d4ed8"} onMouseOut={e=>e.target.style.color="#64748b"}>Mentions Légales</a>
-        <a href="#" onClick={e => {e.preventDefault(); alert("🔒 La politique de confidentialité concernant les données RGPD de l'IFSI sera affichée ici.");}} style={{ color: "#64748b", textDecoration: "none" }} onMouseOver={e=>e.target.style.color="#1d4ed8"} onMouseOut={e=>e.target.style.color="#64748b"}>Politique de confidentialité</a>
-        <a href="mailto:support@qualiforma.fr" style={{ color: "#64748b", textDecoration: "none" }} onMouseOver={e=>e.target.style.color="#1d4ed8"} onMouseOut={e=>e.target.style.color="#64748b"}>✉️ Contact Support</a>
+        <a href="#" onClick={e => {e.preventDefault(); alert("📄 Les mentions légales seront intégrées ici lors du lancement officiel (Éditeur, Hébergeur, etc.).");}} style={{ color: "#64748b", textDecoration: "none" }} className="theme-subtext">Mentions Légales</a>
+        <a href="#" onClick={e => {e.preventDefault(); alert("🔒 La politique de confidentialité concernant les données RGPD de l'IFSI sera affichée ici.");}} style={{ color: "#64748b", textDecoration: "none" }} className="theme-subtext">Politique de confidentialité</a>
+        <a href="mailto:support@qualiforma.fr" style={{ color: "#64748b", textDecoration: "none" }} className="theme-subtext">✉️ Contact Support</a>
       </div>
     </footer>
   );
@@ -56,20 +55,20 @@ function Footer() {
 function BackupsTab({ backupsList, handleRestoreBackup }) {
   return (
       <div className="animate-fade-in" style={{ maxWidth: "800px", margin: "0 auto", marginTop: "20px" }}>
-          <div style={{ marginBottom: "32px", textAlign: "center", background: "white", padding: "30px", borderRadius: "16px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
+          <div style={{ marginBottom: "32px", textAlign: "center", background: "white", padding: "30px", borderRadius: "16px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }} className="theme-card">
               <div style={{ fontSize: "50px", marginBottom: "10px" }}>⏳</div>
-              <h2 style={{ fontSize: "24px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 8px" }}>Machine à remonter le temps</h2>
-              <p style={{ fontSize: "14px", color: "#64748b", margin: 0, lineHeight: "1.5" }}>L'application sauvegarde automatiquement l'état de l'IFSI une fois par jour et avant chaque importation Excel.</p>
+              <h2 style={{ fontSize: "24px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 8px" }} className="theme-text">Machine à remonter le temps</h2>
+              <p style={{ fontSize: "14px", color: "#64748b", margin: 0, lineHeight: "1.5" }} className="theme-subtext">L'application sauvegarde automatiquement l'état de l'IFSI une fois par jour et avant chaque importation Excel.</p>
           </div>
           {backupsList.length === 0 ? (
-              <div style={{ background: "white", padding: "40px", textAlign: "center", borderRadius: "14px", border: "1px dashed #cbd5e1", color: "#9ca3af", fontStyle: "italic" }}>Le coffre-fort est vide.</div>
+              <div style={{ background: "white", padding: "40px", textAlign: "center", borderRadius: "14px", border: "1px dashed #cbd5e1", color: "#9ca3af", fontStyle: "italic" }} className="theme-card">Le coffre-fort est vide.</div>
           ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {backupsList.map((b) => (
-                      <div key={b.id} className="td-dash" style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div key={b.id} className="td-dash theme-card" style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div>
-                                  <div style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f" }}>{b.type}</div>
-                                  <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>{new Date(b.timestamp).toLocaleString("fr-FR")}</div>
+                                  <div style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f" }} className="theme-text">{b.type}</div>
+                                  <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }} className="theme-subtext">{new Date(b.timestamp).toLocaleString("fr-FR")}</div>
                           </div>
                           <button onClick={() => handleRestoreBackup(b)} style={{ background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", padding: "8px 16px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer" }}>Restaurer</button>
                       </div>
@@ -81,6 +80,10 @@ function BackupsTab({ backupsList, handleRestoreBackup }) {
 }
 
 function MainApp() {
+  // 👉 NOUVEAUX ÉTATS POUR L'ACCESSIBILITÉ
+  const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme_dark") === "true");
+  const [isColorblindMode, setIsColorblindMode] = useState(() => localStorage.getItem("theme_colorblind") === "true");
+
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [userProfile, setUserProfile] = useState(null); 
@@ -109,6 +112,10 @@ function MainApp() {
   const [backupsList, setBackupsList] = useState([]);
   const dailyBackupDone = useRef(null); 
   const [verificationSent, setVerificationSent] = useState(false);
+
+  // Mémorisation des thèmes
+  useEffect(() => { localStorage.setItem("theme_dark", isDarkMode); }, [isDarkMode]);
+  useEffect(() => { localStorage.setItem("theme_colorblind", isColorblindMode); }, [isColorblindMode]);
 
   const navBtn = (active) => ({
     padding: "8px 16px",
@@ -589,6 +596,35 @@ function MainApp() {
         @media (max-width: 1024px) { .responsive-grid-5 { grid-template-columns: 1fr 1fr; } .responsive-grid-2 { grid-template-columns: 1fr; } }
         .td-dash { transition: all 0.2s ease; border: 1px solid transparent; }
         .td-dash:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1) !important; border-color: #bfdbfe !important; }
+        
+        /* 🌙 INJECTION CSS MAGIQUE : MODE SOMBRE */
+        ${isDarkMode ? `
+          body { background-color: #0f172a !important; color: #f1f5f9 !important; }
+          .animate-fade-in > div, .modal-content, footer { background-color: #1e293b !important; border-color: #334155 !important; }
+          .theme-card, .td-dash, .org-card { background-color: #1e293b !important; border-color: #334155 !important; color: #f8fafc !important; }
+          .theme-bg-sub { background-color: #0f172a !important; border-color: #334155 !important; }
+          .theme-text, h2, h3, span { color: #f8fafc !important; }
+          .theme-subtext, p { color: #94a3b8 !important; }
+          .theme-input, select, textarea { background-color: #0f172a !important; color: white !important; border-color: #334155 !important; }
+          .theme-th { background-color: #0f172a !important; color: #94a3b8 !important; border-color: #334155 !important; }
+          .theme-td { border-color: #334155 !important; color: #f1f5f9 !important; }
+          .theme-tr { background-color: transparent !important; }
+          .theme-avatar-bg { background-color: #334155 !important; }
+        ` : ''}
+
+        /* 👁️ INJECTION CSS MAGIQUE : MODE DALTONIEN (Protanopie/Deutéranopie) */
+        ${isColorblindMode ? `
+          /* Transforme le VERT (Conforme) en BLEU CLAIR */
+          div[style*="color: #10b981"], div[style*="color: #166534"], span[style*="color: #10b981"], div[style*="color: #059669"] { color: #3b82f6 !important; }
+          div[style*="background: #f0fdf4"] { background-color: #eff6ff !important; border-color: #bfdbfe !important; }
+          
+          /* Transforme le ROUGE (Non Conforme) en ORANGE/JAUNE HAUT CONTRASTE */
+          div[style*="color: #dc2626"], div[style*="color: #ef4444"], span[style*="color: #dc2626"] { color: #ea580c !important; }
+          div[style*="background: #fef2f2"] { background-color: #fff7ed !important; border-color: #ffedd5 !important; }
+          
+          /* Transforme les badges urgents Rouges en Oranges */
+          span[style*="background: #dc2626"], div[style*="background: #dc2626"] { background-color: #ea580c !important; color: white !important; }
+        ` : ''}
       `}</style>
 
       {importReport && (
@@ -631,10 +667,10 @@ function MainApp() {
               <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs><path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#g)"/><path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#g)"/></svg>
               </div>
-              <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</span>
+              <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }} className="theme-text">QualiForma</span>
             </div>
             {userProfile?.role === "superadmin" ? (
-              <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db", fontWeight: "800", color: "#1d4ed8" }}>
+              <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db", fontWeight: "800", color: "#1d4ed8" }} className="theme-input">
                 {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                 <option value="NEW">+ Nouvel établissement</option>
               </select>
@@ -662,13 +698,13 @@ function MainApp() {
             {userProfile?.role === "superadmin" && !isArchive && (
               <>
                 <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
-                <label htmlFor="import-excel" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
+                <label htmlFor="import-excel" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }} className="theme-input">
                   <span>📥</span> Importer
                 </label>
               </>
             )}
             <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
-            <button onClick={() => setActiveTab("compte")} style={{ border: "1px solid #d1d5db", padding: "6px 12px", borderRadius: "6px", background: "white", cursor: "pointer" }}>⚙️</button>
+            <button onClick={() => setActiveTab("compte")} style={{ border: "1px solid #d1d5db", padding: "6px 12px", borderRadius: "6px", background: "white", cursor: "pointer" }} className="theme-input">⚙️</button>
             <button onClick={handleLogout} style={{ color: "#ef4444", border: "1px solid #fca5a5", padding: "6px 12px", borderRadius: "6px", background: "#fef2f2", cursor: "pointer", fontWeight: "bold" }}>Quitter</button>
           </div>
         </div>
@@ -693,10 +729,9 @@ function MainApp() {
         
         {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} handleSendResetEmail={handleSendResetEmail} />}
         
-        {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={(e) => { e.preventDefault(); updatePassword(auth.currentUser, pwdUpdate.p1).then(()=>setPwdUpdate({...pwdUpdate, success: "Mot de passe modifié", p1:"", p2:""})).catch(err => setPwdUpdate({...pwdUpdate, error: err.message}))}} />}
+        {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={(e) => { e.preventDefault(); updatePassword(auth.currentUser, pwdUpdate.p1).then(()=>setPwdUpdate({...pwdUpdate, success: "Mot de passe modifié", p1:"", p2:""})).catch(err => setPwdUpdate({...pwdUpdate, error: err.message}))}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} />}
       </div>
       
-      {/* AFFICHAGE DU NOUVEAU FOOTER */}
       <Footer />
     </div>
   );
