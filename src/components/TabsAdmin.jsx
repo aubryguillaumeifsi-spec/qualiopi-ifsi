@@ -10,18 +10,18 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
   return (
     <div className="animate-fade-in responsive-grid-2">
       {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
-        <div style={card} className="theme-card">
-          <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px" }} className="theme-text">Ajouter un compte</h2>
+        <div style={card}>
+          <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px" }}>Ajouter un compte</h2>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <input type="email" placeholder="Adresse email (ex: agent@ifsi.fr)" value={newMember.email} onChange={e => setNewMember({ ...newMember, email: e.target.value })} style={input} className="theme-input" />
-            <input type="password" placeholder="Mot de passe provisoire (6 min.)" value={newMember.pwd} onChange={e => setNewMember({ ...newMember, pwd: e.target.value })} style={input} className="theme-input" />
-            <select value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} style={input} className="theme-input">
+            <input type="email" placeholder="Adresse email (ex: agent@ifsi.fr)" value={newMember.email} onChange={e => setNewMember({ ...newMember, email: e.target.value })} style={input} />
+            <input type="password" placeholder="Mot de passe provisoire (6 min.)" value={newMember.pwd} onChange={e => setNewMember({ ...newMember, pwd: e.target.value })} style={input} />
+            <select value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} style={input}>
               <option value="user">Utilisateur (Édition IFSI)</option>
               <option value="admin">Administrateur (Gestion Équipe & IFSI)</option>
               {userProfile?.role === "superadmin" && <option value="superadmin">Super-Administrateur (Réseau complet)</option>}
             </select>
             {userProfile?.role === "superadmin" && newMember.role !== "superadmin" && (
-              <select value={newMember.ifsi} onChange={e => setNewMember({ ...newMember, ifsi: e.target.value })} style={input} className="theme-input">
+              <select value={newMember.ifsi} onChange={e => setNewMember({ ...newMember, ifsi: e.target.value })} style={input}>
                 <option value="">Sélectionner l'établissement d'affectation...</option>
                 {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
               </select>
@@ -33,34 +33,34 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
         </div>
       )}
 
-      <div style={{ ...card, gridColumn: (userProfile?.role === "admin" || userProfile?.role === "superadmin") ? "span 1" : "1 / -1", overflow: "hidden" }} className="theme-card">
-        <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px" }} className="theme-text">Annuaire de l'équipe</h2>
-        <input type="text" placeholder="Rechercher par email..." value={teamSearchTerm} onChange={e => setTeamSearchTerm(e.target.value)} style={{ ...input, marginBottom: "16px" }} className="theme-input" />
+      <div style={{ ...card, gridColumn: (userProfile?.role === "admin" || userProfile?.role === "superadmin") ? "span 1" : "1 / -1", overflow: "hidden" }}>
+        <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px" }}>Annuaire de l'équipe</h2>
+        <input type="text" placeholder="Rechercher par email..." value={teamSearchTerm} onChange={e => setTeamSearchTerm(e.target.value)} style={{ ...input, marginBottom: "16px" }} />
         
         <div style={{ overflowX: "auto", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "450px" }}>
             <thead>
               <tr>
-                <th style={th} className="theme-th" onClick={() => handleSortTeam("email")}>Email {teamSortConfig.key==="email"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>
-                <th style={th} className="theme-th" onClick={() => handleSortTeam("role")}>Rôle {teamSortConfig.key==="role"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>
-                {userProfile?.role === "superadmin" && <th style={th} className="theme-th" onClick={() => handleSortTeam("ifsi")}>Établissement {teamSortConfig.key==="ifsi"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>}
-                <th style={{...th, textAlign:"right"}} className="theme-th">Actions</th>
+                <th style={th} onClick={() => handleSortTeam("email")}>Email {teamSortConfig.key==="email"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>
+                <th style={th} onClick={() => handleSortTeam("role")}>Rôle {teamSortConfig.key==="role"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>
+                {userProfile?.role === "superadmin" && <th style={th} onClick={() => handleSortTeam("ifsi")}>Établissement {teamSortConfig.key==="ifsi"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>}
+                <th style={{...th, textAlign:"right"}}>Actions</th>
               </tr>
             </thead>
             <tbody>
               {sortedTeamUsers.map(u => (
-                <tr key={u.id} className="td-dash theme-tr">
-                  <td style={{ ...td, fontWeight: "600", color: "#1e3a5f" }} className="theme-text">
+                <tr key={u.id} className="td-dash">
+                  <td style={{ ...td, fontWeight: "600", color: "#1e3a5f" }}>
                     {u.email} 
                     {u.id === auth.currentUser?.uid && <span style={{fontSize:"10px", background:"#d1fae5", border:"1px solid #6ee7b7", color:"#065f46", padding:"2px 6px", borderRadius:"4px", marginLeft:"8px"}}>Vous</span>}
                   </td>
-                  <td style={td} className="theme-td">
+                  <td style={td}>
                     <span style={{ fontSize: "11px", fontWeight: "800", background: u.role==="superadmin"?"#fef3c7":u.role==="admin"?"#e0e7ff":"#f1f5f9", color: u.role==="superadmin"?"#92400e":u.role==="admin"?"#1e40af":"#475569", padding: "4px 10px", borderRadius: "6px", border: `1px solid ${u.role==="superadmin"?"#fde68a":u.role==="admin"?"#bfdbfe":"#cbd5e1"}` }}>
                       {u.role === "superadmin" ? "Superadmin" : u.role === "admin" ? "Admin" : "User"}
                     </span>
                   </td>
-                  {userProfile?.role === "superadmin" && <td style={{...td, fontSize:"12px", color:"#64748b", fontStyle: u.role==="superadmin"?"italic":"normal"}} className="theme-td">{u.role === "superadmin" ? "Accès global Réseau" : (ifsiList.find(i=>i.id===u.etablissementId)?.name || "Aucun")}</td>}
-                  <td style={{ ...td, textAlign: "right" }} className="theme-td">
+                  {userProfile?.role === "superadmin" && <td style={{...td, fontSize:"12px", color:"#64748b", fontStyle: u.role==="superadmin"?"italic":"normal"}}>{u.role === "superadmin" ? "Accès global Réseau" : (ifsiList.find(i=>i.id===u.etablissementId)?.name || "Aucun")}</td>}
+                  <td style={{ ...td, textAlign: "right" }}>
                     <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                       {(userProfile?.role === "superadmin" || userProfile?.role === "admin") && (
                          <button onClick={() => handleSendResetEmail(u.email)} title="Envoyer le lien de changement de mot de passe" style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize:"12px", fontWeight:"700", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background="#dbeafe"} onMouseOut={e=>e.currentTarget.style.background="#eff6ff"}>✉️ Lien de Reset</button>
@@ -84,26 +84,25 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
   return (
     <div className="animate-fade-in" style={{ maxWidth: "500px", margin: "0 auto" }}>
       
-      {/* BLOC PROFIL & SÉCURITÉ */}
-      <div style={card} className="theme-card">
+      <div style={card}>
         <div style={{ textAlign: "center", marginBottom: "20px" }}>
-           <div style={{ width: "60px", height: "60px", background: "#f1f5f9", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: "24px" }} className="theme-avatar-bg">👤</div>
-           <h2 style={{ fontSize: "20px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 4px" }} className="theme-text">Mon Profil</h2>
-           <div style={{ color: "#64748b", fontSize: "14px" }} className="theme-subtext">Connecté avec <strong style={{ color: "#1d4ed8" }}>{auth.currentUser?.email}</strong></div>
+           <div style={{ width: "60px", height: "60px", background: "#f1f5f9", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: "24px" }}>👤</div>
+           <h2 style={{ fontSize: "20px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 4px" }}>Mon Profil</h2>
+           <div style={{ color: "#64748b", fontSize: "14px" }}>Connecté avec <strong style={{ color: "#1d4ed8" }}>{auth.currentUser?.email}</strong></div>
         </div>
         
-        <form onSubmit={(e) => handleChangePassword(e, false)} style={{ display: "flex", flexDirection: "column", gap: "14px", background: "#f8fafc", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0" }} className="theme-bg-sub">
-          <h3 style={{ fontSize: "15px", fontWeight: "800", margin: "0 0 4px", color: "#334155", display: "flex", alignItems: "center", gap: "6px" }} className="theme-text"><span>🔐</span> Changer mon mot de passe</h3>
+        <form onSubmit={(e) => handleChangePassword(e, false)} style={{ display: "flex", flexDirection: "column", gap: "14px", background: "#f8fafc", padding: "24px", borderRadius: "12px", border: "1px solid #e2e8f0" }}>
+          <h3 style={{ fontSize: "15px", fontWeight: "800", margin: "0 0 4px", color: "#334155", display: "flex", alignItems: "center", gap: "6px" }}><span>🔐</span> Changer mon mot de passe</h3>
           {pwdUpdate.error && <div style={{ color: "#ef4444", fontSize: "13px", background: "#fef2f2", padding: "10px", borderRadius: "8px", border: "1px solid #fca5a5" }}>{pwdUpdate.error}</div>}
           {pwdUpdate.success && <div style={{ color: "#10b981", fontSize: "13px", background: "#f0fdf4", padding: "10px", borderRadius: "8px", border: "1px solid #bbf7d0" }}>{pwdUpdate.success}</div>}
           
           <div>
-            <label style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "4px", display: "block" }} className="theme-subtext">Nouveau mot de passe</label>
-            <input type="password" placeholder="8 caractères, 1 majuscule, 1 chiffre" value={pwdUpdate.p1} onChange={e => setPwdUpdate({ ...pwdUpdate, p1: e.target.value })} required style={input} className="theme-input" />
+            <label style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "4px", display: "block" }}>Nouveau mot de passe</label>
+            <input type="password" placeholder="8 caractères, 1 majuscule, 1 chiffre" value={pwdUpdate.p1} onChange={e => setPwdUpdate({ ...pwdUpdate, p1: e.target.value })} required style={input} />
           </div>
           <div>
-            <label style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "4px", display: "block" }} className="theme-subtext">Confirmez le mot de passe</label>
-            <input type="password" placeholder="Retapez le même mot de passe" value={pwdUpdate.p2} onChange={e => setPwdUpdate({ ...pwdUpdate, p2: e.target.value })} required style={input} className="theme-input" />
+            <label style={{ fontSize: "12px", fontWeight: "700", color: "#64748b", marginBottom: "4px", display: "block" }}>Confirmez le mot de passe</label>
+            <input type="password" placeholder="Retapez le même mot de passe" value={pwdUpdate.p2} onChange={e => setPwdUpdate({ ...pwdUpdate, p2: e.target.value })} required style={input} />
           </div>
           <button type="submit" disabled={pwdUpdate.loading} style={{ ...btn, marginTop: "10px", padding: "12px" }}>
             {pwdUpdate.loading ? "Mise à jour en cours..." : "Valider le nouveau mot de passe"}
@@ -112,25 +111,25 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
       </div>
 
       {/* BLOC ACCESSIBILITÉ & INCLUSION */}
-      <div style={{ ...card, marginTop: "20px" }} className="theme-card">
-        <h3 style={{ fontSize: "16px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }} className="theme-text">
+      <div style={{ ...card, marginTop: "20px" }}>
+        <h3 style={{ fontSize: "16px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ background: "#eff6ff", padding: "6px", borderRadius: "8px", fontSize: "18px" }}>🎨</span> Accessibilité & Inclusion
         </h3>
         
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
           
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "#f8fafc", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0" }} className="theme-bg-sub hover-card">
+          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "#f8fafc", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
             <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: "#334155" }} className="theme-text">Mode Sombre</div>
-              <div style={{ fontSize: "11px", color: "#64748b" }} className="theme-subtext">Idéal pour le confort visuel en basse lumière.</div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#334155" }}>Mode Sombre</div>
+              <div style={{ fontSize: "11px", color: "#64748b" }}>Idéal pour le confort visuel en basse lumière.</div>
             </div>
             <input type="checkbox" checked={isDarkMode} onChange={(e) => setIsDarkMode(e.target.checked)} style={{ width: "20px", height: "20px", accentColor: "#1d4ed8", cursor: "pointer" }} />
           </label>
 
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "#f8fafc", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0" }} className="theme-bg-sub hover-card">
+          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "#f8fafc", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
             <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: "#334155" }} className="theme-text">Mode Daltonien</div>
-              <div style={{ fontSize: "11px", color: "#64748b" }} className="theme-subtext">Remplace les couleurs Rouge/Vert par Orange/Bleu.</div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#334155" }}>Mode Daltonien</div>
+              <div style={{ fontSize: "11px", color: "#64748b" }}>Remplace les couleurs Rouge/Vert par Orange/Bleu.</div>
             </div>
             <input type="checkbox" checked={isColorblindMode} onChange={(e) => setIsColorblindMode(e.target.checked)} style={{ width: "20px", height: "20px", accentColor: "#1d4ed8", cursor: "pointer" }} />
           </label>
