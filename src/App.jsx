@@ -248,9 +248,56 @@ function MainApp() {
 
   const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
   const handleIfsiSwitch = async (e) => { if (e.target.value === "NEW") { const nom = prompt("Nom de l'établissement :"); if (nom?.trim()) { const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); setSelectedIfsi(id); } } else { setSelectedIfsi(e.target.value); } };
+  
+  const getIfsiGlobalStats = useCallback((id) => {
+    const d = allQualiopiData[id === "demo_ifps_cham" ? "criteres" : id]?.campaigns?.at(-1)?.liste || [];
+    const conforme = d.filter(c => c.statut === "conforme").length;
+    const concerned = d.filter(c => c.statut !== "non-concerne").length || 1;
+    return { pct: Math.round((conforme/concerned)*100), conforme, total: concerned, liste: d, auditDate: allQualiopiData[id]?.campaigns?.at(-1)?.auditDate };
+  }, [allQualiopiData]);
+
+  const tourData = useMemo(() => {
+    const active = ifsiList.filter(i => !i.archived).map(i => ({ ...i, ...getIfsiGlobalStats(i.id) }));
+    const score = active.length ? Math.round(active.reduce((acc, curr) => acc + curr.pct, 0) / active.length) : 0;
+    let alerts = [];
+    active.forEach(s => (s.liste || []).forEach(c => {
+      if (c.statut === "non-conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "non-conforme" });
+      else if (days(c.delai) < 0 && c.statut !== "non-concerne" && c.statut !== "conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "depasse", days: Math.abs(days(c.delai)) });
+    }));
+    return { active, archived: ifsiList.filter(i => i.archived), score, alerts };
+  }, [ifsiList, getIfsiGlobalStats]);
+
+  const sortedTourIfsis = useMemo(() => [...tourData.active].sort((a,b) => {
+    if (tourSort === "urgence") return new Date(a.auditDate) - new Date(b.auditDate);
+    if (tourSort === "score_desc") return b.pct - a.pct;
+    return a.name.localeCompare(b.name);
+  }), [tourData.active, tourSort]);
+
+  // 👉 LE RETOUR DES COULEURS ET DES BRANCHEMENTS ORGANIGRAMME
+  const getRoleColor = (roleName) => { 
+    if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; 
+    const idx = orgRoles.indexOf(roleName); 
+    return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[7]; 
+  };
+  const handleDragStartOrg = (e, type, id) => { e.dataTransfer.setData("type", type); e.dataTransfer.setData("id", id); };
+  const handleDragOverOrg = (e) => { e.preventDefault(); };
+  const handleDropOrg = (e, targetRole) => { e.preventDefault(); const type = e.dataTransfer.getData("type"); const id = e.dataTransfer.getData("id"); if (type === "account") { const user = orgAccounts.find(u => u.id === id); const currentRoles = Array.isArray(user?.orgRoles) ? user.orgRoles : (user?.orgRole ? [user.orgRole] : []); if (!currentRoles.includes(targetRole)) setDoc(doc(db, "users", id), { orgRoles: [...currentRoles, targetRole], orgRole: "" }, { merge: true }); } else if (type === "manual") { const updatedManuals = manualUsers.map(u => { if (u.id === id) { const currentRoles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []); if (!currentRoles.includes(targetRole)) return { ...u, roles: [...currentRoles, targetRole], role: "" }; } return u; }); setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); } };
+  const removeRoleFromUser = (type, id, roleToRemove) => { if (type === "account") { const user = orgAccounts.find(u => u.id === id); const currentRoles = Array.isArray(user?.orgRoles) ? user.orgRoles : []; setDoc(doc(db, "users", id), { orgRoles: currentRoles.filter(r => r !== roleToRemove) }, { merge: true }); } else if (type === "manual") { const updatedManuals = manualUsers.map(u => { if (u.id === id) { const currentRoles = Array.isArray(u.roles) ? u.roles : []; return { ...u, roles: currentRoles.filter(r => r !== roleToRemove) }; } return u; }); setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); } };
+  const editOrgRole = async (oldRole) => { const newRole = prompt("Renommer la colonne :", oldRole); if (newRole && newRole.trim() !== "" && newRole !== oldRole) { const finalRole = newRole.trim(); if (orgRoles.includes(finalRole)) return alert("Ce rôle existe déjà."); const updatedRoles = orgRoles.map(r => r === oldRole ? finalRole : r); const updatedManuals = manualUsers.map(u => ({ ...u, roles: (Array.isArray(u.roles) ? u.roles : []).map(r => r === oldRole ? finalRole : r) })); for (const acc of orgAccounts) { const cRoles = Array.isArray(acc.orgRoles) ? acc.orgRoles : []; if (cRoles.includes(oldRole)) await setDoc(doc(db, "users", acc.id), { orgRoles: cRoles.map(r => r === oldRole ? finalRole : r) }, { merge: true }); } await setDoc(doc(db, "etablissements", selectedIfsi), { roles: updatedRoles, manualUsers: updatedManuals }, { merge: true }); } };
+  const editManualUser = async (id, currentName) => { const newName = prompt("Modifier le nom de l'entité :", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { const finalName = newName.trim(); const updatedManuals = manualUsers.map(u => u.id === id ? { ...u, name: finalName } : u); await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); if (campaigns && campaigns.length > 0) { const newCampaigns = campaigns.map(camp => { const newListe = camp.liste.map(c => { if (c.responsables && c.responsables.includes(currentName)) return { ...c, responsables: c.responsables.map(r => r === currentName ? finalName : r) }; return c; }); return { ...camp, liste: newListe }; }); saveData(newCampaigns); } } };
+  const addOrgRole = () => { const r = newRoleInput.trim(); if (r && !orgRoles.includes(r)) { setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, r] }, { merge: true }); setNewRoleInput(""); } };
+  const deleteOrgRole = (roleToDelete) => { if (allIfsiMembers.some(m => m.roles.includes(roleToDelete))) return alert("⚠️ Impossible : Des personnes ont encore cette casquette."); if (window.confirm(`Supprimer la colonne "${roleToDelete}" ?`)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: orgRoles.filter(r => r !== roleToDelete) }, { merge: true }); };
+  const addManualUser = () => { const n = newManualUserInput.trim(); if (n) { setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, { id: 'm_' + Date.now(), name: n, roles: [] }] }, { merge: true }); setNewManualUserInput(""); } };
+  const deleteManualUser = (idToDelete) => { if (window.confirm("Supprimer ce profil manuel ?")) setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true }); };
+  const applyDefaultRoles = () => { if(window.confirm("Appliquer les colonnes par défaut ?")) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...new Set([...orgRoles, ...DEFAULT_ROLES])] }, { merge: true }); };
+
+  const handleCreateUser = async () => { if (!newMember.email || !newMember.pwd) return alert("Requis."); if (newMember.pwd.length < 6) return alert("Mot de passe : 6 min."); setIsCreatingUser(true); try { const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd); const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi; await setDoc(doc(db, "users", userCredential.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true }); alert(`✅ Compte créé !`); setNewMember({ email: "", pwd: "", role: "user", ifsi: "" }); secondaryAuth.signOut(); } catch (error) { alert("Erreur : " + error.message); } setIsCreatingUser(false); };
+  const handleDeleteUser = async (userId) => { if (!window.confirm(`Révoquer cet accès ?`)) return; try { await deleteDoc(doc(db, "users", userId)); } catch (e) { alert(e.message); } };
+  const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
+  const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
+  const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleLogout = () => { signOut(auth); };
 
-  // 👉 FONCTION EXPORT EXCEL (REAJOUTEE)
   const exportToExcel = async () => {
     if (!criteres) return;
     if (typeof window.ExcelJS === "undefined") { alert("Chargement..."); return; }
@@ -318,17 +365,10 @@ function MainApp() {
         <div className="animate-fade-in" style={{ background: "white", padding: "40px", borderRadius: "16px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)", maxWidth: "500px", width: "100%", textAlign: "center" }}>
            <div style={{ fontSize: "50px", marginBottom: "20px" }}>✉️</div>
            <h2 style={{ color: "#1e3a5f", margin: "0 0 10px 0" }}>Vérification de l'email</h2>
-           <p style={{ color: "#64748b", marginBottom: "30px", fontSize: "15px", lineHeight: "1.6" }}>
-             Un e-mail de confirmation a été envoyé à <strong>{auth.currentUser?.email}</strong>.<br/>
-             Veuillez cliquer sur le lien dans l'e-mail pour activer votre compte.
-           </p>
-           {verificationSent ? (
-             <div style={{ background: "#f0fdf4", color: "#166534", padding: "12px", borderRadius: "8px", fontSize: "14px", fontWeight: "bold", marginBottom: "20px" }}>✅ Nouveau lien envoyé !</div>
-           ) : (
-             <button onClick={handleResendVerification} style={{ width: "100%", padding: "12px", background: "#1d4ed8", color: "white", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", marginBottom: "12px" }}>Renvoyer l'e-mail</button>
-           )}
-           <button onClick={() => window.location.reload()} style={{ width: "100%", padding: "12px", background: "#f1f5f9", color: "#1e3a5f", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", marginBottom: "12px" }}>J'ai validé mon mail (Actualiser)</button>
-           <button onClick={handleLogout} style={{ width: "100%", padding: "12px", background: "transparent", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: "8px", cursor: "pointer" }}>Se déconnecter</button>
+           <p style={{ color: "#64748b", marginBottom: "30px", fontSize: "15px", lineHeight: "1.6" }}>Vérifiez votre boîte mail <strong>{auth.currentUser?.email}</strong> pour activer votre compte.</p>
+           <button onClick={handleResendVerification} style={{ width: "100%", padding: "12px", background: "#1d4ed8", color: "white", border: "none", borderRadius: "8px", cursor: "pointer", marginBottom: "12px" }}>Renvoyer l'e-mail</button>
+           <button onClick={() => window.location.reload()} style={{ width: "100%", padding: "12px", background: "#f1f5f9", color: "#1e3a5f", borderRadius: "8px", border: "none", cursor: "pointer", marginBottom: "12px" }}>Actualiser</button>
+           <button onClick={handleLogout} style={{ width: "100%", padding: "12px", background: "transparent", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: "8px", cursor: "pointer" }}>Déconnexion</button>
         </div>
       </div>
     );
@@ -342,7 +382,6 @@ function MainApp() {
            <h2 style={{ color: "#ef4444", textAlign: "center", margin: "0 0 10px 0" }}>Sécurité</h2>
            <p style={{ textAlign: "center", color: "#64748b", marginBottom: "30px", fontSize: "14px" }}>C'est votre première connexion. Vous devez créer votre mot de passe.</p>
            <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={(e) => updatePassword(auth.currentUser, pwdUpdate.p1).then(()=>setDoc(doc(db,"users",auth.currentUser.uid),{mustChangePassword:false},{merge:true})).then(()=>window.location.reload())} />
-           <button onClick={handleLogout} style={{ marginTop: "20px", width: "100%", padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Quitter</button>
         </div>
       </div>
     );
@@ -367,7 +406,6 @@ function MainApp() {
         <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveData} isReadOnly={isArchive} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} />
       )}
 
-      {/* NAVIGATION */}
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", maxWidth: "1440px", margin: "0 auto", gap: "20px" }}>
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -413,13 +451,16 @@ function MainApp() {
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         {activeTab === "backups" && <BackupsTab backupsList={backupsList} handleRestoreBackup={handleRestoreBackup} />}
         {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={() => {}} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} />}
-        {activeTab === "tour_controle" && <TourControleTab globalScore={0} activeIfsis={[]} totalUsersInNetwork={0} topAlerts={[]} sortedTourIfsis={[]} setSelectedIfsi={setSelectedIfsi} archivedIfsis={[]} today={today} handleRenameIfsi={()=>{}} handleArchiveIfsi={()=>{}} handleHardDeleteIfsi={()=>{}} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={0} />}
-        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={(r)=>({bg:"#eee",border:"#ccc",text:"#000"})} handleDragOverOrg={()=>{}} handleDropOrg={()=>{}} handleDragStartOrg={()=>{}} removeRoleFromUser={()=>{}} editOrgRole={()=>{}} editManualUser={()=>{}} deleteManualUser={()=>{}} addManualUser={()=>{}} addOrgRole={()=>{}} newManualUserInput="" setNewManualUserInput={()=>{}} newRoleInput="" setNewRoleInput={()=>{}} deleteOrgRole={()=>{}} applyDefaultRoles={()=>{}} />}
+        
+        {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={tourData.alerts.length} />}
+        
+        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleDragOverOrg={handleDragOverOrg} handleDropOrg={handleDropOrg} handleDragStartOrg={handleDragStartOrg} removeRoleFromUser={removeRoleFromUser} editOrgRole={editOrgRole} editManualUser={editManualUser} deleteManualUser={deleteManualUser} addManualUser={addManualUser} addOrgRole={addOrgRole} newManualUserInput={newManualUserInput} setNewManualUserInput={setNewManualUserInput} newRoleInput={newRoleInput} setNewRoleInput={setNewRoleInput} deleteOrgRole={deleteOrgRole} applyDefaultRoles={applyDefaultRoles} />}
+        
         {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} />}
         {activeTab === "axes" && <AxesTab axes={axes} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} isAuditMode={isAuditMode} />}
-        {activeTab === "responsables" && <ResponsablesTab byPerson={byPerson} setModalCritere={setModalCritere} isArchive={isArchive} getRoleColor={(r)=>({bg:"#eee",border:"#ccc",text:"#000"})} />}
+        {activeTab === "responsables" && <ResponsablesTab byPerson={byPerson} setModalCritere={setModalCritere} isArchive={isArchive} getRoleColor={getRoleColor} />}
         {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} currentCampaign={currentCampaign} criteres={criteres} />}
-        {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={()=>{}} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={[]} teamSortConfig={teamSortConfig} handleSortTeam={()=>{}} handleDeleteUser={()=>{}} auth={auth} handleSendResetEmail={handleSendResetEmail} />}
+        {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={teamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} handleSendResetEmail={handleSendResetEmail} />}
         {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} />}
       </div>
     </div>
