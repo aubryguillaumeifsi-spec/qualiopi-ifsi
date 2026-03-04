@@ -152,6 +152,7 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
   };
 
   async function handleAnalyze(file) {
+    // 👉 ALERTE RGPD BLOQUANTE AVANT LE SCAN
     if (!window.confirm("⚠️ ALERTE RGPD - CONFIDENTIALITÉ DES DONNÉES\n\nAvant de transmettre ce document à l'Intelligence Artificielle, veuillez confirmer qu'il ne contient AUCUNE donnée personnelle, médicale ou sensible (noms de patients, numéros de sécurité sociale, etc.).\n\nAvez-vous bien anonymisé ou biffé les informations sensibles ?")) return;
 
     if (!file.url) return;
