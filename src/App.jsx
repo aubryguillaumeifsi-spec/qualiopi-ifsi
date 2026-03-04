@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import LoginPage from "./components/LoginPage";
 import DetailModal from "./components/DetailModal";
 
@@ -36,6 +36,44 @@ const today = new Date();
 const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
 const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
 
+// 👉 SOUS-COMPOSANT UI DE LA MACHINE A REMONTER LE TEMPS
+function BackupsTab({ backupsList, handleRestoreBackup }) {
+  return (
+      <div className="animate-fade-in" style={{ maxWidth: "800px", margin: "0 auto", marginTop: "20px" }}>
+          <div style={{ marginBottom: "32px", textAlign: "center", background: "white", padding: "30px", borderRadius: "16px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
+              <div style={{ fontSize: "50px", marginBottom: "10px" }}>⏳</div>
+              <h2 style={{ fontSize: "24px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 8px" }}>Machine à remonter le temps</h2>
+              <p style={{ fontSize: "14px", color: "#64748b", margin: 0, lineHeight: "1.5" }}>L'application sauvegarde automatiquement l'état de l'IFSI une fois par jour et avant chaque importation Excel. <strong>Les données de plus de 10 jours sont détruites automatiquement pour économiser de l'espace.</strong></p>
+          </div>
+          
+          {backupsList.length === 0 ? (
+              <div style={{ background: "white", padding: "40px", textAlign: "center", borderRadius: "14px", border: "1px dashed #cbd5e1", color: "#9ca3af", fontStyle: "italic" }}>
+                  Le coffre-fort est vide pour le moment.
+              </div>
+          ) : (
+              <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+                  {backupsList.map((b, idx) => (
+                      <div key={b.id} className="td-dash" style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                          <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
+                              <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: idx === 0 ? "#eff6ff" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
+                                {b.type.includes("Import") ? "📥" : "💾"}
+                              </div>
+                              <div>
+                                  <div style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f" }}>{b.type}</div>
+                                  <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>Enregistré le {new Date(b.timestamp).toLocaleString("fr-FR", { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute:'2-digit' })}</div>
+                              </div>
+                          </div>
+                          <button onClick={() => handleRestoreBackup(b)} style={{ background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", padding: "8px 16px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "flex", gap: "8px", alignItems: "center", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background="#fee2e2"} onMouseOut={e=>e.currentTarget.style.background="#fef2f2"}>
+                              <span>⏪</span> Restaurer
+                          </button>
+                      </div>
+                  ))}
+              </div>
+          )}
+      </div>
+  );
+}
+
 function MainApp() {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -63,6 +101,10 @@ function MainApp() {
   const [tourSort, setTourSort] = useState("urgence");
   
   const [importReport, setImportReport] = useState(null);
+  
+  // 👉 NOUVEAUX ETATS POUR LES BACKUPS
+  const [backupsList, setBackupsList] = useState([]);
+  const dailyBackupDone = useRef(null); // Pour ne déclencher le backup quotidien qu'une seule fois
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
@@ -129,6 +171,82 @@ function MainApp() {
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
   };
+
+  // 👉 LA LOGIQUE DE LA MACHINE À REMONTER LE TEMPS
+  
+  // 1. Le Créateur de Backup Manuel
+  const createManualBackup = async (label, dataToBackup) => {
+    const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
+    const backupId = `${docId}_manual_${Date.now()}`;
+    await setDoc(doc(db, "backups", backupId), {
+        ifsiId: docId,
+        timestamp: Date.now(),
+        date: new Date().toISOString(),
+        type: label,
+        campaigns: dataToBackup
+    });
+  };
+
+  // 2. Le Fantôme Quotidien
+  useEffect(() => {
+    if (!campaigns || !selectedIfsi || campaigns.length === 0) return;
+    if (dailyBackupDone.current === selectedIfsi) return; // Déjà vérifié pour cette session
+    dailyBackupDone.current = selectedIfsi;
+    
+    const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
+    const todayStr = new Date().toISOString().split('T')[0];
+    const todayBackupId = `${docId}_daily_${todayStr}`;
+    
+    getDoc(doc(db, "backups", todayBackupId)).then(snap => {
+        if (!snap.exists()) {
+            setDoc(doc(db, "backups", todayBackupId), {
+                ifsiId: docId,
+                timestamp: Date.now(),
+                date: new Date().toISOString(),
+                type: "Sauvegarde Quotidienne",
+                campaigns: campaigns
+            }).catch(e => console.log("Sauvegarde fantôme ignorée", e));
+        }
+    });
+  }, [selectedIfsi, campaigns]);
+
+  // 3. Le Lecteur de Coffre-Fort (et le Balayeur 10 jours)
+  useEffect(() => {
+    if (activeTab === "backups" && selectedIfsi) {
+        const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
+        const unsub = onSnapshot(collection(db, "backups"), (snap) => {
+            const list = [];
+            const now = Date.now();
+            const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000; // 10 jours en millisecondes
+            
+            snap.forEach(docSnap => {
+                const d = docSnap.data();
+                if (d.ifsiId === docId) {
+                    if (d.timestamp < tenDaysAgo) {
+                        deleteDoc(docSnap.ref); // Le balayeur détruit l'archive silencieusement
+                    } else {
+                        list.push({ id: docSnap.id, ...d });
+                    }
+                }
+            });
+            setBackupsList(list.sort((a,b) => b.timestamp - a.timestamp)); // Du plus récent au plus vieux
+        });
+        return () => unsub();
+    }
+  }, [activeTab, selectedIfsi]);
+
+  // 4. L'Action de Restauration
+  const handleRestoreBackup = async (backup) => {
+    if (window.confirm(`⚠️ ATTENTION ⚠️\n\nVous allez restaurer toute la base de données à l'état précis du :\n${new Date(backup.timestamp).toLocaleString()}\n\nToutes les modifications (textes, statuts, agents) faites depuis cette date seront écrasées et PERDUES.\n\nÊtes-vous absolument sûr ?`)) {
+        await createManualBackup("Avant Restauration", campaigns); // Sécurité Inception !
+        const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
+        await setDoc(doc(db, "qualiopi", docId), { campaigns: backup.campaigns, updatedAt: new Date().toISOString() }, { merge: true });
+        alert("✅ Restauration réussie ! L'application est revenue dans le passé.");
+        setActiveTab("dashboard");
+    }
+  };
+
+  // --- FIN MACHINE A REMONTER LE TEMPS ---
 
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
@@ -294,22 +412,19 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // 👉 L'IMPORT EXCEL TOTALEMENT MAGIQUE
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
 
     if (file.name.toLowerCase().endsWith('.csv')) {
-      setImportReport({ type: "warning", title: "Format inadapté", msg: "L'application attend un fichier Excel (.xlsx) et non un fichier CSV. Veuillez ouvrir votre fichier et l'enregistrer au format Excel.", details: "" });
+      setImportReport({ type: "warning", title: "Format inadapté", msg: "L'application attend un fichier Excel (.xlsx) et non un fichier CSV.", details: "" });
       return e.target.value = null;
     }
-
     if (typeof window.ExcelJS === "undefined") {
-      setImportReport({ type: "error", title: "Erreur Système", msg: "Le moteur de lecture Excel n'est pas encore chargé.", details: "" });
+      setImportReport({ type: "error", title: "Erreur Système", msg: "Moteur Excel non chargé.", details: "" });
       return e.target.value = null;
     }
-
-    if (!window.confirm("⚠️ L'import écrasera les données actuelles de cet établissement par celles du fichier. Continuer ?")) {
+    if (!window.confirm("⚠️ L'import écrasera les données actuelles de cet établissement. Continuer ?")) {
       return e.target.value = null;
     }
 
@@ -318,14 +433,13 @@ function MainApp() {
       const workbook = new window.ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
       const worksheet = workbook.worksheets[0];
-      
-      if (!worksheet) throw new Error("Aucun onglet trouvé dans le fichier.");
+      if (!worksheet) throw new Error("Aucun onglet trouvé.");
+
+      // 🛑 SAUVEGARDE PARACHUTE AVANT IMPORT
+      await createManualBackup("Avant Import Excel", campaigns);
 
       let updatedCriteres = [...criteres];
-      let count = 0;
-      let logs = [];
-      let newlyDiscoveredUsers = new Set();
-
+      let count = 0; let logs = []; let newlyDiscoveredUsers = new Set();
       const existingNamesList = allIfsiMembers.map(m => m.name.toLowerCase());
 
       const getCellText = (cell) => {
@@ -342,8 +456,7 @@ function MainApp() {
       const normalize = str => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
 
       const tagImport = (oldVal, newVal) => {
-        const o = String(oldVal || "").trim();
-        const n = String(newVal || "").trim();
+        const o = String(oldVal || "").trim(); const n = String(newVal || "").trim();
         if (!n || o === n) return o;
         if (n.includes("[📥 IMPORT EXCEL]")) return n;
         return `[📥 IMPORT EXCEL]\n${n}`;
@@ -351,15 +464,12 @@ function MainApp() {
 
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return; 
-        
         let numRaw = getCellText(row.getCell(1)).trim();
         if (!numRaw) return;
-        
         const numClean = numRaw.replace(/[^\d]/g, '');
         const index = updatedCriteres.findIndex(c => String(c.num) === numClean || String(c.num) === numRaw);
         
         if (index !== -1) {
-          // --- Extraction Statut ---
           const statutText = getCellText(row.getCell(4)).trim();
           let statutKey = updatedCriteres[index].statut || "non-evalue";
           if (statutText) {
@@ -367,29 +477,18 @@ function MainApp() {
             if (foundStatut) statutKey = foundStatut[0];
           }
 
-          // --- Extraction Date (Echeance) ---
           const dateCell = row.getCell(5);
           let newDelai = updatedCriteres[index].delai;
           if (dateCell && dateCell.value) {
-            if (dateCell.value instanceof Date) {
-              newDelai = dateCell.value.toISOString().split('T')[0];
-            } else {
-              const dStr = getCellText(dateCell).trim();
-              if (dStr.includes('/')) {
-                 const parts = dStr.split('/');
-                 if (parts.length === 3) newDelai = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
-              }
-            }
+            if (dateCell.value instanceof Date) { newDelai = dateCell.value.toISOString().split('T')[0]; } 
+            else { const dStr = getCellText(dateCell).trim(); if (dStr.includes('/')) { const parts = dStr.split('/'); if (parts.length === 3) newDelai = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`; } }
           }
 
-          // --- Extraction Responsables ---
           const respText = getCellText(row.getCell(6));
           let responsables = updatedCriteres[index].responsables || [];
           if (respText) {
              responsables = respText.split(',').map(s => s.trim()).filter(s => s);
-             responsables.forEach(r => {
-                if (!existingNamesList.includes(r.toLowerCase())) newlyDiscoveredUsers.add(r);
-             });
+             responsables.forEach(r => { if (!existingNamesList.includes(r.toLowerCase())) newlyDiscoveredUsers.add(r); });
           }
 
           let newCritere = {
@@ -403,48 +502,28 @@ function MainApp() {
             notes: tagImport(updatedCriteres[index].notes, getCellText(row.getCell(10))),
           };
 
-          // Bouclier Anti-Firebase
           Object.keys(newCritere).forEach(key => { if (newCritere[key] === undefined) newCritere[key] = ""; });
 
-          // Ajout Log Historique
-          newCritere.historique = [...(newCritere.historique || []), {
-              date: new Date().toISOString(),
-              user: "Système d'Import",
-              msg: "📥 Données synchronisées depuis un fichier Excel"
-          }];
+          newCritere.historique = [...(newCritere.historique || []), { date: new Date().toISOString(), user: "Système d'Import", msg: "📥 Données synchronisées depuis un fichier Excel" }];
 
           updatedCriteres[index] = newCritere;
-          count++;
-          logs.push(`Indicateur ${numClean} mis à jour avec succès.`);
+          count++; logs.push(`Indicateur ${numClean} mis à jour avec succès.`);
         }
       });
 
       if (count === 0) {
-        setImportReport({ type: "warning", title: "Aucune mise à jour", msg: "Le fichier a été lu, mais aucun numéro d'indicateur correspondant n'a été trouvé. Assurez-vous d'importer le fichier généré par le bouton 'Excel'.", details: "" });
+        setImportReport({ type: "warning", title: "Aucune mise à jour", msg: "Le fichier a été lu, mais aucun numéro d'indicateur correspondant n'a été trouvé.", details: "" });
       } else {
-        
-        // 👻 CRÉATION DES RESPONSABLES FANTÔMES
         if (newlyDiscoveredUsers.size > 0) {
-           const newManualsToAdd = Array.from(newlyDiscoveredUsers).map(name => ({
-              id: 'm_' + Date.now() + Math.random().toString(36).substr(2, 5),
-              name: name,
-              roles: []
-           }));
+           const newManualsToAdd = Array.from(newlyDiscoveredUsers).map(name => ({ id: 'm_' + Date.now() + Math.random().toString(36).substr(2, 5), name: name, roles: [] }));
            const freshIfsi = await getDoc(doc(db, "etablissements", selectedIfsi));
-           if (freshIfsi.exists()) {
-              const currentManuals = freshIfsi.data().manualUsers || [];
-              await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...currentManuals, ...newManualsToAdd] }, { merge: true });
-           }
+           if (freshIfsi.exists()) { const currentManuals = freshIfsi.data().manualUsers || []; await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...currentManuals, ...newManualsToAdd] }, { merge: true }); }
         }
-
         const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: updatedCriteres } : camp);
         await saveData(newCampaigns);
-        setImportReport({ type: "success", title: "Import Réussi", msg: `Base de données mise à jour ! ${newlyDiscoveredUsers.size > 0 ? `\n👤 ${newlyDiscoveredUsers.size} nouveaux responsables créés dans l'Organigramme.` : ''}`, details: `${count} indicateurs affectés:\n${logs.join("\n")}` });
+        setImportReport({ type: "success", title: "Import Réussi", msg: `Base de données mise à jour ! ${newlyDiscoveredUsers.size > 0 ? `\n👤 ${newlyDiscoveredUsers.size} nouveaux responsables créés.` : ''}`, details: `${count} indicateurs affectés:\n${logs.join("\n")}` });
       }
-    } catch (error) {
-      console.error(error);
-      setImportReport({ type: "error", title: "Échec de la lecture", msg: "Impossible de décoder le fichier Excel. S'il est actuellement ouvert dans un autre logiciel, fermez-le d'abord.", details: `${error.name}: ${error.message}` });
-    }
+    } catch (error) { setImportReport({ type: "error", title: "Échec de la lecture", msg: "Impossible de décoder le fichier Excel.", details: `${error.name}: ${error.message}` }); }
     e.target.value = null;
   };
 
@@ -540,6 +619,9 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {/* 👉 LE BOUTON D'ACCÈS AU COFFRE-FORT (SUPERADMIN UNIQUEMENT) */}
+            {userProfile?.role === "superadmin" && <button onClick={() => setActiveTab("backups")} style={{ ...navBtn(activeTab === "backups"), color: "#1e3a5f", background: activeTab === "backups" ? "#e0e7ff" : "transparent", display: "flex", gap: "6px", padding: "6px 12px" }}><span>⏳</span> Backups</button>}
+
             {userProfile?.role === "superadmin" && !isArchive && (
               <>
                 <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
@@ -557,6 +639,7 @@ function MainApp() {
 
       {/* CONTENU */}
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
+        {activeTab === "backups" && <BackupsTab backupsList={backupsList} handleRestoreBackup={handleRestoreBackup} />}
         {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit Qualiopi" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={handleEditAuditDate} stats={stats} urgents={urgents} criteres={criteres} />}
         {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={totalUsersInNetwork} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={tourData.alerts.length} />}
         {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleDragOverOrg={handleDragOverOrg} handleDropOrg={handleDropOrg} handleDragStartOrg={handleDragStartOrg} removeRoleFromUser={removeRoleFromUser} editOrgRole={editOrgRole} editManualUser={editManualUser} deleteManualUser={deleteManualUser} addManualUser={addManualUser} addOrgRole={addOrgRole} newManualUserInput={newManualUserInput} setNewManualUserInput={setNewManualUserInput} newRoleInput={newRoleInput} setNewRoleInput={setNewRoleInput} deleteOrgRole={deleteOrgRole} applyDefaultRoles={applyDefaultRoles} />}
