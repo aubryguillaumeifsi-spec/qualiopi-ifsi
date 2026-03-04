@@ -294,7 +294,7 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // 👉 L'IMPORT EXCEL ULTRA-BLINDÉ CONTRE LE BUG FIREBASE "UNDEFINED"
+  // 👉 L'IMPORT EXCEL TOTALEMENT MAGIQUE
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -324,6 +324,9 @@ function MainApp() {
       let updatedCriteres = [...criteres];
       let count = 0;
       let logs = [];
+      let newlyDiscoveredUsers = new Set();
+
+      const existingNamesList = allIfsiMembers.map(m => m.name.toLowerCase());
 
       const getCellText = (cell) => {
         if (!cell || cell.value === null || cell.value === undefined) return "";
@@ -338,6 +341,14 @@ function MainApp() {
 
       const normalize = str => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
 
+      const tagImport = (oldVal, newVal) => {
+        const o = String(oldVal || "").trim();
+        const n = String(newVal || "").trim();
+        if (!n || o === n) return o;
+        if (n.includes("[📥 IMPORT EXCEL]")) return n;
+        return `[📥 IMPORT EXCEL]\n${n}`;
+      };
+
       worksheet.eachRow((row, rowNumber) => {
         if (rowNumber === 1) return; 
         
@@ -345,10 +356,10 @@ function MainApp() {
         if (!numRaw) return;
         
         const numClean = numRaw.replace(/[^\d]/g, '');
-
         const index = updatedCriteres.findIndex(c => String(c.num) === numClean || String(c.num) === numRaw);
         
         if (index !== -1) {
+          // --- Extraction Statut ---
           const statutText = getCellText(row.getCell(4)).trim();
           let statutKey = updatedCriteres[index].statut || "non-evalue";
           if (statutText) {
@@ -356,26 +367,51 @@ function MainApp() {
             if (foundStatut) statutKey = foundStatut[0];
           }
 
+          // --- Extraction Date (Echeance) ---
+          const dateCell = row.getCell(5);
+          let newDelai = updatedCriteres[index].delai;
+          if (dateCell && dateCell.value) {
+            if (dateCell.value instanceof Date) {
+              newDelai = dateCell.value.toISOString().split('T')[0];
+            } else {
+              const dStr = getCellText(dateCell).trim();
+              if (dStr.includes('/')) {
+                 const parts = dStr.split('/');
+                 if (parts.length === 3) newDelai = `${parts[2]}-${parts[1].padStart(2,'0')}-${parts[0].padStart(2,'0')}`;
+              }
+            }
+          }
+
+          // --- Extraction Responsables ---
           const respText = getCellText(row.getCell(6));
           let responsables = updatedCriteres[index].responsables || [];
-          if (respText) responsables = respText.split(',').map(s => s.trim()).filter(s => s);
+          if (respText) {
+             responsables = respText.split(',').map(s => s.trim()).filter(s => s);
+             responsables.forEach(r => {
+                if (!existingNamesList.includes(r.toLowerCase())) newlyDiscoveredUsers.add(r);
+             });
+          }
 
           let newCritere = {
             ...updatedCriteres[index],
             statut: statutKey,
+            delai: newDelai || updatedCriteres[index].delai,
             responsables: responsables,
-            preuves: getCellText(row.getCell(7)) || updatedCriteres[index].preuves || "",
-            preuves_encours: getCellText(row.getCell(8)) || updatedCriteres[index].preuves_encours || "",
-            attendus: getCellText(row.getCell(9)) || updatedCriteres[index].attendus || "",
-            notes: getCellText(row.getCell(10)) || updatedCriteres[index].notes || "",
+            preuves: tagImport(updatedCriteres[index].preuves, getCellText(row.getCell(7))),
+            preuves_encours: tagImport(updatedCriteres[index].preuves_encours, getCellText(row.getCell(8))),
+            attendus: tagImport(updatedCriteres[index].attendus, getCellText(row.getCell(9))),
+            notes: tagImport(updatedCriteres[index].notes, getCellText(row.getCell(10))),
           };
 
-          // 🚨 LE FAMEUX BOUCLIER ANTI-UNDEFINED
-          Object.keys(newCritere).forEach(key => {
-            if (newCritere[key] === undefined) {
-              newCritere[key] = "";
-            }
-          });
+          // Bouclier Anti-Firebase
+          Object.keys(newCritere).forEach(key => { if (newCritere[key] === undefined) newCritere[key] = ""; });
+
+          // Ajout Log Historique
+          newCritere.historique = [...(newCritere.historique || []), {
+              date: new Date().toISOString(),
+              user: "Système d'Import",
+              msg: "📥 Données synchronisées depuis un fichier Excel"
+          }];
 
           updatedCriteres[index] = newCritere;
           count++;
@@ -386,9 +422,24 @@ function MainApp() {
       if (count === 0) {
         setImportReport({ type: "warning", title: "Aucune mise à jour", msg: "Le fichier a été lu, mais aucun numéro d'indicateur correspondant n'a été trouvé. Assurez-vous d'importer le fichier généré par le bouton 'Excel'.", details: "" });
       } else {
+        
+        // 👻 CRÉATION DES RESPONSABLES FANTÔMES
+        if (newlyDiscoveredUsers.size > 0) {
+           const newManualsToAdd = Array.from(newlyDiscoveredUsers).map(name => ({
+              id: 'm_' + Date.now() + Math.random().toString(36).substr(2, 5),
+              name: name,
+              roles: []
+           }));
+           const freshIfsi = await getDoc(doc(db, "etablissements", selectedIfsi));
+           if (freshIfsi.exists()) {
+              const currentManuals = freshIfsi.data().manualUsers || [];
+              await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...currentManuals, ...newManualsToAdd] }, { merge: true });
+           }
+        }
+
         const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: updatedCriteres } : camp);
         await saveData(newCampaigns);
-        setImportReport({ type: "success", title: "Import Réussi", msg: `Base de données mise à jour !`, details: `${count} indicateurs affectés:\n${logs.join("\n")}` });
+        setImportReport({ type: "success", title: "Import Réussi", msg: `Base de données mise à jour ! ${newlyDiscoveredUsers.size > 0 ? `\n👤 ${newlyDiscoveredUsers.size} nouveaux responsables créés dans l'Organigramme.` : ''}`, details: `${count} indicateurs affectés:\n${logs.join("\n")}` });
       }
     } catch (error) {
       console.error(error);
@@ -442,7 +493,7 @@ function MainApp() {
            <div className="animate-fade-in" style={{ background: "white", borderRadius: "16px", padding: "32px", maxWidth: "500px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
               <div style={{ fontSize: "40px", textAlign: "center", marginBottom: "16px" }}>{importReport.type === 'success' ? '✅' : importReport.type === 'warning' ? '⚠️' : '❌'}</div>
               <h2 style={{ textAlign: "center", margin: "0 0 12px 0", color: "#1e3a5f" }}>{importReport.title}</h2>
-              <p style={{ textAlign: "center", color: "#475569", fontSize: "14px", marginBottom: "20px", lineHeight: "1.5" }}>{importReport.msg}</p>
+              <p style={{ textAlign: "center", color: "#475569", fontSize: "14px", marginBottom: "20px", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>{importReport.msg}</p>
               {importReport.details && (
                  <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px", fontSize: "11px", color: "#64748b", maxHeight: "150px", overflowY: "auto", whiteSpace: "pre-wrap", fontFamily: "monospace", marginBottom: "20px", border: "1px solid #cbd5e1" }}>
                    {importReport.details}
@@ -489,7 +540,7 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {(userProfile?.role === "superadmin") && !isArchive && (
+            {userProfile?.role === "superadmin" && !isArchive && (
               <>
                 <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
                 <label htmlFor="import-excel" className="hide-mobile" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
