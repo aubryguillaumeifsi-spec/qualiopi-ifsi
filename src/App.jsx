@@ -589,7 +589,25 @@ function MainApp() {
            <div style={{ textAlign: "center", fontSize: "40px", marginBottom: "10px" }}>🔒</div>
            <h2 style={{ color: "#ef4444", textAlign: "center", margin: "0 0 10px 0" }}>Sécurité du compte</h2>
            <p style={{ textAlign: "center", color: "#64748b", marginBottom: "30px", fontSize: "14px", lineHeight: "1.5" }}>C'est votre première connexion. Vous devez créer votre mot de passe.</p>
-           <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={(e) => { e.preventDefault(); updatePassword(auth.currentUser, pwdUpdate.p1).then(()=>setDoc(doc(db,"users",auth.currentUser.uid),{mustChangePassword:false},{merge:true})).then(()=>window.location.reload()).catch(err => setPwdUpdate({...pwdUpdate, error: err.message}))}} />
+           <CompteTab 
+             auth={auth} 
+             userProfile={userProfile} 
+             pwdUpdate={pwdUpdate} 
+             setPwdUpdate={setPwdUpdate} 
+             handleChangePassword={async (e) => { 
+               e.preventDefault(); 
+               setPwdUpdate({...pwdUpdate, loading: true}); 
+               try { 
+                 await updatePassword(auth.currentUser, pwdUpdate.p1); 
+                 await setDoc(doc(db,"users",auth.currentUser.uid),{mustChangePassword:false},{merge:true}); 
+                 alert("✅ Mot de passe mis à jour ! Redémarrage..."); 
+                 window.location.reload(); 
+               } catch (err) { 
+                 alert("Erreur : " + err.message); 
+                 setPwdUpdate({...pwdUpdate, loading: false, error: err.message}); 
+               } 
+             }} 
+           />
            <button onClick={handleLogout} style={{ marginTop: "20px", width: "100%", padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Quitter</button>
         </div>
       </div>
@@ -802,7 +820,7 @@ function MainApp() {
         
         {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} handleSendResetEmail={handleSendResetEmail} isDarkMode={isDarkMode} />}
         
-        {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={(e) => { e.preventDefault(); updatePassword(auth.currentUser, pwdUpdate.p1).then(()=>setPwdUpdate({...pwdUpdate, success: "Mot de passe modifié", p1:"", p2:""})).catch(err => setPwdUpdate({...pwdUpdate, error: err.message}))}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} />}
+        {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={async (e) => { e.preventDefault(); setPwdUpdate({...pwdUpdate, loading: true}); try { await updatePassword(auth.currentUser, pwdUpdate.p1); setPwdUpdate({...pwdUpdate, loading: false, success: "Mot de passe modifié", p1:"", p2:""}); } catch (err) { setPwdUpdate({...pwdUpdate, loading: false, error: err.message}); } }} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} />}
       </div>
       
       <Footer isDarkMode={isDarkMode} />
