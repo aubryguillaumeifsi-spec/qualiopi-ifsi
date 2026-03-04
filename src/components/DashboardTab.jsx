@@ -1,6 +1,27 @@
 import React from "react";
 import { CRITERES_LABELS } from "../data";
 
+// 👉 LE COMPOSANT MANQUANT (GaugeChart) EST RÉINTÉGRÉ ICI !
+export function GaugeChart({ pct, score, color }) {
+  const val = pct !== undefined ? pct : (score !== undefined ? score : 0);
+  const c = color || "#1d4ed8";
+  const r = 32;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (val / 100) * circ;
+  return (
+    <div style={{ position: "relative", width: "80px", height: "80px" }}>
+      <svg width="80" height="80" viewBox="0 0 80 80" style={{ transform: "rotate(-90deg)" }}>
+        {/* Le fond de la jauge est rendu universel avec une transparence pour le Dark Mode */}
+        <circle cx="40" cy="40" r={r} fill="transparent" stroke="rgba(148, 163, 184, 0.2)" strokeWidth="8" />
+        <circle cx="40" cy="40" r={r} fill="transparent" stroke={c} strokeWidth="8" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s ease-out" }} />
+      </svg>
+      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "900" }}>
+        {val}%
+      </div>
+    </div>
+  );
+}
+
 export default function DashboardTab({ bannerConfig, currentAuditDate, isArchive, handleEditAuditDate, stats, urgents, criteres, userProfile }) {
   
   // Reconstitution des 15 dernières actions de l'historique
@@ -46,7 +67,6 @@ export default function DashboardTab({ bannerConfig, currentAuditDate, isArchive
            <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
              {urgents.length === 0 ? <div style={{ color: "#64748b", fontStyle: "italic", fontSize: "14px" }}>Aucune urgence à traiter.</div> : null}
              
-             {/* 👉 ICI TA NOUVELLE FONCTIONNALITÉ DE COULEUR ! */}
              {urgents.map(c => {
                const catColor = CRITERES_LABELS[c.critere]?.color || "#9ca3af";
                return (
