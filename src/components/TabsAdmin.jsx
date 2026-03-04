@@ -37,7 +37,7 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
         <h2 style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 16px" }}>Annuaire de l'équipe</h2>
         <input type="text" placeholder="Rechercher par email..." value={teamSearchTerm} onChange={e => setTeamSearchTerm(e.target.value)} style={{ ...input, marginBottom: "16px" }} />
         
-        <div style={{ overflowX: "auto", borderRadius: "8px", border: "1px solid #e2e8f0" }}>
+        <div style={{ overflowX: "auto", borderRadius: "8px", border: "1px solid #e2e8f0", background: "white" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "450px" }}>
             <thead>
               <tr>
@@ -119,8 +119,8 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
           
           <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: "#f8fafc", padding: "12px 16px", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
             <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: "#334155" }}>Mode Sombre</div>
-              <div style={{ fontSize: "11px", color: "#64748b" }}>Idéal pour le confort visuel en basse lumière.</div>
+              <div style={{ fontSize: "14px", fontWeight: "700", color: "#334155" }}>Mode Sombre (Gemini)</div>
+              <div style={{ fontSize: "11px", color: "#64748b" }}>Contraste élevé, idéal en basse lumière.</div>
             </div>
             <input type="checkbox" checked={isDarkMode} onChange={(e) => setIsDarkMode(e.target.checked)} style={{ width: "20px", height: "20px", accentColor: "#1d4ed8", cursor: "pointer" }} />
           </label>
