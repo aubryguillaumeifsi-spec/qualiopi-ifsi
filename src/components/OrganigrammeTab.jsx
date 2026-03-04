@@ -4,7 +4,7 @@ export default function OrganigrammeTab({
   currentIfsiName, orgRoles, allIfsiMembers, getRoleColor,
   handleDragOverOrg, handleDropOrg, handleDragStartOrg, removeRoleFromUser,
   editOrgRole, editManualUser, deleteManualUser, addManualUser,
-  addOrgRole, newManualUserInput, setNewManualUserInput, newRoleInput,
+  addOrgRole, newManualUser, setNewManualUser, newRoleInput,
   setNewRoleInput, deleteOrgRole, applyDefaultRoles
 }) {
   
@@ -29,14 +29,15 @@ export default function OrganigrammeTab({
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)" }}>
           <h3 style={{ margin: "0 0 12px 0", fontSize: "15px", color: "#1e3a5f" }}>👤 Créer un collaborateur manuel</h3>
           <div style={{ display: "flex", gap: "10px" }}>
-            <input type="text" placeholder="Ex: Jean Dupont" value={newManualUserInput} onChange={e => setNewManualUserInput(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none" }} />
+            <input type="text" placeholder="Prénom" value={newManualUser.prenom} onChange={e => setNewManualUser({...newManualUser, prenom: e.target.value})} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none" }} />
+            <input type="text" placeholder="NOM" value={newManualUser.nom} onChange={e => setNewManualUser({...newManualUser, nom: e.target.value})} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none", textTransform: "uppercase" }} />
             <button onClick={addManualUser} style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", padding: "0 16px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", color: "#334155" }}>Ajouter</button>
           </div>
         </div>
 
         {/* Boîte 2 : Ajouter une colonne */}
         <div style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "16px", padding: "20px", boxShadow: "0 4px 6px -1px rgba(0,0,0,0.05)" }}>
-          <h3 style={{ margin: "0 0 12px 0", fontSize: "15px", color: "#1e3a5f" }}>🗂️ Créer une nouvelle colonne</h3>
+          <h3 style={{ margin: "0 0 12px 0", fontSize: "15px", color: "#1e3a5f" }}>🗂️ Créer une nouvelle mission / colonne</h3>
           <div style={{ display: "flex", gap: "10px" }}>
             <input type="text" placeholder="Ex: Informatique" value={newRoleInput} onChange={e => setNewRoleInput(e.target.value)} style={{ flex: 1, padding: "10px", borderRadius: "8px", border: "1px solid #cbd5e1", outline: "none" }} />
             <button onClick={addOrgRole} style={{ background: "#f1f5f9", border: "1px solid #cbd5e1", padding: "0 16px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", color: "#334155" }}>Ajouter</button>
