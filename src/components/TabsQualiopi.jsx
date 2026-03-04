@@ -32,16 +32,26 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
             const nbFiles = (c.fichiers || []).filter(f => !f.archive).length;
             const nbChemins = (c.chemins_reseau || []).length;
             const hasLink = (c.preuves || "").trim().length > 0;
-            return (<tr key={c.id} className="print-break-avoid td-dash" onMouseOver={e => e.currentTarget.style.background="#f8fafc"} onMouseOut={e => e.currentTarget.style.background="white"}><td style={{ ...td, width: "90px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td><td style={{ ...td, maxWidth: "300px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>{cConf.label}</div></td><td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); return <span key={rSafe} style={{ fontSize: "10px", color: "#1e40af", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: "4px", padding: "3px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "3px 6px" }}>+{resps.length-2}</span>}</div>}</td><td style={td}><div style={{ fontSize: "12px", fontWeight: "600" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700", marginTop: "2px" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td><td style={td}><StatusBadge statut={c.statut} /></td>
-            <td style={td}>
-              <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
-                {nbChemins > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "3px 8px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap", fontWeight: "600" }}>🔗 {nbChemins} Lien(s)</span>}
-                {nbFiles > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "3px 8px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap", fontWeight: "600" }}>☁️ {nbFiles} Fichier(s)</span>}
-                {hasLink && <span style={{ fontSize: "10px", color: "#1d4ed8", background: "#eff6ff", padding: "3px 8px", borderRadius: "4px", border: "1px solid #bfdbfe", whiteSpace: "nowrap", fontWeight: "600" }}>📝 Texte / URL</span>}
-                {nbFiles === 0 && nbChemins === 0 && !hasLink && <span style={{ fontSize: "10px", color: "#9ca3af", fontStyle: "italic" }}>Aucune preuve</span>}
-              </div>
-            </td>
-            <td className="no-print" style={{ ...td, width: "100px", textAlign: "right" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "6px 14px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition: "transform 0.1s" }} onActive={e=>e.currentTarget.style.transform="scale(0.95)"}>{isArchive ? "Consulter" : "Éditer"}</button></td></tr>);})}</tbody>
+            return (
+              /* L'effet "carte vivante" est appliqué ici via la classe td-dash */
+              <tr key={c.id} className="print-break-avoid td-dash" style={{ background: "white" }}>
+                <td style={{ ...td, width: "90px" }}><span style={nb(cConf.color)}>{c.num || "-"}</span></td>
+                <td style={{ ...td, maxWidth: "300px", opacity: c.statut==="non-concerne"?0.6:1 }}><div style={{ fontWeight: "600", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af", marginTop: "4px" }}>{cConf.label}</div></td>
+                <td style={{ ...td, maxWidth: "200px" }}>{resps.length === 0 ? <span style={{ fontSize: "11px", color: "#d97706", fontWeight: "600", background: "#fffbeb", border: "1px solid #fcd34d", borderRadius: "5px", padding: "2px 8px" }}>À assigner</span> : <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>{resps.slice(0,2).map(r => { const rSafe = String(r || ""); return <span key={rSafe} style={{ fontSize: "10px", color: "#1e40af", background: "#eff6ff", border: `1px solid #bfdbfe`, borderRadius: "4px", padding: "3px 6px", fontWeight: "600" }}>{rSafe.split("(")[0].trim()}</span> })}{resps.length > 2 && <span style={{ fontSize: "10px", color: "#6b7280", background: "#f3f4f6", borderRadius: "4px", padding: "3px 6px" }}>+{resps.length-2}</span>}</div>}</td>
+                <td style={td}><div style={{ fontSize: "12px", fontWeight: "600" }}>{c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{c.statut!=="non-concerne" && !isNaN(d) && <div style={{ fontSize: "10px", color: dayColor(c.delai), fontWeight: "700", marginTop: "2px" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}</td>
+                <td style={td}><StatusBadge statut={c.statut} /></td>
+                <td style={td}>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                    {nbChemins > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "3px 8px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap", fontWeight: "600" }}>🔗 {nbChemins} Lien(s)</span>}
+                    {nbFiles > 0 && <span style={{ fontSize: "10px", color: "#065f46", background: "#d1fae5", padding: "3px 8px", borderRadius: "4px", border: "1px solid #6ee7b7", whiteSpace: "nowrap", fontWeight: "600" }}>☁️ {nbFiles} Fichier(s)</span>}
+                    {hasLink && <span style={{ fontSize: "10px", color: "#1d4ed8", background: "#eff6ff", padding: "3px 8px", borderRadius: "4px", border: "1px solid #bfdbfe", whiteSpace: "nowrap", fontWeight: "600" }}>📝 Texte / URL</span>}
+                    {nbFiles === 0 && nbChemins === 0 && !hasLink && <span style={{ fontSize: "10px", color: "#9ca3af", fontStyle: "italic" }}>Aucune preuve</span>}
+                  </div>
+                </td>
+                <td className="no-print" style={{ ...td, width: "100px", textAlign: "right" }}><button onClick={() => setModalCritere(c)} style={{ background: isArchive ? "#f1f5f9" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", border: isArchive ? "1px solid #d1d5db" : "none", borderRadius: "6px", color: isArchive ? "#4b5563" : "white", padding: "6px 14px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>{isArchive ? "Consulter" : "Éditer"}</button></td>
+              </tr>
+            );
+          })}</tbody>
         </table>
       </div>
     </div>
@@ -58,7 +68,27 @@ export function AxesTab({ axes, days, today, dayColor, setModalCritere, isArchiv
           {items.map(c => {
             const cConf = CRITERES_LABELS[c.critere] || { label: "Critère", color: "#9ca3af" };
             const d = days(c.delai);
-            return (<div key={c.id} className="print-break-avoid td-dash" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "12px" }}><div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}><span style={nb(cConf.color)}>{c.num || "-"}</span><div style={{ flex: 1, minWidth: "250px" }}><div style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f" }}>{c.titre || "-"}</div><div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "12px" }}>{cConf.label}</div>{(!isAuditMode && (c.attendus||"")) && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "10px 14px", marginBottom: "8px" }}><span style={{ fontWeight: "800", color: "#92400e" }}>Remarques Audit : </span>{c.attendus}</div>}{((c.fichiers && c.fichiers.length > 0) || (c.preuves||"").trim()) && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "10px 14px", marginBottom: "8px" }}><span style={{ fontWeight: "800", color: "#065f46" }}>{isAuditMode ? "Preuves :" : "Preuves finalisées :"} </span>{c.fichiers?.length > 0 ? `${c.fichiers.length} document(s) joint(s). ` : ""}{c.preuves}</div>}{(!isAuditMode && (c.preuves_encours||"").trim()) && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px dashed #fde68a", borderRadius: "6px", padding: "10px 14px" }}><span style={{ fontWeight: "800", color: "#d97706" }}>En chantier : </span>{c.preuves_encours}</div>}</div><div style={{ textAlign: "right", minWidth: "120px", display: "flex", flexDirection: "column", alignItems: "flex-end" }}><StatusBadge statut={c.statut} /><div style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px", fontWeight: "600" }}>{new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>{!isNaN(d) && <div style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "800", marginTop: "2px" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}<button onClick={() => setModalCritere(c)} style={{ marginTop: "12px", background: isArchive ? "#f1f5f9" : (isNC?"#fff5f5":"#fffbeb"), border:`1px solid ${isArchive ? "#d1d5db" : (isNC?"#fca5a5":"#fcd34d")}`, borderRadius: "6px", color: isArchive ? "#4b5563" : (isNC?"#dc2626":"#92400e"), padding: "6px 14px", fontSize: "12px", cursor: "pointer", fontWeight: "700" }}>{isArchive ? "Consulter" : "Mettre à jour"}</button></div></div></div>)
+            return (
+              /* L'effet carte vivante est appliqué ici via la classe td-dash */
+              <div key={c.id} className="print-break-avoid td-dash" style={{ background: "white", border: `1px solid ${isNC?"#fca5a5":"#fcd34d"}`, borderLeft: `4px solid ${isNC?"#dc2626":"#d97706"}`, borderRadius: "10px", padding: "16px 20px", marginBottom: "12px" }}>
+                <div style={{ display: "flex", gap: "16px", flexWrap: "wrap" }}>
+                  <span style={nb(cConf.color)}>{c.num || "-"}</span>
+                  <div style={{ flex: 1, minWidth: "250px" }}>
+                    <div style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f" }}>{c.titre || "-"}</div>
+                    <div style={{ fontSize: "11px", color: "#9ca3af", marginBottom: "12px" }}>{cConf.label}</div>
+                    {(!isAuditMode && (c.attendus||"")) && <div style={{ fontSize: "12px", background: "#fef9c3", border: "1px solid #fde68a", borderRadius: "6px", padding: "10px 14px", marginBottom: "8px" }}><span style={{ fontWeight: "800", color: "#92400e" }}>Remarques Audit : </span>{c.attendus}</div>}
+                    {((c.fichiers && c.fichiers.length > 0) || (c.preuves||"").trim()) && <div style={{ fontSize: "12px", background: "#d1fae5", border: "1px solid #6ee7b7", borderRadius: "6px", padding: "10px 14px", marginBottom: "8px" }}><span style={{ fontWeight: "800", color: "#065f46" }}>{isAuditMode ? "Preuves :" : "Preuves finalisées :"} </span>{c.fichiers?.length > 0 ? `${c.fichiers.length} document(s) joint(s). ` : ""}{c.preuves}</div>}
+                    {(!isAuditMode && (c.preuves_encours||"").trim()) && <div style={{ fontSize: "12px", background: "#fefce8", border: "1px dashed #fde68a", borderRadius: "6px", padding: "10px 14px" }}><span style={{ fontWeight: "800", color: "#d97706" }}>En chantier : </span>{c.preuves_encours}</div>}
+                  </div>
+                  <div style={{ textAlign: "right", minWidth: "120px", display: "flex", flexDirection: "column", alignItems: "flex-end" }}>
+                    <StatusBadge statut={c.statut} />
+                    <div style={{ fontSize: "12px", color: "#6b7280", marginTop: "8px", fontWeight: "600" }}>{new Date(c.delai || today).toLocaleDateString("fr-FR")}</div>
+                    {!isNaN(d) && <div style={{ fontSize: "11px", color: dayColor(c.delai), fontWeight: "800", marginTop: "2px" }}>{d < 0 ? `${Math.abs(d)}j dépassé` : `J-${d}`}</div>}
+                    <button onClick={() => setModalCritere(c)} style={{ marginTop: "12px", background: isArchive ? "#f1f5f9" : (isNC?"#fff5f5":"#fffbeb"), border:`1px solid ${isArchive ? "#d1d5db" : (isNC?"#fca5a5":"#fcd34d")}`, borderRadius: "6px", color: isArchive ? "#4b5563" : (isNC?"#dc2626":"#92400e"), padding: "6px 14px", fontSize: "12px", cursor: "pointer", fontWeight: "700" }}>{isArchive ? "Consulter" : "Mettre à jour"}</button>
+                  </div>
+                </div>
+              </div>
+            );
           })}
         </div>);
       })}
@@ -70,11 +100,12 @@ export function ResponsablesTab({ byPerson, setModalCritere, isArchive, getRoleC
   return (
     <div className="animate-fade-in">
       <div style={{ marginBottom: "22px" }}><h2 style={{ fontSize: "20px", fontWeight: "800", color: "#1e3a5f", margin: "0 0 4px" }}>Avancement par Membre de l'équipe</h2></div>
-      {/* 👉 La grille s'adapte maintenant à la taille de l'écran */}
+      
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 350px), 1fr))", gap: "20px" }}>
         {byPerson.map(p => {
           const conformes = p.items.filter(c => c.statut==="conforme").length;
           return (
+            /* L'effet carte vivante est appliqué ici via la classe td-dash */
             <div key={p.id} className="print-break-avoid td-dash" style={card}>
               <div style={{ display: "flex", alignItems: "center", gap: "12px", marginBottom: "14px", paddingBottom: "12px", borderBottom: "1px solid #f1f5f9" }}>
                 <div style={{ width: "46px", height: "46px", borderRadius: "50%", background: "#f1f5f9", border: `2px solid #cbd5e1`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "900", color: "#475569", flexShrink: 0 }}>{p.name.substring(0,2).toUpperCase()}</div>
@@ -167,14 +198,8 @@ export function LivreBlancTab({ currentIfsiName, currentCampaign, criteres }) {
                  {!hasPreuves ? (<div style={{ fontSize: "14px", color: "#9ca3af", fontStyle: "italic", background: "#f8fafc", padding: "12px", borderRadius: "6px" }}>Aucune preuve validée.</div>) : (
                    <div style={{ background: "#f0fdf4", border: "1px solid #bbf7d0", padding: "16px", borderRadius: "8px" }}>
                      {c.preuves && (<div style={{ fontSize: "14px", color: "#166534", whiteSpace: "pre-wrap", lineHeight: "1.6", marginBottom: (validFiles.length > 0 || validChemins.length > 0) ? "16px" : "0" }}>{c.preuves}</div>)}
-                     
-                     {validChemins.length > 0 && (<div style={{ marginBottom: validFiles.length > 0 ? "12px" : "0" }}>
-                       {validChemins.map((link, i) => (<div key={i} style={{ fontSize: "13px", color: "#065f46", display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "6px", padding: "6px", background: "white", borderRadius: "6px", border: "1px solid #86efac" }}><span>🔗</span> <span style={{ fontWeight: "700" }}>{link.nom}</span> <span style={{ color: "#10b981", fontStyle: "italic" }}>({link.chemin})</span></div>))}
-                     </div>)}
-                     
-                     {validFiles.length > 0 && (<div>
-                       {validFiles.map((file, i) => (<div key={i} style={{ fontSize: "13px", color: "#065f46", display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", padding: "6px", background: "white", borderRadius: "6px", border: "1px solid #86efac" }}><span>☁️</span> <span style={{ fontWeight: "700" }}>{file.name}</span></div>))}
-                     </div>)}
+                     {validChemins.length > 0 && (<div style={{ marginBottom: validFiles.length > 0 ? "12px" : "0" }}>{validChemins.map((link, i) => (<div key={i} style={{ fontSize: "13px", color: "#065f46", display: "flex", gap: "8px", alignItems: "flex-start", marginBottom: "6px", padding: "6px", background: "white", borderRadius: "6px", border: "1px solid #86efac" }}><span>🔗</span> <span style={{ fontWeight: "700" }}>{link.nom}</span> <span style={{ color: "#10b981", fontStyle: "italic" }}>({link.chemin})</span></div>))}</div>)}
+                     {validFiles.length > 0 && (<div>{validFiles.map((file, i) => (<div key={i} style={{ fontSize: "13px", color: "#065f46", display: "flex", gap: "8px", alignItems: "center", marginBottom: "6px", padding: "6px", background: "white", borderRadius: "6px", border: "1px solid #86efac" }}><span>☁️</span> <span style={{ fontWeight: "700" }}>{file.name}</span></div>))}</div>)}
                    </div>
                  )}
                </div>
