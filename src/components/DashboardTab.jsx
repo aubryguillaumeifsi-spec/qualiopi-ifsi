@@ -1,5 +1,22 @@
 import React from "react";
 
+// 👉 LA FAMEUSE JAUGE EST DE RETOUR !
+export function GaugeChart({ score }) {
+  const radius = 36;
+  const circumference = 2 * Math.PI * radius;
+  const strokeDashoffset = circumference - (score / 100) * circumference;
+  const color = score >= 80 ? "#10b981" : score >= 50 ? "#d97706" : "#ef4444";
+  return (
+    <div style={{ position: "relative", width: "80px", height: "80px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <svg width="80" height="80" style={{ transform: "rotate(-90deg)" }}>
+        <circle cx="40" cy="40" r={radius} stroke="#e2e8f0" strokeWidth="8" fill="none" />
+        <circle cx="40" cy="40" r={radius} stroke={color} strokeWidth="8" fill="none" strokeDasharray={circumference} strokeDashoffset={strokeDashoffset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s ease-in-out" }} />
+      </svg>
+      <div style={{ position: "absolute", fontSize: "18px", fontWeight: "900", color: color }}>{score}%</div>
+    </div>
+  );
+}
+
 export function ProgressBar({ value, max, color }) {
   const pct = max > 0 ? Math.round((value / max) * 100) : 0;
   return (
