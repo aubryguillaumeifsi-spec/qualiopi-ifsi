@@ -63,10 +63,10 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
                   <td style={{ ...td, textAlign: "right" }}>
                     <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
                       {(userProfile?.role === "superadmin" || userProfile?.role === "admin") && (
-                         <button onClick={() => handleSendResetEmail(u.email)} title="Envoyer le lien de changement de mot de passe" style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize:"12px", fontWeight:"700", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background="#dbeafe"} onMouseOut={e=>e.currentTarget.style.background="#eff6ff"}>✉️ Lien de Reset</button>
+                         <button onClick={() => handleSendResetEmail(u.email)} title="Envoyer le lien de changement de mot de passe" style={{ background: "#eff6ff", border: "1px solid #bfdbfe", color: "#1d4ed8", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize:"12px", fontWeight:"700", transition:"all 0.2s" }}>✉️ Lien de Reset</button>
                       )}
                       {userProfile?.role === "superadmin" && u.role !== "superadmin" && (
-                         <button onClick={() => handleDeleteUser(u.id)} style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#ef4444", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontWeight: "700", fontSize:"12px", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background="#fee2e2"} onMouseOut={e=>e.currentTarget.style.background="#fef2f2"}>Supprimer</button>
+                         <button onClick={() => handleDeleteUser(u.id)} style={{ background: "#fef2f2", border: "1px solid #fca5a5", color: "#ef4444", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontWeight: "700", fontSize:"12px", transition:"all 0.2s" }}>Supprimer</button>
                       )}
                     </div>
                   </td>
@@ -110,7 +110,6 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
         </form>
       </div>
 
-      {/* BLOC ACCESSIBILITÉ & INCLUSION */}
       <div style={{ ...card, marginTop: "20px" }}>
         <h3 style={{ fontSize: "16px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }}>
           <span style={{ background: "#eff6ff", padding: "6px", borderRadius: "8px", fontSize: "18px" }}>🎨</span> Accessibilité & Inclusion
