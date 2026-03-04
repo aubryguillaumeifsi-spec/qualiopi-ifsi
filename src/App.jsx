@@ -62,7 +62,6 @@ function MainApp() {
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
 
-  // Initialisation liste établissements
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = [];
@@ -72,7 +71,6 @@ function MainApp() {
     return () => unsub();
   }, []);
 
-  // Auth & Profile
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -95,7 +93,6 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
-  // Cleanup Team Users listener
   useEffect(() => {
     let unsub = null;
     if (selectedIfsi && userProfile && userProfile.role !== "guest") {
@@ -108,7 +105,6 @@ function MainApp() {
     return () => unsub && unsub();
   }, [selectedIfsi, userProfile]);
 
-  // Data Qualiopi Sync
   useEffect(() => {
     if (!selectedIfsi || !userProfile || userProfile.mustChangePassword) return;
     setCampaigns(null);
@@ -132,7 +128,6 @@ function MainApp() {
     await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
   };
 
-  // --- OPTIMISATIONS DES DONNÉES ---
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
@@ -209,138 +204,12 @@ function MainApp() {
 
   const totalUsersInNetwork = teamUsers.length;
 
-  // --- HANDLERS (RÉPARÉS) ---
+  const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
+  const handleIfsiSwitch = async (e) => { if (e.target.value === "NEW") { const nom = prompt("Nom de l'établissement :"); if (nom?.trim()) { const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); setSelectedIfsi(id); } } else { setSelectedIfsi(e.target.value); } };
+  const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
+  const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
+  const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
 
-  // 👉 LA FONCTION MANQUANTE DE L'ONGLET EQUIPE :
-  const handleSortTeam = (key) => {
-    let direction = "asc";
-    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc";
-    setTeamSortConfig({ key, direction });
-  };
-
-  const handleIfsiSwitch = async (e) => {
-    if (e.target.value === "NEW") {
-      const nom = prompt("Nom de l'établissement :");
-      if (nom?.trim()) {
-        const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000);
-        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false });
-        setSelectedIfsi(id);
-      }
-    } else { setSelectedIfsi(e.target.value); }
-  };
-
-  const handleRenameIfsi = async (id, currentName) => {
-    const n = prompt("Nouveau nom :", currentName);
-    if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true });
-  };
-
-  const handleArchiveIfsi = async (id, name, status) => {
-    if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`))
-      await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true });
-  };
-
-  const handleHardDeleteIfsi = async (id, name) => {
-    if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") {
-      await deleteDoc(doc(db, "etablissements", id));
-      await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id));
-      if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham");
-    }
-  };
-
-  const saveModal = (updated, action) => {
-    try {
-      if (isArchive) {
-         if (action === "close" || !action) setModalCritere(null);
-         else if (action === "next") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) + 1]);
-         else if (action === "prev") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) - 1]);
-         return;
-      }
-      
-      const oldCritere = criteres.find(c => c.id === updated.id) || updated; 
-      let newLogs = []; 
-      const userEmail = auth.currentUser?.email || "Utilisateur"; 
-      const now = new Date().toISOString();
-
-      if (oldCritere.statut !== updated.statut) { 
-        const oldName = STATUT_CONFIG[oldCritere.statut]?.label || "Non évalué"; 
-        const newName = STATUT_CONFIG[updated.statut]?.label || "Non évalué"; 
-        newLogs.push({ date: now, user: userEmail, msg: `Statut : ${oldName} ➡️ ${newName}` }); 
-      }
-      
-      const oldResps = Array.isArray(oldCritere.responsables) ? oldCritere.responsables.slice().sort().join(", ") : ""; 
-      const newResps = Array.isArray(updated.responsables) ? updated.responsables.slice().sort().join(", ") : "";
-      if (oldResps !== newResps) newLogs.push({ date: now, user: userEmail, msg: `Responsables mis à jour : ${newResps || "Aucun"}` });
-      if ((oldCritere.preuves || "") !== (updated.preuves || "")) newLogs.push({ date: now, user: userEmail, msg: `📝 A modifié le texte des justifications / liens publics` });
-      if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) newLogs.push({ date: now, user: userEmail, msg: `🚧 A modifié le texte de la zone de chantier` });
-
-      const oldFiles = oldCritere.fichiers || []; const newFiles = updated.fichiers || [];
-      newFiles.forEach(nf => { 
-        const of = oldFiles.find(o => o.url === nf.url); 
-        if (!of) newLogs.push({ date: now, user: userEmail, msg: `📎 A importé le fichier : ${nf.name}` }); 
-        else if (of.validated !== nf.validated) newLogs.push({ date: now, user: userEmail, msg: nf.validated ? `✅ A validé le document comme preuve officielle : ${nf.name}` : `❌ A repassé en chantier le document : ${nf.name}` }); 
-      });
-      oldFiles.forEach(of => { if (!newFiles.find(nf => nf.url === of.url)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le fichier : ${of.name}` }); });
-
-      const oldChemins = Array.isArray(oldCritere.chemins_reseau) ? oldCritere.chemins_reseau : []; 
-      const newChemins = Array.isArray(updated.chemins_reseau) ? updated.chemins_reseau : [];
-      newChemins.forEach(nc => { 
-        const oc = oldChemins.find(o => typeof o === 'object' && o.chemin === nc.chemin); 
-        if (!oc) newLogs.push({ date: now, user: userEmail, msg: `🔗 A ajouté le lien réseau : ${nc.nom}` }); 
-        else if (oc.validated !== nc.validated) newLogs.push({ date: now, user: userEmail, msg: nc.validated ? `✅ A validé le lien réseau comme preuve officielle : ${nc.nom}` : `❌ A repassé en chantier le lien réseau : ${nc.nom}` }); 
-      });
-      oldChemins.forEach(oc => { if (typeof oc === 'object' && !newChemins.find(nc => nc.chemin === oc.chemin)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le lien réseau : ${oc.nom}` }); });
-
-      let finalUpdated = { ...updated }; 
-      if (newLogs.length > 0) finalUpdated.historique = [...(oldCritere.historique || []), ...newLogs];
-
-      const newCriteres = criteres.map(c => c.id === finalUpdated.id ? finalUpdated : c);
-      saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
-
-      const currentIndex = filtered.findIndex(c => c.id === finalUpdated.id);
-      if (action === "close" || action === undefined) setModalCritere(null);
-      else if (action === "next") setModalCritere(filtered[currentIndex + 1]);
-      else if (action === "prev") setModalCritere(filtered[currentIndex - 1]);
-    } catch (error) {
-      console.error("Erreur dans saveModal :", error);
-      setModalCritere(null);
-    }
-  };
-
-  const handleAutoSave = (updated) => {
-    if (isArchive) return;
-    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
-  };
-
-  const exportToExcel = async () => {
-    if (!criteres) return;
-    if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
-    const workbook = new window.ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
-    worksheet.columns = [
-      { header: 'N°', key: 'num', width: 8 }, { header: 'Critère', key: 'critere', width: 12 }, { header: 'Indicateur', key: 'titre', width: 45 }, { header: 'Statut', key: 'statut', width: 18 },
-      { header: 'Échéance', key: 'delai', width: 14 }, { header: 'Responsable(s)', key: 'resp', width: 25 }, { header: 'Preuves finalisées', key: 'preuves', width: 50 },
-      { header: 'Preuves en cours', key: 'preuves_encours', width: 50 }, { header: 'Remarques Évaluateur', key: 'attendus', width: 45 }, { header: 'Notes internes', key: 'notes', width: 45 }
-    ];
-    const toArgb = (hex) => hex ? hex.replace('#', 'FF').toUpperCase() : 'FF000000';
-    criteres.forEach(c => {
-      const d = days(c.delai);
-      const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"];
-      const resps = Array.isArray(c.responsables) ? c.responsables : []; 
-      const row = worksheet.addRow({
-        num: c.num || "", critere: `Critère ${c.critere || ""}`, titre: c.titre || "", statut: sConf.label, delai: c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR"),
-        resp: resps.join(", "), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || ""
-      });
-      const cConf = CRITERES_LABELS[c.critere] || { color: "#9ca3af" }; 
-      row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true }; row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' }; 
-      row.getCell('statut').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(sConf.bg) } }; row.getCell('statut').font = { color: { argb: toArgb(sConf.color) }, bold: true }; row.getCell('statut').alignment = { horizontal: 'center', vertical: 'middle' }; 
-      const cellDelai = row.getCell('delai'); if (!isNaN(d) && d < 0 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFDC2626' }, bold: true }; } else if (!isNaN(d) && d < 30 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFD97706' }, bold: true }; }
-    });
-    const headerRow = worksheet.getRow(1); headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; headerRow.alignment = { vertical: 'middle', horizontal: 'center' }; worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
-    worksheet.eachRow((row, rowNumber) => { row.eachCell((cell) => { cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } }; if (rowNumber > 1) { if (!cell.alignment) { cell.alignment = { vertical: 'top', wrapText: true }; } else { cell.alignment.wrapText = true; } } }); });
-    const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
-  };
-
-  // ... (Toutes les autres fonctions handlers Organigramme et Auth restent identiques et connectées aux composants)
   const getRoleColor = (roleName) => { if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; const idx = orgRoles.indexOf(roleName); return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[7]; };
   const handleDragStartOrg = (e, type, id) => { e.dataTransfer.setData("type", type); e.dataTransfer.setData("id", id); };
   const handleDragOverOrg = (e) => { e.preventDefault(); };
@@ -362,6 +231,127 @@ function MainApp() {
   const handleDeleteCampaign = () => { if (campaigns.length <= 1) return alert("Impossible de supprimer la dernière."); if (window.confirm(`Supprimer cette évaluation ? IRRÉVERSIBLE.`)) { const u = campaigns.filter(c => c.id !== activeCampaignId); saveData(u); setActiveCampaignId(u[u.length - 1].id); } };
   const handleLogout = () => { signOut(auth); };
 
+  const saveModal = (updated, action) => {
+    try {
+      if (isArchive) {
+         if (action === "close" || !action) setModalCritere(null);
+         else if (action === "next") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) + 1]);
+         else if (action === "prev") setModalCritere(filtered[filtered.findIndex(c => c.id === updated.id) - 1]);
+         return;
+      }
+      const oldCritere = criteres.find(c => c.id === updated.id) || updated; 
+      let newLogs = []; const userEmail = auth.currentUser?.email || "Utilisateur"; const now = new Date().toISOString();
+
+      if (oldCritere.statut !== updated.statut) { const oldName = STATUT_CONFIG[oldCritere.statut]?.label || "Non évalué"; const newName = STATUT_CONFIG[updated.statut]?.label || "Non évalué"; newLogs.push({ date: now, user: userEmail, msg: `Statut : ${oldName} ➡️ ${newName}` }); }
+      const oldResps = Array.isArray(oldCritere.responsables) ? oldCritere.responsables.slice().sort().join(", ") : ""; const newResps = Array.isArray(updated.responsables) ? updated.responsables.slice().sort().join(", ") : "";
+      if (oldResps !== newResps) newLogs.push({ date: now, user: userEmail, msg: `Responsables mis à jour : ${newResps || "Aucun"}` });
+      if ((oldCritere.preuves || "") !== (updated.preuves || "")) newLogs.push({ date: now, user: userEmail, msg: `📝 A modifié le texte des justifications / liens publics` });
+      if ((oldCritere.preuves_encours || "") !== (updated.preuves_encours || "")) newLogs.push({ date: now, user: userEmail, msg: `🚧 A modifié le texte de la zone de chantier` });
+
+      const oldFiles = oldCritere.fichiers || []; const newFiles = updated.fichiers || [];
+      newFiles.forEach(nf => { const of = oldFiles.find(o => o.url === nf.url); if (!of) newLogs.push({ date: now, user: userEmail, msg: `📎 A importé le fichier : ${nf.name}` }); else if (of.validated !== nf.validated) newLogs.push({ date: now, user: userEmail, msg: nf.validated ? `✅ A validé le document comme preuve officielle : ${nf.name}` : `❌ A repassé en chantier le document : ${nf.name}` }); });
+      oldFiles.forEach(of => { if (!newFiles.find(nf => nf.url === of.url)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le fichier : ${of.name}` }); });
+
+      const oldChemins = Array.isArray(oldCritere.chemins_reseau) ? oldCritere.chemins_reseau : []; const newChemins = Array.isArray(updated.chemins_reseau) ? updated.chemins_reseau : [];
+      newChemins.forEach(nc => { const oc = oldChemins.find(o => typeof o === 'object' && o.chemin === nc.chemin); if (!oc) newLogs.push({ date: now, user: userEmail, msg: `🔗 A ajouté le lien réseau : ${nc.nom}` }); else if (oc.validated !== nc.validated) newLogs.push({ date: now, user: userEmail, msg: nc.validated ? `✅ A validé le lien réseau comme preuve officielle : ${nc.nom}` : `❌ A repassé en chantier le lien réseau : ${nc.nom}` }); });
+      oldChemins.forEach(oc => { if (typeof oc === 'object' && !newChemins.find(nc => nc.chemin === oc.chemin)) newLogs.push({ date: now, user: userEmail, msg: `🗑️ A supprimé le lien réseau : ${oc.nom}` }); });
+
+      let finalUpdated = { ...updated }; if (newLogs.length > 0) finalUpdated.historique = [...(oldCritere.historique || []), ...newLogs];
+      const newCriteres = criteres.map(c => c.id === finalUpdated.id ? finalUpdated : c);
+      saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: newCriteres } : camp));
+
+      const currentIndex = filtered.findIndex(c => c.id === finalUpdated.id);
+      if (action === "close" || action === undefined) setModalCritere(null);
+      else if (action === "next") setModalCritere(filtered[currentIndex + 1]);
+      else if (action === "prev") setModalCritere(filtered[currentIndex - 1]);
+    } catch (error) { console.error(error); setModalCritere(null); }
+  };
+
+  const handleAutoSave = (updated) => {
+    if (isArchive) return;
+    saveData(campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: criteres.map(c => c.id === updated.id ? updated : c) } : camp));
+  };
+
+  const exportToExcel = async () => {
+    if (!criteres) return;
+    if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
+    const workbook = new window.ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
+    worksheet.columns = [ { header: 'N°', key: 'num', width: 8 }, { header: 'Critère', key: 'critere', width: 12 }, { header: 'Indicateur', key: 'titre', width: 45 }, { header: 'Statut', key: 'statut', width: 18 }, { header: 'Échéance', key: 'delai', width: 14 }, { header: 'Responsable(s)', key: 'resp', width: 25 }, { header: 'Preuves finalisées', key: 'preuves', width: 50 }, { header: 'Preuves en cours', key: 'preuves_encours', width: 50 }, { header: 'Remarques Évaluateur', key: 'attendus', width: 45 }, { header: 'Notes internes', key: 'notes', width: 45 } ];
+    const toArgb = (hex) => hex ? hex.replace('#', 'FF').toUpperCase() : 'FF000000';
+    criteres.forEach(c => {
+      const d = days(c.delai); const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"]; const resps = Array.isArray(c.responsables) ? c.responsables : []; 
+      const row = worksheet.addRow({ num: c.num || "", critere: `Critère ${c.critere || ""}`, titre: c.titre || "", statut: sConf.label, delai: c.statut==="non-concerne"?"-":new Date(c.delai || today).toLocaleDateString("fr-FR"), resp: resps.join(", "), preuves: c.preuves || "", preuves_encours: c.preuves_encours || "", attendus: c.attendus || "", notes: c.notes || "" });
+      const cConf = CRITERES_LABELS[c.critere] || { color: "#9ca3af" }; 
+      row.getCell('num').font = { color: { argb: toArgb(cConf.color) }, bold: true }; row.getCell('num').alignment = { horizontal: 'center', vertical: 'middle' }; 
+      row.getCell('statut').fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: toArgb(sConf.bg) } }; row.getCell('statut').font = { color: { argb: toArgb(sConf.color) }, bold: true }; row.getCell('statut').alignment = { horizontal: 'center', vertical: 'middle' }; 
+      const cellDelai = row.getCell('delai'); if (!isNaN(d) && d < 0 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFDC2626' }, bold: true }; } else if (!isNaN(d) && d < 30 && c.statut!=="non-concerne") { cellDelai.font = { color: { argb: 'FFD97706' }, bold: true }; }
+    });
+    const headerRow = worksheet.getRow(1); headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } }; headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } }; headerRow.alignment = { vertical: 'middle', horizontal: 'center' }; worksheet.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+    worksheet.eachRow((row, rowNumber) => { row.eachCell((cell) => { cell.border = { top: { style: 'thin', color: { argb: 'FFD1D5DB' } }, left: { style: 'thin', color: { argb: 'FFD1D5DB' } }, bottom: { style: 'thin', color: { argb: 'FFD1D5DB' } }, right: { style: 'thin', color: { argb: 'FFD1D5DB' } } }; if (rowNumber > 1) { if (!cell.alignment) { cell.alignment = { vertical: 'top', wrapText: true }; } else { cell.alignment.wrapText = true; } } }); });
+    const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
+  };
+
+  // 👉 FONCTION D'IMPORT EXCEL MAGIQUE
+  const handleImportExcel = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    if (typeof window.ExcelJS === "undefined") return alert("Le moteur Excel n'est pas encore chargé. Veuillez patienter.");
+
+    if (!window.confirm("⚠️ Attention : L'import va écraser les données actuelles de cette certification par celles du fichier Excel. Êtes-vous sûr de vouloir continuer ?")) {
+      e.target.value = null;
+      return;
+    }
+
+    try {
+      const arrayBuffer = await file.arrayBuffer();
+      const workbook = new window.ExcelJS.Workbook();
+      await workbook.xlsx.load(arrayBuffer);
+      const worksheet = workbook.worksheets[0];
+
+      let updatedCriteres = [...criteres];
+      let count = 0;
+
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // On saute la ligne d'en-tête
+        const numCell = row.getCell(1).text;
+        if (!numCell) return;
+
+        const index = updatedCriteres.findIndex(c => String(c.num) === String(numCell));
+        if (index !== -1) {
+          const statutText = row.getCell(4).text?.trim();
+          let statutKey = updatedCriteres[index].statut;
+          if (statutText) {
+            const foundStatut = Object.entries(STATUT_CONFIG).find(([k,v]) => v.label.toLowerCase() === statutText.toLowerCase());
+            if (foundStatut) statutKey = foundStatut[0];
+          }
+
+          const respText = row.getCell(6).text;
+          let responsables = updatedCriteres[index].responsables || [];
+          if (respText) responsables = respText.split(',').map(s => s.trim()).filter(s => s);
+
+          updatedCriteres[index] = {
+            ...updatedCriteres[index],
+            statut: statutKey,
+            responsables: responsables,
+            preuves: row.getCell(7).text || updatedCriteres[index].preuves,
+            preuves_encours: row.getCell(8).text || updatedCriteres[index].preuves_encours,
+            attendus: row.getCell(9).text || updatedCriteres[index].attendus,
+            notes: row.getCell(10).text || updatedCriteres[index].notes,
+          };
+          count++;
+        }
+      });
+
+      const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: updatedCriteres } : camp);
+      await saveData(newCampaigns);
+      alert(`✅ Import réussi ! ${count} indicateurs ont été mis à jour.`);
+    } catch (error) {
+      alert("Erreur lors de l'import : Le format du fichier n'est pas reconnu.");
+    }
+    e.target.value = null;
+  };
+
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap", transition: "all 0.2s" });
 
   if (!authChecked) return null;
@@ -373,16 +363,13 @@ function MainApp() {
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       
-      {/* 👉 LE BLOC CSS COMPLET QUI RAMÈNE LA MAGIE VISUELLE */}
       <style>{`
         @media print { .no-print { display: none !important; } body { background: white !important; } .print-break-avoid { page-break-inside: avoid; } }
-        
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         
         .flex-nav { display: flex; align-items: center; justify-content: space-between; padding: 14px 0; gap: 20px; flex-wrap: wrap; }
         .nav-center { display: flex; gap: 4px; align-items: center; flex-wrap: wrap; flex: 1; justify-content: center; }
-        
         .responsive-grid-5 { display: grid; grid-template-columns: repeat(5, 1fr); gap: 12px; }
         .responsive-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         
@@ -434,12 +421,24 @@ function MainApp() {
             <button style={navBtn(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>Dashboard</button>
             <button style={navBtn(activeTab === "criteres")} onClick={() => setActiveTab("criteres")}>Indicateurs</button>
             <button style={navBtn(activeTab === "axes")} onClick={() => setActiveTab("axes")}>Priorités</button>
+            <button style={navBtn(activeTab === "responsables")} onClick={() => setActiveTab("responsables")}>Responsables</button>
             <button style={navBtn(activeTab === "livre_blanc")} onClick={() => setActiveTab("livre_blanc")}>Livre Blanc</button>
-            <button style={navBtn(activeTab === "organigramme")} onClick={() => setActiveTab("organigramme")}>🌳 Organigramme</button>
+            {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && <button style={navBtn(activeTab === "organigramme")} onClick={() => setActiveTab("organigramme")}>🌳 Organigramme</button>}
+            {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && <button style={navBtn(activeTab === "equipe")} onClick={() => setActiveTab("equipe")}>👥 Comptes</button>}
           </div>
 
-          <div style={{ display: "flex", gap: "10px" }}>
-            <button onClick={() => setActiveTab("compte")} style={{ border: "1px solid #d1d5db", padding: "6px 12px", borderRadius: "6px", background: "white" }}>⚙️</button>
+          <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+            {/* 👉 BOUTON IMPORT EXCEL ICI */}
+            {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && !isArchive && (
+              <>
+                <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
+                <label htmlFor="import-excel" className="hide-mobile" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
+                  <span>📥</span> Importer
+                </label>
+              </>
+            )}
+            <button className="hide-mobile" onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
+            <button onClick={() => setActiveTab("compte")} style={{ border: "1px solid #d1d5db", padding: "6px 12px", borderRadius: "6px", background: "white", cursor: "pointer" }}>⚙️</button>
             <button onClick={handleLogout} style={{ color: "#ef4444", border: "1px solid #fca5a5", padding: "6px 12px", borderRadius: "6px", background: "#fef2f2", cursor: "pointer", fontWeight: "bold" }}>Déconnexion</button>
           </div>
         </div>
