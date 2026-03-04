@@ -60,7 +60,7 @@ function OrganigramSelect({ selected, onChange, disabled, allMembers, rolePalett
 
 export default function DetailModal({ critere, onClose, onSave, onAutoSave, isReadOnly, isAuditMode, allMembers, rolePalette, orgRoles, hasNext, hasPrev }) {
   
-  const [data, setData] = useState(null); // On initialise à null pour la sécurité
+  const [data, setData] = useState(null);
   const [activeSubTab, setActiveSubTab] = useState("validation");
   const [uploading, setUploading] = useState(false);
   const [isAnalyzing, setIsAnalyzing] = useState(false);
@@ -87,7 +87,6 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
     }
   }, [critere]);
 
-  // SÉCURITÉ : Si les données ne sont pas prêtes, on affiche un petit chargement au lieu de planter
   if (!data) return <div style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.7)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}><div style={{ color: "white", fontWeight: "bold" }}>Chargement de l'indicateur...</div></div>;
 
   const cfg = CRITERES_LABELS[critere.critere] || { color: "#9ca3af" };
@@ -167,7 +166,17 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
          if (file.name.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
          const genAI = new GoogleGenerativeAI(apiKey);
          const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-         const prompt = `Auditeur Qualiopi. Analyse document critère ${data.num} : "${data.titre}". Attendu : ${guide.niveau}. Résumé court avec emojis : 1.Contenu 2.Pertinence 3.Manques.`;
+         
+         // 👉 LE NOUVEAU PROMPT INTRANSIGEANT EST LÀ :
+         const prompt = `CRITIQUE : Avant toute analyse, tu dois vérifier que le document fourni a un lien DIRECT et ÉVIDENT avec la formation professionnelle et le référentiel Qualiopi. Si le document n'a rien à voir (ex: politique, élection, recette de cuisine, publicité), TU DOIS REFUSER L'ANALYSE et répondre UNIQUEMENT : '❌ Document non pertinent : Ce document ne semble avoir aucun lien avec la formation professionnelle ou les exigences de cet indicateur Qualiopi.'
+
+Tu es un Auditeur Qualiopi expert et strict. Analyse ce document pour le critère ${data.num} : "${data.titre}".
+Niveau attendu : ${guide.niveau}.
+Fais un résumé court (avec emojis) structuré ainsi :
+1. Contenu (Ce que contient vraiment le document)
+2. Pertinence (En quoi il répond aux exigences de l'indicateur)
+3. Manques (Ce qu'il manque pour être une preuve parfaite)`;
+         
          const result = await model.generateContent([prompt, { inlineData: { data: base64data, mimeType } }]);
          setAiReport(result.response.text());
          setIsAnalyzing(false);
