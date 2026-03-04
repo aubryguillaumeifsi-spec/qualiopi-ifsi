@@ -33,17 +33,18 @@ const ROLE_PALETTE = [ { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, { 
 
 const today = new Date();
 const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
+const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
 
-function Footer({ isDarkMode }) {
+function Footer() {
   return (
-    <footer className="no-print" style={{ background: isDarkMode ? "#1e293b" : "white", borderTop: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", padding: "20px 32px", marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", fontSize: "13px", color: isDarkMode ? "#94a3b8" : "#64748b" }}>
+    <footer className="no-print custom-footer" style={{ background: "white", borderTop: "1px solid #e2e8f0", padding: "20px 32px", marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", fontSize: "13px", color: "#64748b" }}>
       <div>
-        <strong style={{ color: isDarkMode ? "#f8fafc" : "#1e3a5f", fontSize: "14px" }}>QualiForma</strong> 
-        <span style={{ background: isDarkMode ? "#0f172a" : "#eff6ff", color: isDarkMode ? "#60a5fa" : "#1d4ed8", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "900", marginLeft: "8px" }}>V1.0 Bêta</span>
+        <strong style={{ color: "#1e3a5f", fontSize: "14px" }} className="custom-text">QualiForma</strong> 
+        <span className="custom-badge" style={{ background: "#eff6ff", color: "#1d4ed8", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "900", marginLeft: "8px" }}>V1.0 Bêta</span>
       </div>
       <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", justifyContent: "center", fontWeight: "600" }}>
-        <a href="#" onClick={e => {e.preventDefault(); alert("📄 Mentions légales...");}} style={{ color: "inherit", textDecoration: "none" }}>Mentions Légales</a>
-        <a href="#" onClick={e => {e.preventDefault(); alert("🔒 Confidentialité...");}} style={{ color: "inherit", textDecoration: "none" }}>Politique de confidentialité</a>
+        <a href="#" onClick={e => {e.preventDefault(); alert("📄 Les mentions légales seront intégrées ici lors du lancement officiel (Éditeur, Hébergeur, etc.).");}} style={{ color: "inherit", textDecoration: "none" }}>Mentions Légales</a>
+        <a href="#" onClick={e => {e.preventDefault(); alert("🔒 La politique de confidentialité concernant les données RGPD de l'IFSI sera affichée ici.");}} style={{ color: "inherit", textDecoration: "none" }}>Politique de confidentialité</a>
         <a href="mailto:support@qualiforma.fr" style={{ color: "inherit", textDecoration: "none" }}>✉️ Contact Support</a>
       </div>
     </footer>
@@ -78,41 +79,11 @@ function BackupsTab({ backupsList, handleRestoreBackup }) {
 }
 
 function MainApp() {
-  // 👉 GESTION DES THÈMES
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme_dark") === "true");
   const [isColorblindMode, setIsColorblindMode] = useState(() => localStorage.getItem("theme_colorblind") === "true");
 
   useEffect(() => { localStorage.setItem("theme_dark", isDarkMode); }, [isDarkMode]);
-  useEffect(() => { 
-    localStorage.setItem("theme_colorblind", isColorblindMode); 
-    // MUTATION EN TEMPS RÉEL DU FICHIER DATA.JS POUR LE MODE DALTONIEN !
-    if (isColorblindMode) {
-        STATUT_CONFIG["conforme"].bg = "#eff6ff";
-        STATUT_CONFIG["conforme"].color = "#1d4ed8";
-        STATUT_CONFIG["conforme"].border = "#bfdbfe";
-        
-        STATUT_CONFIG["non-conforme"].bg = "#fff7ed";
-        STATUT_CONFIG["non-conforme"].color = "#ea580c";
-        STATUT_CONFIG["non-conforme"].border = "#fed7aa";
-    } else {
-        STATUT_CONFIG["conforme"].bg = "#d1fae5";
-        STATUT_CONFIG["conforme"].color = "#065f46";
-        STATUT_CONFIG["conforme"].border = "#6ee7b7";
-        
-        STATUT_CONFIG["non-conforme"].bg = "#fef2f2";
-        STATUT_CONFIG["non-conforme"].color = "#991b1b";
-        STATUT_CONFIG["non-conforme"].border = "#fca5a5";
-    }
-  }, [isColorblindMode]);
-
-  // Fonction dynamique pour les badges urgents
-  const dayColor = useCallback((d) => { 
-    const daysLeft = days(d); 
-    if (isNaN(daysLeft)) return "#6b7280"; 
-    if (daysLeft < 0) return isColorblindMode ? "#ea580c" : "#dc2626"; // Daltonien : Orange au lieu de Rouge
-    if (daysLeft < 30) return "#d97706"; 
-    return "#6b7280"; 
-  }, [isColorblindMode]);
+  useEffect(() => { localStorage.setItem("theme_colorblind", isColorblindMode); }, [isColorblindMode]);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -151,7 +122,7 @@ function MainApp() {
     fontSize: "13px",
     fontWeight: "600",
     background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent",
-    color: active ? "white" : (isDarkMode ? "#94a3b8" : "#4b5563"),
+    color: active ? "white" : "#64748b",
     whiteSpace: "nowrap",
     transition: "all 0.2s"
   });
@@ -611,9 +582,12 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
 
   return (
-    <div className={isDarkMode ? "dark-mode" : ""} style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: isDarkMode ? "#0f172a" : "#f8fafc", fontFamily: "Outfit,sans-serif", color: isDarkMode ? "#f1f5f9" : "#1e3a5f" }}>
+    <div className={`theme-container ${isDarkMode ? 'dark-mode' : ''} ${isColorblindMode ? 'colorblind-mode' : ''}`} style={{ minHeight: "100vh", display: "flex", flexDirection: "column", fontFamily: "Outfit,sans-serif" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+      
+      {/* 🚀 MATRICE CSS GLOBALE D'ÉCRASEMENT DES THÈMES 🚀 */}
       <style>{`
+        /* --- BASE STYLES --- */
         @media print { .no-print { display: none !important; } body { background: white !important; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -621,55 +595,119 @@ function MainApp() {
         .responsive-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
         @media (max-width: 1024px) { .responsive-grid-5 { grid-template-columns: 1fr 1fr; } .responsive-grid-2 { grid-template-columns: 1fr; } }
         .td-dash { transition: all 0.2s ease; border: 1px solid transparent; }
-        .td-dash:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1) !important; border-color: #bfdbfe !important; }
+        .td-dash:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1) !important; }
         
-        /* 🌙 INJECTION CSS MAGIQUE : MODE SOMBRE GLOBAL */
-        .dark-mode [style*="background: white"],
-        .dark-mode [style*="background-color: white"],
-        .dark-mode [style*="background-color: rgb(255, 255, 255)"] {
-            background-color: #1e293b !important;
-            border-color: #334155 !important;
-        }
+        .theme-container { background-color: #f8fafc; color: #1e3a5f; }
+
+        /* --- 🌙 MODE SOMBRE (GEMINI STYLE) --- */
+        .dark-mode { background-color: #131314 !important; color: #e3e3e3 !important; }
         
-        .dark-mode [style*="background: #f8fafc"],
-        .dark-mode [style*="background-color: rgb(248, 250, 252)"] {
-            background-color: #0f172a !important;
-            border-color: #334155 !important;
-        }
-        
-        .dark-mode [style*="background: #f1f5f9"],
-        .dark-mode [style*="background-color: rgb(241, 245, 249)"] {
-            background-color: #0f172a !important;
-            border-color: #334155 !important;
+        /* 1. Remplacement des fonds clairs par du sombre */
+        .dark-mode div[style*="background: white"], .dark-mode div[style*="background:white"], .dark-mode div[style*="background-color: white"],
+        .dark-mode div[style*="background: #f8fafc"], .dark-mode div[style*="background-color: #f8fafc"],
+        .dark-mode div[style*="background: #f1f5f9"], .dark-mode div[style*="background-color: #f1f5f9"],
+        .dark-mode footer, .dark-mode .modal-content {
+            background-color: #1e1f20 !important;
+            border-color: #333537 !important;
         }
 
-        .dark-mode [style*="color: #1e3a5f"],
-        .dark-mode [style*="color: rgb(30, 58, 95)"] { color: #f8fafc !important; }
+        /* 2. Écrasement total de TOUS les textes sombres pour les rendre clairs */
+        .dark-mode span, .dark-mode h1, .dark-mode h2, .dark-mode h3, .dark-mode h4, .dark-mode p, .dark-mode div, .dark-mode td, .dark-mode th, .dark-mode strong {
+            color: #e3e3e3 !important;
+        }
         
-        .dark-mode [style*="color: #64748b"],
-        .dark-mode [style*="color: rgb(100, 116, 139)"] { color: #94a3b8 !important; }
+        /* 3. Textes secondaires (Gris) */
+        .dark-mode span[style*="color: #64748b"], .dark-mode div[style*="color: #64748b"], .dark-mode p[style*="color: #64748b"],
+        .dark-mode span[style*="color: #9ca3af"], .dark-mode div[style*="color: #9ca3af"] {
+            color: #c4c7c5 !important;
+        }
         
-        .dark-mode [style*="color: #475569"],
-        .dark-mode [style*="color: rgb(71, 85, 105)"] { color: #cbd5e1 !important; }
-        
-        .dark-mode [style*="border: 1px solid #e2e8f0"],
-        .dark-mode [style*="border-bottom: 1px solid #e2e8f0"],
-        .dark-mode [style*="border-top: 1px solid #e2e8f0"] {
-            border-color: #334155 !important;
+        /* 4. Textes d'accentuation (Bleu) */
+        .dark-mode span[style*="color: #1d4ed8"], .dark-mode div[style*="color: #1d4ed8"], .dark-mode strong[style*="color: #1d4ed8"] {
+            color: #8ab4f8 !important;
         }
 
-        .dark-mode button[style*="background: transparent"] { color: #94a3b8 !important; }
-        .dark-mode button[style*="background: transparent"]:hover { color: #f8fafc !important; }
+        /* 5. Écrasement des bordures grises */
+        .dark-mode div[style*="border"], .dark-mode th, .dark-mode td, .dark-mode textarea {
+            border-color: #333537 !important;
+        }
+
+        /* 6. Formulaires, inputs et selects */
+        .dark-mode input, .dark-mode select, .dark-mode textarea {
+            background-color: #131314 !important;
+            color: #e3e3e3 !important;
+            border: 1px solid #333537 !important;
+        }
+
+        /* 7. Correction des blocs Organigramme (Ils sont trop clairs) */
+        .dark-mode div[style*="background: #e0e7ff"], .dark-mode div[style*="background: #dcfce7"],
+        .dark-mode div[style*="background: #fef3c7"], .dark-mode div[style*="background: #f3e8ff"],
+        .dark-mode div[style*="background: #fee2e2"], .dark-mode div[style*="background: #ccfbf1"],
+        .dark-mode div[style*="background: #fce7f3"], .dark-mode div[style*="background: #1e3a5f"] {
+            background-color: #1e1f20 !important;
+            border-bottom: 2px solid #8ab4f8 !important;
+        }
+        .dark-mode .org-card { background-color: #131314 !important; }
+
+        /* 8. Les boutons transparents ou clairs */
+        .dark-mode button { color: #e3e3e3; }
+        .dark-mode button[style*="background: transparent"] { color: #8ab4f8 !important; }
+        .dark-mode button[style*="background: white"], .dark-mode button[style*="background: #f1f5f9"] {
+            background-color: #333537 !important; color: #e3e3e3 !important; border-color: #555 !important;
+        }
+
+
+        /* --- 👁️ MODE DALTONIEN (ROUGE->ORANGE | VERT->BLEU) --- */
+        /* Application stricte sur TOUTES les nuances de rouge et vert trouvées dans le style en ligne */
+        
+        /* Les Textes et Bordures Verts deviennent Bleus */
+        .colorblind-mode div[style*="#10b981"], .colorblind-mode span[style*="#10b981"],
+        .colorblind-mode div[style*="#059669"], .colorblind-mode span[style*="#059669"],
+        .colorblind-mode div[style*="#166534"], .colorblind-mode span[style*="#166534"],
+        .colorblind-mode div[style*="#065f46"], .colorblind-mode span[style*="#065f46"],
+        .colorblind-mode div[style*="#6ee7b7"], .colorblind-mode span[style*="#6ee7b7"] {
+            color: #1d4ed8 !important;
+            border-color: #bfdbfe !important;
+        }
+        
+        /* Les Fonds Verts clairs deviennent Bleus clairs */
+        .colorblind-mode div[style*="background: #f0fdf4"], .colorblind-mode div[style*="background-color: #f0fdf4"],
+        .colorblind-mode div[style*="background: #d1fae5"], .colorblind-mode div[style*="background-color: #d1fae5"] {
+            background-color: #eff6ff !important;
+            border-color: #bfdbfe !important;
+        }
+
+        /* Les Textes et Bordures Rouges deviennent Oranges */
+        .colorblind-mode div[style*="#ef4444"], .colorblind-mode span[style*="#ef4444"],
+        .colorblind-mode div[style*="#dc2626"], .colorblind-mode span[style*="#dc2626"],
+        .colorblind-mode div[style*="#991b1b"], .colorblind-mode span[style*="#991b1b"],
+        .colorblind-mode div[style*="#fca5a5"], .colorblind-mode span[style*="#fca5a5"] {
+            color: #ea580c !important;
+            border-color: #fdba74 !important;
+        }
+
+        /* Les Fonds Rouges clairs deviennent Oranges clairs */
+        .colorblind-mode div[style*="background: #fef2f2"], .colorblind-mode div[style*="background-color: #fef2f2"] {
+            background-color: #fff7ed !important;
+            border-color: #ffedd5 !important;
+        }
+
+        /* Les Pastilles Rouges pleines (Badges) deviennent Oranges */
+        .colorblind-mode span[style*="background: #dc2626"], .colorblind-mode div[style*="background: #dc2626"],
+        .colorblind-mode span[style*="background: #ef4444"], .colorblind-mode div[style*="background: #ef4444"] {
+            background-color: #ea580c !important;
+            color: white !important;
+        }
       `}</style>
 
       {importReport && (
         <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.8)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(4px)" }}>
-           <div className="animate-fade-in" style={{ background: isDarkMode ? "#1e293b" : "white", borderRadius: "16px", padding: "32px", maxWidth: "500px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
+           <div className="animate-fade-in" style={{ background: "white", borderRadius: "16px", padding: "32px", maxWidth: "500px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
               <div style={{ fontSize: "40px", textAlign: "center", marginBottom: "16px" }}>{importReport.type === 'success' ? '✅' : importReport.type === 'warning' ? '⚠️' : '❌'}</div>
-              <h2 style={{ textAlign: "center", margin: "0 0 12px 0", color: isDarkMode ? "#f8fafc" : "#1e3a5f" }}>{importReport.title}</h2>
-              <p style={{ textAlign: "center", color: isDarkMode ? "#cbd5e1" : "#475569", fontSize: "14px", marginBottom: "20px", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>{importReport.msg}</p>
+              <h2 style={{ textAlign: "center", margin: "0 0 12px 0", color: "#1e3a5f" }}>{importReport.title}</h2>
+              <p style={{ textAlign: "center", color: "#475569", fontSize: "14px", marginBottom: "20px", lineHeight: "1.5", whiteSpace: "pre-wrap" }}>{importReport.msg}</p>
               {importReport.details && (
-                 <div style={{ background: isDarkMode ? "#0f172a" : "#f1f5f9", padding: "12px", borderRadius: "8px", fontSize: "11px", color: isDarkMode ? "#94a3b8" : "#64748b", maxHeight: "150px", overflowY: "auto", whiteSpace: "pre-wrap", fontFamily: "monospace", marginBottom: "20px", border: isDarkMode ? "1px solid #334155" : "1px solid #cbd5e1" }}>
+                 <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px", fontSize: "11px", color: "#64748b", maxHeight: "150px", overflowY: "auto", whiteSpace: "pre-wrap", fontFamily: "monospace", marginBottom: "20px", border: "1px solid #cbd5e1" }}>
                    {importReport.details}
                  </div>
               )}
@@ -691,11 +729,10 @@ function MainApp() {
           orgRoles={orgRoles} 
           hasPrev={filtered.findIndex(c => c.id === modalCritere.id) > 0} 
           hasNext={filtered.findIndex(c => c.id === modalCritere.id) < filtered.length - 1} 
-          isDarkMode={isDarkMode}
         />
       )}
 
-      <div className="no-print" style={{ background: isDarkMode ? "#1e293b" : "white", borderBottom: isDarkMode ? "1px solid #334155" : "1px solid #e2e8f0", padding: "14px 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
+      <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "14px 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", maxWidth: "1440px", margin: "0 auto", gap: "20px", flexWrap: "wrap" }}>
           
           <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
@@ -703,15 +740,15 @@ function MainApp() {
               <div style={{ width: "42px", height: "42px", display: "flex", alignItems: "center", justifyContent: "center" }}>
                 <svg width="38" height="38" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#1d4ed8"/><stop offset="1" stopColor="#3b82f6"/></linearGradient></defs><path fillRule="evenodd" clipRule="evenodd" d="M11 2C6.02944 2 2 6.02944 2 11C2 15.9706 6.02944 20 11 20C13.125 20 15.078 19.2635 16.6177 18.0319L20.2929 21.7071C20.6834 22.0976 21.3166 22.0976 21.7071 21.7071C22.0976 21.3166 22.0976 20.6834 21.7071 20.2929L18.0319 16.6177C19.2635 15.078 20 13.125 20 11C20 6.02944 15.9706 2 11 2ZM4 11C4 7.13401 7.13401 4 11 4C14.866 4 18 7.13401 18 11C18 14.866 14.866 18 11 18C7.13401 18 4 14.866 4 11Z" fill="url(#g)"/><path d="M10.5 15.5L7 12L8.41 10.59L10.5 12.67L14.59 8.59L16 10L10.5 15.5Z" fill="url(#g)"/></svg>
               </div>
-              <span style={{ fontSize: "18px", fontWeight: "800", color: isDarkMode ? "#f8fafc" : "#1e3a5f" }}>QualiForma</span>
+              <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</span>
             </div>
             {userProfile?.role === "superadmin" ? (
-              <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", background: isDarkMode ? "#0f172a" : "white", border: isDarkMode ? "1px solid #334155" : "1px solid #d1d5db", fontWeight: "800", color: isDarkMode ? "#60a5fa" : "#1d4ed8" }}>
+              <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db", fontWeight: "800", color: "#1d4ed8" }}>
                 {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                 <option value="NEW">+ Nouvel établissement</option>
               </select>
             ) : (
-              <div style={{ padding: "6px 12px", borderRadius: "6px", background: isDarkMode ? "#0f172a" : "#eff6ff", border: isDarkMode ? "1px solid #334155" : "1px solid #bfdbfe", fontWeight: "800", color: isDarkMode ? "#60a5fa" : "#1d4ed8", fontSize: "14px" }}>
+              <div style={{ padding: "6px 12px", borderRadius: "6px", background: "#eff6ff", border: "1px solid #bfdbfe", fontWeight: "800", color: "#1d4ed8", fontSize: "14px" }}>
                 {currentIfsiName}
               </div>
             )}
@@ -729,19 +766,19 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {userProfile?.role === "superadmin" && <button onClick={() => setActiveTab("backups")} style={{ ...navBtn(activeTab === "backups"), color: isDarkMode ? "#f8fafc" : "#1e3a5f", background: activeTab === "backups" ? (isDarkMode ? "#334155" : "#e0e7ff") : "transparent", display: "flex", gap: "6px", padding: "6px 12px" }}><span>⏳</span> Backups</button>}
+            {userProfile?.role === "superadmin" && <button onClick={() => setActiveTab("backups")} style={{ ...navBtn(activeTab === "backups"), color: "#1e3a5f", background: activeTab === "backups" ? "#e0e7ff" : "transparent", display: "flex", gap: "6px", padding: "6px 12px" }}><span>⏳</span> Backups</button>}
 
             {userProfile?.role === "superadmin" && !isArchive && (
               <>
                 <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
-                <label htmlFor="import-excel" style={{ ...navBtn(false), color: isDarkMode ? "#34d399" : "#059669", background: isDarkMode ? "#064e3b" : "white", fontSize: "12px", border: isDarkMode ? "1px solid #047857" : "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
+                <label htmlFor="import-excel" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
                   <span>📥</span> Importer
                 </label>
               </>
             )}
-            <button onClick={exportToExcel} style={{ ...navBtn(false), color: isDarkMode ? "#34d399" : "#059669", background: isDarkMode ? "#064e3b" : "#d1fae5", fontSize: "12px", border: isDarkMode ? "1px solid #047857" : "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
-            <button onClick={() => setActiveTab("compte")} style={{ border: isDarkMode ? "1px solid #334155" : "1px solid #d1d5db", padding: "6px 12px", borderRadius: "6px", background: isDarkMode ? "#1e293b" : "white", cursor: "pointer" }}>⚙️</button>
-            <button onClick={handleLogout} style={{ color: isDarkMode ? "#f87171" : "#ef4444", border: isDarkMode ? "1px solid #991b1b" : "1px solid #fca5a5", padding: "6px 12px", borderRadius: "6px", background: isDarkMode ? "#450a0a" : "#fef2f2", cursor: "pointer", fontWeight: "bold" }}>Quitter</button>
+            <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669", background: "#d1fae5", fontSize: "12px", border: "1px solid #6ee7b7", display: "flex", gap: "6px", padding: "6px 12px" }}><span>📊</span> Excel</button>
+            <button onClick={() => setActiveTab("compte")} style={{ border: "1px solid #d1d5db", padding: "6px 12px", borderRadius: "6px", background: "white", cursor: "pointer" }}>⚙️</button>
+            <button onClick={handleLogout} style={{ color: "#ef4444", border: "1px solid #fca5a5", padding: "6px 12px", borderRadius: "6px", background: "#fef2f2", cursor: "pointer", fontWeight: "bold" }}>Quitter</button>
           </div>
         </div>
       </div>
@@ -768,7 +805,7 @@ function MainApp() {
         {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={(e) => { e.preventDefault(); updatePassword(auth.currentUser, pwdUpdate.p1).then(()=>setPwdUpdate({...pwdUpdate, success: "Mot de passe modifié", p1:"", p2:""})).catch(err => setPwdUpdate({...pwdUpdate, error: err.message}))}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} />}
       </div>
       
-      <Footer isDarkMode={isDarkMode} />
+      <Footer />
     </div>
   );
 }
