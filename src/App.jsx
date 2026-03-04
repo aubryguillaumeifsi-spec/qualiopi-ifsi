@@ -42,7 +42,7 @@ function BackupsTab({ backupsList, handleRestoreBackup }) {
           <div style={{ marginBottom: "32px", textAlign: "center", background: "white", padding: "30px", borderRadius: "16px", boxShadow: "0 4px 6px rgba(0,0,0,0.05)", border: "1px solid #e2e8f0" }}>
               <div style={{ fontSize: "50px", marginBottom: "10px" }}>⏳</div>
               <h2 style={{ fontSize: "24px", fontWeight: "900", color: "#1e3a5f", margin: "0 0 8px" }}>Machine à remonter le temps</h2>
-              <p style={{ fontSize: "14px", color: "#64748b", margin: 0, lineHeight: "1.5" }}>Sauvegardes automatiques des 10 derniers jours.</p>
+              <p style={{ fontSize: "14px", color: "#64748b", margin: 0 }}>Sauvegardes automatiques quotidiennes et avant import.</p>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
               {backupsList.map((b) => (
@@ -87,6 +87,20 @@ function MainApp() {
   const [backupsList, setBackupsList] = useState([]);
   const dailyBackupDone = useRef(null); 
   const [verificationSent, setVerificationSent] = useState(false);
+
+  // 🎨 DÉFINITION DE navBtn (Celle qui manquait !)
+  const navBtn = (active) => ({ 
+    padding: "8px 16px", 
+    borderRadius: "8px", 
+    border: "none", 
+    cursor: "pointer", 
+    fontSize: "13px", 
+    fontWeight: "600", 
+    background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", 
+    color: active ? "white" : "#4b5563", 
+    whiteSpace: "nowrap",
+    transition: "all 0.2s"
+  });
 
   useEffect(() => {
     onSnapshot(collection(db, "etablissements"), (snapshot) => {
@@ -149,13 +163,11 @@ function MainApp() {
     return () => { unsub(); unsubIfsi(); };
   }, [selectedIfsi, userProfile]);
 
-  // 👉 SAUVEGARDE GLOBALE (Utilisée par l'autosave et le modal)
   const saveData = async (newCampaigns) => {
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
   };
 
-  // 👉 NAVIGATION DANS LE MODAL (Flèches cliquables)
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   
@@ -199,12 +211,6 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  // --- REST DE LA LOGIQUE ---
-  const createManualBackup = async (label, dataToBackup) => {
-    const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
-    await setDoc(doc(db, "backups", `${docId}_${Date.now()}`), { ifsiId: docId, timestamp: Date.now(), type: label, campaigns: dataToBackup });
-  };
-
   const handleRestoreBackup = async (backup) => {
     if (window.confirm("Restaurer cette version ?")) {
       const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
@@ -216,15 +222,36 @@ function MainApp() {
   const exportToExcel = async () => {
     if (!criteres || typeof window.ExcelJS === "undefined") return;
     const workbook = new window.ExcelJS.Workbook();
-    const worksheet = workbook.addWorksheet('Suivi');
-    worksheet.columns = [ { header: 'N°', key: 'num', width: 8 }, { header: 'Indicateur', key: 'titre', width: 40 }, { header: 'Statut', key: 'statut', width: 20 } ];
-    criteres.forEach(c => worksheet.addRow({ num: c.num, titre: c.titre, statut: STATUT_CONFIG[c.statut]?.label }));
+    const worksheet = workbook.addWorksheet('Suivi Qualiopi');
+    worksheet.columns = [ { header: 'N°', key: 'num', width: 8 }, { header: 'Critère', key: 'critere', width: 12 }, { header: 'Indicateur', key: 'titre', width: 45 }, { header: 'Statut', key: 'statut', width: 18 }, { header: 'Responsables', key: 'resp', width: 25 } ];
+    criteres.forEach(c => worksheet.addRow({ num: c.num, critere: c.critere, titre: c.titre, statut: STATUT_CONFIG[c.statut]?.label, resp: (c.responsables || []).join(', ') }));
     const buffer = await workbook.xlsx.writeBuffer();
-    const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([buffer])); link.download = "Export.xlsx"; link.click();
+    const link = document.createElement("a"); link.href = URL.createObjectURL(new Blob([buffer])); link.download = `Export_${ifsiList.find(i=>i.id===selectedIfsi)?.name}.xlsx`; link.click();
   };
 
   const handleIfsiSwitch = (e) => setSelectedIfsi(e.target.value);
   const handleLogout = () => signOut(auth);
+
+  // LOGIQUE TOUR DE CONTROLE & ORGANIGRAMME
+  const getIfsiGlobalStats = useCallback((id) => {
+    const d = allQualiopiData[id === "demo_ifps_cham" ? "criteres" : id]?.campaigns?.at(-1)?.liste || [];
+    const conforme = d.filter(c => c.statut === "conforme").length;
+    const concerned = d.filter(c => c.statut !== "non-concerne").length || 1;
+    return { pct: Math.round((conforme/concerned)*100), conforme, total: concerned, liste: d, auditDate: allQualiopiData[id]?.campaigns?.at(-1)?.auditDate };
+  }, [allQualiopiData]);
+
+  const tourData = useMemo(() => {
+    const active = ifsiList.filter(i => !i.archived).map(i => ({ ...i, ...getIfsiGlobalStats(i.id) }));
+    const score = active.length ? Math.round(active.reduce((acc, curr) => acc + curr.pct, 0) / active.length) : 0;
+    let alerts = [];
+    active.forEach(s => (s.liste || []).forEach(c => {
+      if (c.statut === "non-conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "non-conforme" });
+      else if (days(c.delai) < 0 && c.statut !== "non-concerne" && c.statut !== "conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "depasse", days: Math.abs(days(c.delai)) });
+    }));
+    return { active, archived: ifsiList.filter(i => i.archived), score, alerts };
+  }, [ifsiList, getIfsiGlobalStats]);
+
+  const sortedTourIfsis = useMemo(() => [...tourData.active].sort((a,b) => a.name.localeCompare(b.name)), [tourData.active]);
 
   const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
@@ -240,8 +267,24 @@ function MainApp() {
     return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[7];
   };
 
+  const byPerson = useMemo(() => allIfsiMembers.map(m => ({ ...m, items: criteres.filter(c => c.responsables?.includes(m.name)) })).filter(p => p.items.length > 0 || p.roles.length > 0), [allIfsiMembers, criteres]);
+
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
+
+  if (activeTab === "validation_requise") {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc", padding: "20px", display: "flex", justifyContent: "center", alignItems: "center", fontFamily: "Outfit, sans-serif" }}>
+        <div className="animate-fade-in" style={{ background: "white", padding: "40px", borderRadius: "16px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)", maxWidth: "500px", width: "100%", textAlign: "center" }}>
+           <div style={{ fontSize: "50px", marginBottom: "20px" }}>✉️</div>
+           <h2 style={{ color: "#1e3a5f" }}>Vérification requise</h2>
+           <p style={{ color: "#64748b", marginBottom: "30px", fontSize: "15px" }}>Cliquez sur le lien envoyé à <strong>{auth.currentUser?.email}</strong>.</p>
+           <button onClick={() => window.location.reload()} style={{ width: "100%", padding: "12px", background: "#1d4ed8", color: "white", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer" }}>Actualiser</button>
+           <button onClick={handleLogout} style={{ marginTop: "10px", width: "100%", padding: "12px", background: "transparent", color: "#ef4444", border: "1px solid #fca5a5", borderRadius: "8px", cursor: "pointer" }}>Déconnexion</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif" }}>
@@ -259,7 +302,6 @@ function MainApp() {
         />
       )}
 
-      {/* NAV */}
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "10px 32px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "15px" }}>
           <span style={{ fontWeight: "900", color: "#1d4ed8", fontSize: "20px" }}>QualiForma</span>
@@ -273,6 +315,7 @@ function MainApp() {
           <button style={navBtn(activeTab === "dashboard")} onClick={() => setActiveTab("dashboard")}>Tableau de bord</button>
           <button style={navBtn(activeTab === "criteres")} onClick={() => setActiveTab("criteres")}>Indicateurs</button>
           <button style={navBtn(activeTab === "organigramme")} onClick={() => setActiveTab("organigramme")}>Organigramme</button>
+          {userProfile?.role === "superadmin" && <button style={navBtn(activeTab === "tour_controle")} onClick={() => setActiveTab("tour_controle")}>🛸 Tour de contrôle</button>}
           {userProfile?.role === "superadmin" && <button style={navBtn(activeTab === "backups")} onClick={() => setActiveTab("backups")}>⏳ Backups</button>}
           <button onClick={exportToExcel} style={{ ...navBtn(false), color: "#059669" }}>📊 Excel</button>
           <button onClick={handleLogout} style={{ ...navBtn(false), color: "#ef4444" }}>Quitter</button>
@@ -282,7 +325,8 @@ function MainApp() {
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "30px" }}>
         {activeTab === "dashboard" && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️" }} currentAuditDate={currentCampaign?.auditDate || ""} isArchive={currentCampaign?.locked} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} />}
         {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={currentCampaign?.locked} />}
-        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={ifsiList.find(i=>i.id===selectedIfsi)?.name} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleDragOverOrg={e=>e.preventDefault()} handleDropOrg={(e,r)=> {/*...*/} } handleDragStartOrg={(e,t,id)=>{/*...*/}} removeRoleFromUser={()=>{}} editOrgRole={()=>{}} editManualUser={()=>{}} deleteManualUser={()=>{}} addManualUser={()=>{}} addOrgRole={()=>{}} newManualUserInput="" setNewManualUserInput={()=>{}} newRoleInput="" setNewRoleInput={()=>{}} deleteOrgRole={()=>{}} applyDefaultRoles={()=>{}} />}
+        {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={ifsiList.find(i=>i.id===selectedIfsi)?.name} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleDragOverOrg={e=>e.preventDefault()} handleDropOrg={()=>{}} handleDragStartOrg={()=>{}} removeRoleFromUser={()=>{}} editOrgRole={()=>{}} editManualUser={()=>{}} deleteManualUser={()=>{}} addManualUser={()=>{}} addOrgRole={()=>{}} newManualUserInput="" setNewManualUserInput={()=>{}} newRoleInput="" setNewRoleInput={()=>{}} deleteOrgRole={()=>{}} applyDefaultRoles={()=>{}} />}
+        {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} handleRenameIfsi={()=>{}} handleArchiveIfsi={()=>{}} handleHardDeleteIfsi={()=>{}} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={tourData.alerts.length} />}
         {activeTab === "backups" && <BackupsTab backupsList={backupsList} handleRestoreBackup={handleRestoreBackup} />}
         {activeTab === "equipe" && <EquipeTab userProfile={userProfile} sortedTeamUsers={teamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} auth={auth} handleSendResetEmail={handleSendResetEmail} />}
         {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} />}
