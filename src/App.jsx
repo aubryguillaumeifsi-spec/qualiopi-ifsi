@@ -292,13 +292,13 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // 👉 FONCTION D'IMPORT EXCEL MAGIQUE
+  // 👉 LA FONCTION BLINDÉE POUR L'IMPORT
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     if (typeof window.ExcelJS === "undefined") return alert("Le moteur Excel n'est pas encore chargé. Veuillez patienter.");
 
-    if (!window.confirm("⚠️ Attention : L'import va écraser les données actuelles de cette certification par celles du fichier Excel. Êtes-vous sûr de vouloir continuer ?")) {
+    if (!window.confirm("⚠️ Attention : L'import va écraser les données actuelles de cet établissement par celles du fichier Excel. Êtes-vous sûr de vouloir continuer ?")) {
       e.target.value = null;
       return;
     }
@@ -313,20 +313,22 @@ function MainApp() {
       let count = 0;
 
       worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return; // On saute la ligne d'en-tête
-        const numCell = row.getCell(1).text;
+        if (rowNumber === 1) return; 
+        
+        let numCell = row.getCell(1).text || row.getCell(1).value;
         if (!numCell) return;
+        numCell = String(numCell).trim();
 
-        const index = updatedCriteres.findIndex(c => String(c.num) === String(numCell));
+        const index = updatedCriteres.findIndex(c => String(c.num) === numCell);
         if (index !== -1) {
-          const statutText = row.getCell(4).text?.trim();
+          const statutText = String(row.getCell(4).text || row.getCell(4).value || "").trim();
           let statutKey = updatedCriteres[index].statut;
           if (statutText) {
             const foundStatut = Object.entries(STATUT_CONFIG).find(([k,v]) => v.label.toLowerCase() === statutText.toLowerCase());
             if (foundStatut) statutKey = foundStatut[0];
           }
 
-          const respText = row.getCell(6).text;
+          const respText = String(row.getCell(6).text || row.getCell(6).value || "");
           let responsables = updatedCriteres[index].responsables || [];
           if (respText) responsables = respText.split(',').map(s => s.trim()).filter(s => s);
 
@@ -334,10 +336,10 @@ function MainApp() {
             ...updatedCriteres[index],
             statut: statutKey,
             responsables: responsables,
-            preuves: row.getCell(7).text || updatedCriteres[index].preuves,
-            preuves_encours: row.getCell(8).text || updatedCriteres[index].preuves_encours,
-            attendus: row.getCell(9).text || updatedCriteres[index].attendus,
-            notes: row.getCell(10).text || updatedCriteres[index].notes,
+            preuves: String(row.getCell(7).text || row.getCell(7).value || "") || updatedCriteres[index].preuves,
+            preuves_encours: String(row.getCell(8).text || row.getCell(8).value || "") || updatedCriteres[index].preuves_encours,
+            attendus: String(row.getCell(9).text || row.getCell(9).value || "") || updatedCriteres[index].attendus,
+            notes: String(row.getCell(10).text || row.getCell(10).value || "") || updatedCriteres[index].notes,
           };
           count++;
         }
@@ -347,7 +349,8 @@ function MainApp() {
       await saveData(newCampaigns);
       alert(`✅ Import réussi ! ${count} indicateurs ont été mis à jour.`);
     } catch (error) {
-      alert("Erreur lors de l'import : Le format du fichier n'est pas reconnu.");
+      console.error("Erreur lors de l'import :", error);
+      alert("❌ Échec de l'importation :\n" + error.message + "\n\nAstuce : Assurez-vous que le fichier Excel n'est pas actuellement ouvert dans Microsoft Excel.");
     }
     e.target.value = null;
   };
@@ -428,8 +431,8 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {/* 👉 BOUTON IMPORT EXCEL ICI */}
-            {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && !isArchive && (
+            {/* 👉 BOUTON IMPORT EXCEL RÉSERVÉ AU SUPERADMIN */}
+            {userProfile?.role === "superadmin" && !isArchive && (
               <>
                 <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
                 <label htmlFor="import-excel" className="hide-mobile" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
