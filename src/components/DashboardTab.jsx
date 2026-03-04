@@ -1,7 +1,7 @@
 import React from "react";
 import { CRITERES_LABELS } from "../data";
 
-// 👉 LE COMPOSANT MANQUANT (GaugeChart) EST RÉINTÉGRÉ ICI !
+// 👉 LE GRAPHIQUE CIRCULAIRE (Utilisé par la Tour de Contrôle)
 export function GaugeChart({ pct, score, color }) {
   const val = pct !== undefined ? pct : (score !== undefined ? score : 0);
   const c = color || "#1d4ed8";
@@ -11,13 +11,21 @@ export function GaugeChart({ pct, score, color }) {
   return (
     <div style={{ position: "relative", width: "80px", height: "80px" }}>
       <svg width="80" height="80" viewBox="0 0 80 80" style={{ transform: "rotate(-90deg)" }}>
-        {/* Le fond de la jauge est rendu universel avec une transparence pour le Dark Mode */}
         <circle cx="40" cy="40" r={r} fill="transparent" stroke="rgba(148, 163, 184, 0.2)" strokeWidth="8" />
         <circle cx="40" cy="40" r={r} fill="transparent" stroke={c} strokeWidth="8" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s ease-out" }} />
       </svg>
       <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "900" }}>
         {val}%
       </div>
+    </div>
+  );
+}
+
+// 👉 LA BARRE DE PROGRESSION (Utilisée par l'onglet Priorités / Axes)
+export function ProgressBar({ pct, color }) {
+  return (
+    <div style={{ background: "#e2e8f0", borderRadius: "8px", height: "8px", width: "100%", overflow: "hidden" }}>
+      <div style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: color || "#1d4ed8", height: "100%", borderRadius: "8px", transition: "width 0.5s ease-out" }} />
     </div>
   );
 }
