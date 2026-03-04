@@ -84,10 +84,7 @@ function MainApp() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
   const [newRoleInput, setNewRoleInput] = useState("");
-  
-  // 👉 NOUVEAU STATE POUR PRENOM ET NOM
   const [newManualUser, setNewManualUser] = useState({ prenom: "", nom: "" });
-  
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
@@ -121,8 +118,11 @@ function MainApp() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsLoggedIn(true);
-        if (!user.emailVerified) setActiveTab("validation_requise");
-        else setActiveTab("dashboard");
+        if (!user.emailVerified) {
+          setActiveTab("validation_requise");
+        } else {
+          setActiveTab("dashboard");
+        }
         
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
@@ -231,12 +231,20 @@ function MainApp() {
   
   const handleLogout = () => signOut(auth);
 
-  // 👉 CORRECTION DE LA DATE DE L'AUDIT (Rebranchée)
+  // 👉 DATE DE L'AUDIT FORMAT FRANÇAIS JJ/MM/AAAA
   const handleEditAuditDate = () => {
     if (isArchive) return;
-    const newDate = prompt("Modifier la date de l'audit (format AAAA-MM-JJ) :", currentAuditDate);
-    if (newDate && !isNaN(new Date(newDate).getTime())) {
-      saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c));
+    const currentFr = new Date(currentAuditDate).toLocaleDateString("fr-FR");
+    const newDateFr = prompt("Modifier la date de l'audit (Format demandé : JJ/MM/AAAA) :", currentFr);
+    
+    if (newDateFr) {
+      const parts = newDateFr.split('/');
+      if (parts.length === 3) {
+        const isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        if (!isNaN(new Date(isoDate).getTime())) {
+          saveData(campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: isoDate } : c));
+        } else { alert("Format de date invalide."); }
+      } else { alert("Merci de respecter le format avec les tirets obliques : JJ/MM/AAAA"); }
     }
   };
 
@@ -247,7 +255,7 @@ function MainApp() {
   const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
 
-  // 👉 GOD MODE : Exclut le Superadmin de l'organigramme
+  // EXCLURE SUPERADMIN DE L'ORGANIGRAMME (GOD MODE)
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
   const allIfsiMembers = useMemo(() => [
@@ -273,9 +281,10 @@ function MainApp() {
 
   const byPerson = useMemo(() => allIfsiMembers.map(m => ({ ...m, items: criteres.filter(c => c.responsables?.includes(m.name)) })).filter(p => p.items.length > 0 || p.roles.length > 0), [allIfsiMembers, criteres]);
 
-  // 👉 CLOISONNEMENT DES COMPTES (Superadmin ne voit QUE l'IFSI en cours + les autres Superadmins)
+  // 👉 CLOISONNEMENT DES COMPTES ET INVISIBILITÉ SUPERADMIN
   const sortedTeamUsers = useMemo(() => {
     const filteredUsers = teamUsers.filter(u => {
+      if (u.role === "superadmin") return false; // GOD MODE
       if (userProfile?.role === "superadmin" && u.role !== "superadmin" && u.etablissementId !== selectedIfsi) return false;
       if (!teamSearchTerm) return true;
       const sLower = teamSearchTerm.toLowerCase();
@@ -381,12 +390,11 @@ function MainApp() {
   const addOrgRole = () => { const r = newRoleInput.trim(); if (r && !orgRoles.includes(r)) { setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, r] }, { merge: true }); setNewRoleInput(""); } };
   const deleteOrgRole = (roleToDelete) => { if (allIfsiMembers.some(m => m.roles.includes(roleToDelete))) return alert("⚠️ Impossible : Des personnes ont encore cette casquette."); if (window.confirm(`Supprimer la colonne "${roleToDelete}" ?`)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: orgRoles.filter(r => r !== roleToDelete) }, { merge: true }); };
   
-  // 👉 NOUVELLE FONCTION D'AJOUT MANUEL (PRÉNOM + NOM)
   const addManualUser = () => { 
     const p = newManualUser.prenom.trim();
     const n = newManualUser.nom.trim().toUpperCase();
     if (!p || !n) return alert("Veuillez saisir un Prénom ET un NOM.");
-    const fullName = `${n} ${p}`; // Construit "NOM Prénom" pour le tri alphabétique correct
+    const fullName = `${n} ${p}`; 
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, { id: 'm_' + Date.now(), name: fullName, roles: [] }] }, { merge: true }); 
     setNewManualUser({ prenom: "", nom: "" }); 
   };
