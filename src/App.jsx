@@ -61,6 +61,9 @@ function MainApp() {
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
+  
+  // 👉 NOUVEL ETAT POUR LE RAPPORT D'IMPORT
+  const [importReport, setImportReport] = useState(null);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
@@ -202,8 +205,6 @@ function MainApp() {
     });
   }, [teamUsers, teamSearchTerm, teamSortConfig, ifsiList]);
 
-  const totalUsersInNetwork = teamUsers.length;
-
   const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
   const handleIfsiSwitch = async (e) => { if (e.target.value === "NEW") { const nom = prompt("Nom de l'établissement :"); if (nom?.trim()) { const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); setSelectedIfsi(id); } } else { setSelectedIfsi(e.target.value); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
@@ -292,15 +293,23 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // 👉 LA FONCTION MAGIQUE ET ULTRA-ROBUSTE D'IMPORTATION
+  // 👉 LA FONCTION BLINDÉE ET LE MODAL DE DIAGNOSTIC
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    if (typeof window.ExcelJS === "undefined") return alert("Le moteur Excel n'est pas encore chargé. Veuillez patienter.");
 
-    if (!window.confirm("⚠️ Attention : L'import va écraser les données actuelles de cet établissement par celles du fichier Excel. Êtes-vous sûr de vouloir continuer ?")) {
-      e.target.value = null;
-      return;
+    if (file.name.toLowerCase().endsWith('.csv')) {
+      setImportReport({ type: "warning", title: "Format inadapté", msg: "L'application attend un fichier Excel (.xlsx) et non un fichier CSV. Veuillez ouvrir votre fichier et l'enregistrer au format Excel.", details: "" });
+      return e.target.value = null;
+    }
+
+    if (typeof window.ExcelJS === "undefined") {
+      setImportReport({ type: "error", title: "Erreur Système", msg: "Le moteur de lecture Excel n'est pas encore chargé.", details: "" });
+      return e.target.value = null;
+    }
+
+    if (!window.confirm("⚠️ L'import écrasera les données actuelles de cet établissement par celles du fichier. Continuer ?")) {
+      return e.target.value = null;
     }
 
     try {
@@ -309,36 +318,34 @@ function MainApp() {
       await workbook.xlsx.load(arrayBuffer);
       const worksheet = workbook.worksheets[0];
       
-      if (!worksheet) throw new Error("Aucun onglet lisible n'a été trouvé dans le fichier.");
+      if (!worksheet) throw new Error("Aucun onglet trouvé dans le fichier.");
 
       let updatedCriteres = [...criteres];
       let count = 0;
+      let logs = [];
 
-      // Extracteur sécurisé (Gère le format texte enrichi ou brut d'Excel)
       const getCellText = (cell) => {
-        if (!cell) return "";
-        if (cell.text) return String(cell.text);
-        if (cell.value) {
-          if (typeof cell.value === "object" && cell.value.richText) return cell.value.richText.map(t => t.text).join("");
-          return String(cell.value);
+        if (!cell || cell.value === null || cell.value === undefined) return "";
+        if (typeof cell.value === "object") {
+           if (cell.value.richText) return cell.value.richText.map(t => t.text).join("");
+           if (cell.value.hyperlink) return String(cell.value.text || "");
+           if (cell.value.result !== undefined) return String(cell.value.result);
+           if (cell.value instanceof Date) return cell.value.toLocaleDateString();
         }
-        return "";
+        return String(cell.text || cell.value || "");
       };
 
-      // Normalisateur (Enlève les accents pour la comparaison de statut)
-      const normalize = str => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+      const normalize = str => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
 
       worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return; // Ignore l'en-tête
+        if (rowNumber === 1) return; 
         
         let numRaw = getCellText(row.getCell(1)).trim();
         if (!numRaw) return;
         
-        // Si le tableur a écrit "Indicateur 1", on ne récupère que le chiffre "1"
-        const numMatch = numRaw.match(/\d+/);
-        const numClean = numMatch ? numMatch[0] : numRaw;
+        // Extrait uniquement le chiffre (pour passer de "Indicateur 1" à "1")
+        const numClean = numRaw.replace(/[^\d]/g, '');
 
-        // On cherche le bon indicateur dans notre base
         const index = updatedCriteres.findIndex(c => String(c.num) === numClean || String(c.num) === numRaw);
         
         if (index !== -1) {
@@ -363,21 +370,22 @@ function MainApp() {
             notes: getCellText(row.getCell(10)) || updatedCriteres[index].notes,
           };
           count++;
+          logs.push(`Indicateur ${numClean} mis à jour avec succès.`);
         }
       });
 
       if (count === 0) {
-        alert("⚠️ Fichier lu, mais aucun numéro d'indicateur n'a pu être identifié. Assurez-vous d'importer un fichier généré via le bouton 'Excel'.");
+        setImportReport({ type: "warning", title: "Aucune mise à jour", msg: "Le fichier a été lu, mais aucun numéro d'indicateur correspondant n'a été trouvé. Assurez-vous d'importer le fichier généré par le bouton 'Excel'.", details: "" });
       } else {
         const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: updatedCriteres } : camp);
         await saveData(newCampaigns);
-        alert(`✅ Import réussi ! ${count} indicateurs ont été mis à jour avec succès.`);
+        setImportReport({ type: "success", title: "Import Réussi", msg: `Base de données mise à jour !`, details: `${count} indicateurs affectés:\n${logs.join("\n")}` });
       }
     } catch (error) {
       console.error(error);
-      alert("❌ Échec de la lecture du fichier.\nMessage : " + error.message);
+      setImportReport({ type: "error", title: "Échec de la lecture", msg: "Impossible de décoder le fichier Excel. S'il est actuellement ouvert dans un autre logiciel, fermez-le d'abord.", details: `${error.name}: ${error.message}` });
     }
-    e.target.value = null; // Réinitialise le bouton
+    e.target.value = null;
   };
 
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap", transition: "all 0.2s" });
@@ -420,6 +428,23 @@ function MainApp() {
         .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
 
+      {/* 👉 LE NOUVEAU MODAL DE DIAGNOSTIC D'IMPORT */}
+      {importReport && (
+        <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.8)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(4px)" }}>
+           <div className="animate-fade-in" style={{ background: "white", borderRadius: "16px", padding: "32px", maxWidth: "500px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
+              <div style={{ fontSize: "40px", textAlign: "center", marginBottom: "16px" }}>{importReport.type === 'success' ? '✅' : importReport.type === 'warning' ? '⚠️' : '❌'}</div>
+              <h2 style={{ textAlign: "center", margin: "0 0 12px 0", color: "#1e3a5f" }}>{importReport.title}</h2>
+              <p style={{ textAlign: "center", color: "#475569", fontSize: "14px", marginBottom: "20px", lineHeight: "1.5" }}>{importReport.msg}</p>
+              {importReport.details && (
+                 <div style={{ background: "#f1f5f9", padding: "12px", borderRadius: "8px", fontSize: "11px", color: "#64748b", maxHeight: "150px", overflowY: "auto", whiteSpace: "pre-wrap", fontFamily: "monospace", marginBottom: "20px", border: "1px solid #cbd5e1" }}>
+                   {importReport.details}
+                 </div>
+              )}
+              <button onClick={() => setImportReport(null)} style={{ width: "100%", padding: "12px", background: "#1d4ed8", color: "white", borderRadius: "8px", border: "none", fontWeight: "bold", cursor: "pointer", fontSize: "14px" }}>Fermer</button>
+           </div>
+        </div>
+      )}
+
       {modalCritere && (
         <DetailModal 
           critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} onAutoSave={handleAutoSave}
@@ -456,8 +481,7 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {/* 👉 BOUTON IMPORT EXCEL RÉSERVÉ AU SUPERADMIN ET ADMIN */}
-            {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && !isArchive && (
+            {(userProfile?.role === "superadmin") && !isArchive && (
               <>
                 <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
                 <label htmlFor="import-excel" className="hide-mobile" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
