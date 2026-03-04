@@ -8,8 +8,6 @@ export default function OrganigrammeTab({
   setNewRoleInput, deleteOrgRole, applyDefaultRoles
 }) {
   
-  const unassigned = allIfsiMembers.filter(m => !m.roles || m.roles.length === 0);
-
   return (
     <div className="animate-fade-in">
       
@@ -47,30 +45,51 @@ export default function OrganigrammeTab({
 
       </div>
 
-      {/* 🟠 LA RÉSERVE (Pleine largeur) */}
+      {/* 🟠 EFFECTIFS DE L'AUDIT (Le "Hub" Central) */}
       <div style={{ background: "#f8fafc", border: "2px dashed #cbd5e1", borderRadius: "16px", padding: "20px", marginBottom: "32px" }}>
-        <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#64748b", display: "flex", alignItems: "center", gap: "8px" }}><span>👥</span> Réserve (Membres sans rôle)</h3>
-        {unassigned.length === 0 ? (
-          <div style={{ textAlign: "center", color: "#9ca3af", fontStyle: "italic", fontSize: "14px", marginTop: "10px" }}>Tous les membres ont un rôle ! 🎉</div>
+        <h3 style={{ margin: "0 0 16px 0", fontSize: "16px", color: "#64748b", display: "flex", alignItems: "center", gap: "8px" }}>
+          <span>👥</span> Liste des effectifs (Glissez vers les colonnes pour attribuer une mission)
+        </h3>
+        
+        {allIfsiMembers.length === 0 ? (
+          <div style={{ textAlign: "center", color: "#9ca3af", fontStyle: "italic", fontSize: "14px", marginTop: "10px" }}>Aucun membre dans l'équipe.</div>
         ) : (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: "10px" }}>
-            {unassigned.map(u => (
-              <div key={u.id} draggable onDragStart={(e) => handleDragStartOrg(e, u.type, u.id)} className="org-card" style={{ display: "inline-flex", flexDirection: "row", alignItems: "center", gap: "8px", width: "auto", margin: 0, padding: "6px 12px", background: "white", cursor: "grab" }}>
-                <span style={{ color: "#9ca3af" }}>⋮⋮</span>
-                <span style={{ fontWeight: "700", color: "#1e3a5f" }}>{u.name}</span>
-                {u.type === "manual" && (
-                  <div style={{ display: "flex", gap: "4px", marginLeft: "4px" }}>
-                    <button onClick={() => editManualUser(u.id, u.name)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", opacity: 0.6 }} title="Renommer">✏️</button>
-                    <button onClick={() => deleteManualUser(u.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", opacity: 0.6 }} title="Supprimer">🗑️</button>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: "12px" }}>
+            {allIfsiMembers.map(u => (
+              <div key={u.id} draggable onDragStart={(e) => handleDragStartOrg(e, u.type, u.id)} className="org-card" style={{ display: "flex", flexDirection: "column", gap: "8px", padding: "10px 14px", background: "white", cursor: "grab", minWidth: "180px", flex: "1 1 auto", maxWidth: "300px" }}>
+                
+                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                  <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                    <span style={{ color: "#9ca3af" }}>⋮⋮</span>
+                    <span style={{ fontWeight: "800", color: "#1e3a5f", fontSize: "14px" }}>{u.name}</span>
                   </div>
-                )}
+                  {u.type === "manual" && (
+                    <div style={{ display: "flex", gap: "4px" }}>
+                      <button onClick={() => editManualUser(u.id, u.name)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", opacity: 0.5 }} title="Renommer">✏️</button>
+                      <button onClick={() => deleteManualUser(u.id)} style={{ background: "none", border: "none", cursor: "pointer", fontSize: "12px", opacity: 0.5 }} title="Supprimer">🗑️</button>
+                    </div>
+                  )}
+                </div>
+
+                {/* Badges des rôles actuels */}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "4px" }}>
+                  {u.roles && u.roles.length > 0 ? (
+                    u.roles.map(r => {
+                      const rCol = getRoleColor(r);
+                      return <span key={r} style={{ fontSize: "10px", background: rCol.bg, color: rCol.text, padding: "2px 6px", borderRadius: "4px", border: `1px solid ${rCol.border}`, whiteSpace: "nowrap" }}>{r}</span>
+                    })
+                  ) : (
+                    <span style={{ fontSize: "10px", color: "#9ca3af", fontStyle: "italic", padding: "2px 0" }}>Aucune mission</span>
+                  )}
+                </div>
+
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* 🔵 TABLEAU KANBAN (Retour au Wrap !) */}
+      {/* 🔵 TABLEAU KANBAN (Les Colonnes) */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", paddingBottom: "20px", alignItems: "flex-start" }}>
         {orgRoles.map(role => {
           const membersInRole = allIfsiMembers.filter(m => m.roles.includes(role));
@@ -81,7 +100,6 @@ export default function OrganigrammeTab({
               key={role} 
               onDragOver={handleDragOverOrg} 
               onDrop={(e) => handleDropOrg(e, role)} 
-              // Le flex: "1 1 280px" est la clé magique pour que ça s'adapte et s'empile !
               style={{ background: "#f1f5f9", borderRadius: "16px", flex: "1 1 280px", minWidth: "280px", maxWidth: "100%", display: "flex", flexDirection: "column", border: "1px solid #e2e8f0", overflow: "hidden" }}
             >
               <div style={{ background: colorCfg.bg, borderBottom: `2px solid ${colorCfg.border}`, padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -94,9 +112,8 @@ export default function OrganigrammeTab({
 
               <div style={{ padding: "16px", flex: 1, display: "flex", flexDirection: "column", gap: "12px", minHeight: "80px" }}>
                 {membersInRole.map(u => (
-                  <div key={u.id} draggable onDragStart={(e) => handleDragStartOrg(e, u.type, u.id)} className="org-card" style={{ position: "relative" }}>
+                  <div key={u.id} className="org-card" style={{ position: "relative", cursor: "default" }}>
                     <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px" }}>
-                      <span style={{ color: "#cbd5e1", cursor: "grab" }}>⋮⋮</span>
                       <span style={{ fontWeight: "800", color: "#1e3a5f", fontSize: "14px" }}>{u.name}</span>
                     </div>
                     
