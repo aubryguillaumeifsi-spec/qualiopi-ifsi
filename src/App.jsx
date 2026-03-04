@@ -39,12 +39,12 @@ function Footer() {
   return (
     <footer className="no-print custom-footer" style={{ background: "white", borderTop: "1px solid #e2e8f0", padding: "20px 32px", marginTop: "auto", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "16px", fontSize: "13px", color: "#64748b" }}>
       <div>
-        <strong style={{ color: "#1e3a5f", fontSize: "14px" }} className="custom-text">QualiForma</strong> 
-        <span className="custom-badge" style={{ background: "#eff6ff", color: "#1d4ed8", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "900", marginLeft: "8px" }}>V1.0 Bêta</span>
+        <strong style={{ color: "#1e3a5f", fontSize: "14px" }}>QualiForma</strong> 
+        <span style={{ background: "#eff6ff", color: "#1d4ed8", padding: "3px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "900", marginLeft: "8px" }}>V1.0 Bêta</span>
       </div>
       <div style={{ display: "flex", gap: "24px", flexWrap: "wrap", justifyContent: "center", fontWeight: "600" }}>
-        <a href="#" onClick={e => {e.preventDefault(); alert("📄 Les mentions légales seront intégrées ici lors du lancement officiel (Éditeur, Hébergeur, etc.).");}} style={{ color: "inherit", textDecoration: "none" }}>Mentions Légales</a>
-        <a href="#" onClick={e => {e.preventDefault(); alert("🔒 La politique de confidentialité concernant les données RGPD de l'IFSI sera affichée ici.");}} style={{ color: "inherit", textDecoration: "none" }}>Politique de confidentialité</a>
+        <a href="#" onClick={e => {e.preventDefault(); alert("📄 Mentions Légales (Bientôt disponible)");}} style={{ color: "inherit", textDecoration: "none" }}>Mentions Légales</a>
+        <a href="#" onClick={e => {e.preventDefault(); alert("🔒 Politique de confidentialité (Bientôt disponible)");}} style={{ color: "inherit", textDecoration: "none" }}>Politique de confidentialité</a>
         <a href="mailto:support@qualiforma.fr" style={{ color: "inherit", textDecoration: "none" }}>✉️ Contact Support</a>
       </div>
     </footer>
@@ -372,11 +372,22 @@ function MainApp() {
     } 
   };
 
-  const getRoleColor = (roleName) => { 
-    if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; 
+  // 👉 LA PALETTE DE L'ORGANIGRAMME DEVIENT NATIVE AU MODE SOMBRE !
+  const getRoleColor = useCallback((roleName) => { 
+    const darkPalette = [
+      { bg: "#1a2332", border: "#8ab4f8", text: "#8ab4f8" },
+      { bg: "#13231a", border: "#81c995", text: "#81c995" },
+      { bg: "#2d2411", border: "#fdd663", text: "#fdd663" },
+      { bg: "#231533", border: "#c58af9", text: "#c58af9" },
+      { bg: "#2b1716", border: "#f28b82", text: "#f28b82" },
+      { bg: "#132526", border: "#80cbc4", text: "#80cbc4" },
+      { bg: "#2c1722", border: "#f48fb1", text: "#f48fb1" },
+      { bg: "#1e1f20", border: "#9aa0a6", text: "#9aa0a6" }
+    ];
+    if (roleName === "Direction") return isDarkMode ? { bg: "#8ab4f8", border: "#8ab4f8", text: "#131314" } : { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; 
     const idx = orgRoles.indexOf(roleName); 
-    return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[7]; 
-  };
+    return isDarkMode ? (darkPalette[idx % darkPalette.length] || darkPalette[7]) : (ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[7]); 
+  }, [orgRoles, isDarkMode]);
   
   const handleDragStartOrg = (e, type, id) => { e.dataTransfer.setData("type", type); e.dataTransfer.setData("id", id); };
   const handleDragOverOrg = (e) => { e.preventDefault(); };
@@ -582,12 +593,11 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
 
   return (
-    <div className={`theme-container ${isDarkMode ? 'dark-mode' : ''} ${isColorblindMode ? 'colorblind-mode' : ''}`} style={{ minHeight: "100vh", display: "flex", flexDirection: "column", fontFamily: "Outfit,sans-serif" }}>
+    <div className={`${isDarkMode ? 'dark-mode' : ''} ${isColorblindMode ? 'colorblind-mode' : ''}`} style={{ minHeight: "100vh", display: "flex", flexDirection: "column", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
       <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
       
-      {/* 🚀 MATRICE CSS GLOBALE D'ÉCRASEMENT DES THÈMES 🚀 */}
+      {/* 🚀 MATRICE CSS D'ÉCRASEMENT EXTRÊME (GEMINI & DALTONIEN) 🚀 */}
       <style>{`
-        /* --- BASE STYLES --- */
         @media print { .no-print { display: none !important; } body { background: white !important; } }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -597,107 +607,69 @@ function MainApp() {
         .td-dash { transition: all 0.2s ease; border: 1px solid transparent; }
         .td-dash:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1) !important; }
         
-        .theme-container { background-color: #f8fafc; color: #1e3a5f; }
-
-        /* --- 🌙 MODE SOMBRE (GEMINI STYLE) --- */
+        /* 🌙 MODE SOMBRE (STYLE GOOGLE GEMINI) */
         .dark-mode { background-color: #131314 !important; color: #e3e3e3 !important; }
+        .dark-mode * { border-color: #333537 !important; }
         
-        /* 1. Remplacement des fonds clairs par du sombre */
-        .dark-mode div[style*="background: white"], .dark-mode div[style*="background:white"], .dark-mode div[style*="background-color: white"],
-        .dark-mode div[style*="background: #f8fafc"], .dark-mode div[style*="background-color: #f8fafc"],
-        .dark-mode div[style*="background: #f1f5f9"], .dark-mode div[style*="background-color: #f1f5f9"],
-        .dark-mode footer, .dark-mode .modal-content {
-            background-color: #1e1f20 !important;
-            border-color: #333537 !important;
+        /* Conversion des fonds clairs vers Anthracite */
+        .dark-mode [style*="background: white"], .dark-mode [style*="background-color: white"], .dark-mode [style*="background-color: rgb(255, 255, 255)"],
+        .dark-mode [style*="background: #f8fafc"], .dark-mode [style*="background-color: rgb(248, 250, 252)"],
+        .dark-mode [style*="background: #f1f5f9"], .dark-mode [style*="background-color: rgb(241, 245, 249)"],
+        .dark-mode [style*="background: #eff6ff"], .dark-mode [style*="background-color: rgb(239, 246, 255)"],
+        .dark-mode .custom-footer, .dark-mode .modal-content {
+            background-color: #1e1f20 !important; color: #e3e3e3 !important;
         }
 
-        /* 2. Écrasement total de TOUS les textes sombres pour les rendre clairs */
-        .dark-mode span, .dark-mode h1, .dark-mode h2, .dark-mode h3, .dark-mode h4, .dark-mode p, .dark-mode div, .dark-mode td, .dark-mode th, .dark-mode strong {
+        /* Conversion des Textes Sombres vers Argenté */
+        .dark-mode [style*="color: #1e3a5f"], .dark-mode [style*="color: rgb(30, 58, 95)"],
+        .dark-mode [style*="color: #334155"], .dark-mode [style*="color: rgb(51, 65, 85)"],
+        .dark-mode [style*="color: #0f172a"], .dark-mode [style*="color: rgb(15, 23, 42)"],
+        .dark-mode .custom-text {
             color: #e3e3e3 !important;
         }
-        
-        /* 3. Textes secondaires (Gris) */
-        .dark-mode span[style*="color: #64748b"], .dark-mode div[style*="color: #64748b"], .dark-mode p[style*="color: #64748b"],
-        .dark-mode span[style*="color: #9ca3af"], .dark-mode div[style*="color: #9ca3af"] {
+
+        /* Conversion des Textes Gris vers Gris Clair */
+        .dark-mode [style*="color: #64748b"], .dark-mode [style*="color: rgb(100, 116, 139)"],
+        .dark-mode [style*="color: #475569"], .dark-mode [style*="color: rgb(71, 85, 105)"],
+        .dark-mode [style*="color: #9ca3af"], .dark-mode [style*="color: rgb(156, 163, 175)"] {
             color: #c4c7c5 !important;
         }
+
+        /* Accentuation Bleue façon Gemini */
+        .dark-mode [style*="color: #1d4ed8"], .dark-mode [style*="color: rgb(29, 78, 216)"] { color: #8ab4f8 !important; }
+        .dark-mode .custom-badge { background-color: rgba(138, 180, 248, 0.15) !important; color: #8ab4f8 !important; }
+
+        /* Formulaires & Tableaux */
+        .dark-mode input, .dark-mode select, .dark-mode textarea { background-color: #131314 !important; color: #e3e3e3 !important; }
+        .dark-mode table, .dark-mode tr { background-color: transparent !important; }
+        .dark-mode th { background-color: #131314 !important; color: #c4c7c5 !important; border-bottom: 1px solid #333537 !important; }
+        .dark-mode td { border-bottom: 1px solid #333537 !important; }
+        .dark-mode tr:hover td { background-color: #2a2b2f !important; }
+
+
+        /* 👁️ MODE DALTONIEN (Écrasement direct des valeurs RGB générées par React) */
         
-        /* 4. Textes d'accentuation (Bleu) */
-        .dark-mode span[style*="color: #1d4ed8"], .dark-mode div[style*="color: #1d4ed8"], .dark-mode strong[style*="color: #1d4ed8"] {
-            color: #8ab4f8 !important;
-        }
-
-        /* 5. Écrasement des bordures grises */
-        .dark-mode div[style*="border"], .dark-mode th, .dark-mode td, .dark-mode textarea {
-            border-color: #333537 !important;
-        }
-
-        /* 6. Formulaires, inputs et selects */
-        .dark-mode input, .dark-mode select, .dark-mode textarea {
-            background-color: #131314 !important;
-            color: #e3e3e3 !important;
-            border: 1px solid #333537 !important;
-        }
-
-        /* 7. Correction des blocs Organigramme (Ils sont trop clairs) */
-        .dark-mode div[style*="background: #e0e7ff"], .dark-mode div[style*="background: #dcfce7"],
-        .dark-mode div[style*="background: #fef3c7"], .dark-mode div[style*="background: #f3e8ff"],
-        .dark-mode div[style*="background: #fee2e2"], .dark-mode div[style*="background: #ccfbf1"],
-        .dark-mode div[style*="background: #fce7f3"], .dark-mode div[style*="background: #1e3a5f"] {
-            background-color: #1e1f20 !important;
-            border-bottom: 2px solid #8ab4f8 !important;
-        }
-        .dark-mode .org-card { background-color: #131314 !important; }
-
-        /* 8. Les boutons transparents ou clairs */
-        .dark-mode button { color: #e3e3e3; }
-        .dark-mode button[style*="background: transparent"] { color: #8ab4f8 !important; }
-        .dark-mode button[style*="background: white"], .dark-mode button[style*="background: #f1f5f9"] {
-            background-color: #333537 !important; color: #e3e3e3 !important; border-color: #555 !important;
-        }
-
-
-        /* --- 👁️ MODE DALTONIEN (ROUGE->ORANGE | VERT->BLEU) --- */
-        /* Application stricte sur TOUTES les nuances de rouge et vert trouvées dans le style en ligne */
+        /* ROUGE DEVIENT ORANGE */
+        .colorblind-mode [style*="color: #dc2626"], .colorblind-mode [style*="color: rgb(220, 38, 38)"],
+        .colorblind-mode [style*="color: #ef4444"], .colorblind-mode [style*="color: rgb(239, 68, 68)"],
+        .colorblind-mode [style*="color: #991b1b"], .colorblind-mode [style*="color: rgb(153, 27, 27)"] { color: #ea580c !important; }
         
-        /* Les Textes et Bordures Verts deviennent Bleus */
-        .colorblind-mode div[style*="#10b981"], .colorblind-mode span[style*="#10b981"],
-        .colorblind-mode div[style*="#059669"], .colorblind-mode span[style*="#059669"],
-        .colorblind-mode div[style*="#166534"], .colorblind-mode span[style*="#166534"],
-        .colorblind-mode div[style*="#065f46"], .colorblind-mode span[style*="#065f46"],
-        .colorblind-mode div[style*="#6ee7b7"], .colorblind-mode span[style*="#6ee7b7"] {
-            color: #1d4ed8 !important;
-            border-color: #bfdbfe !important;
-        }
+        .colorblind-mode [style*="background: #fef2f2"], .colorblind-mode [style*="background-color: rgb(254, 242, 242)"] { background-color: #fff7ed !important; border-color: #ffedd5 !important; }
         
-        /* Les Fonds Verts clairs deviennent Bleus clairs */
-        .colorblind-mode div[style*="background: #f0fdf4"], .colorblind-mode div[style*="background-color: #f0fdf4"],
-        .colorblind-mode div[style*="background: #d1fae5"], .colorblind-mode div[style*="background-color: #d1fae5"] {
-            background-color: #eff6ff !important;
-            border-color: #bfdbfe !important;
-        }
+        .colorblind-mode [style*="background: #ef4444"], .colorblind-mode [style*="background-color: rgb(239, 68, 68)"],
+        .colorblind-mode [style*="background: #dc2626"], .colorblind-mode [style*="background-color: rgb(220, 38, 38)"] { background-color: #ea580c !important; color: white !important; }
 
-        /* Les Textes et Bordures Rouges deviennent Oranges */
-        .colorblind-mode div[style*="#ef4444"], .colorblind-mode span[style*="#ef4444"],
-        .colorblind-mode div[style*="#dc2626"], .colorblind-mode span[style*="#dc2626"],
-        .colorblind-mode div[style*="#991b1b"], .colorblind-mode span[style*="#991b1b"],
-        .colorblind-mode div[style*="#fca5a5"], .colorblind-mode span[style*="#fca5a5"] {
-            color: #ea580c !important;
-            border-color: #fdba74 !important;
-        }
-
-        /* Les Fonds Rouges clairs deviennent Oranges clairs */
-        .colorblind-mode div[style*="background: #fef2f2"], .colorblind-mode div[style*="background-color: #fef2f2"] {
-            background-color: #fff7ed !important;
-            border-color: #ffedd5 !important;
-        }
-
-        /* Les Pastilles Rouges pleines (Badges) deviennent Oranges */
-        .colorblind-mode span[style*="background: #dc2626"], .colorblind-mode div[style*="background: #dc2626"],
-        .colorblind-mode span[style*="background: #ef4444"], .colorblind-mode div[style*="background: #ef4444"] {
-            background-color: #ea580c !important;
-            color: white !important;
-        }
+        /* VERT DEVIENT BLEU */
+        .colorblind-mode [style*="color: #10b981"], .colorblind-mode [style*="color: rgb(16, 185, 129)"],
+        .colorblind-mode [style*="color: #059669"], .colorblind-mode [style*="color: rgb(5, 150, 105)"],
+        .colorblind-mode [style*="color: #166534"], .colorblind-mode [style*="color: rgb(22, 101, 52)"],
+        .colorblind-mode [style*="color: #065f46"], .colorblind-mode [style*="color: rgb(6, 95, 70)"] { color: #2563eb !important; }
+        
+        .colorblind-mode [style*="background: #f0fdf4"], .colorblind-mode [style*="background-color: rgb(240, 253, 244)"],
+        .colorblind-mode [style*="background: #d1fae5"], .colorblind-mode [style*="background-color: rgb(209, 250, 229)"] { background-color: #eff6ff !important; border-color: #bfdbfe !important; }
+        
+        .colorblind-mode [style*="background: #10b981"], .colorblind-mode [style*="background-color: rgb(16, 185, 129)"],
+        .colorblind-mode [style*="background: #059669"], .colorblind-mode [style*="background-color: rgb(5, 150, 105)"] { background-color: #2563eb !important; color: white !important; }
       `}</style>
 
       {importReport && (
@@ -766,7 +738,7 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {userProfile?.role === "superadmin" && <button onClick={() => setActiveTab("backups")} style={{ ...navBtn(activeTab === "backups"), color: "#1e3a5f", background: activeTab === "backups" ? "#e0e7ff" : "transparent", display: "flex", gap: "6px", padding: "6px 12px" }}><span>⏳</span> Backups</button>}
+            {userProfile?.role === "superadmin" && <button onClick={() => setActiveTab("backups")} style={{ ...navBtn(activeTab === "backups"), display: "flex", gap: "6px", padding: "6px 12px" }}><span>⏳</span> Backups</button>}
 
             {userProfile?.role === "superadmin" && !isArchive && (
               <>
