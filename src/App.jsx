@@ -62,7 +62,6 @@ function MainApp() {
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
   
-  // 👉 NOUVEL ETAT POUR LE RAPPORT D'IMPORT
   const [importReport, setImportReport] = useState(null);
 
   useEffect(() => {
@@ -205,6 +204,8 @@ function MainApp() {
     });
   }, [teamUsers, teamSearchTerm, teamSortConfig, ifsiList]);
 
+  const totalUsersInNetwork = teamUsers.length;
+
   const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
   const handleIfsiSwitch = async (e) => { if (e.target.value === "NEW") { const nom = prompt("Nom de l'établissement :"); if (nom?.trim()) { const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); setSelectedIfsi(id); } } else { setSelectedIfsi(e.target.value); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
@@ -293,7 +294,7 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // 👉 LA FONCTION BLINDÉE ET LE MODAL DE DIAGNOSTIC
+  // 👉 L'IMPORT EXCEL ULTRA-BLINDÉ CONTRE LE BUG FIREBASE "UNDEFINED"
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -343,14 +344,13 @@ function MainApp() {
         let numRaw = getCellText(row.getCell(1)).trim();
         if (!numRaw) return;
         
-        // Extrait uniquement le chiffre (pour passer de "Indicateur 1" à "1")
         const numClean = numRaw.replace(/[^\d]/g, '');
 
         const index = updatedCriteres.findIndex(c => String(c.num) === numClean || String(c.num) === numRaw);
         
         if (index !== -1) {
           const statutText = getCellText(row.getCell(4)).trim();
-          let statutKey = updatedCriteres[index].statut;
+          let statutKey = updatedCriteres[index].statut || "non-evalue";
           if (statutText) {
             const foundStatut = Object.entries(STATUT_CONFIG).find(([k,v]) => normalize(v.label) === normalize(statutText));
             if (foundStatut) statutKey = foundStatut[0];
@@ -360,15 +360,24 @@ function MainApp() {
           let responsables = updatedCriteres[index].responsables || [];
           if (respText) responsables = respText.split(',').map(s => s.trim()).filter(s => s);
 
-          updatedCriteres[index] = {
+          let newCritere = {
             ...updatedCriteres[index],
             statut: statutKey,
             responsables: responsables,
-            preuves: getCellText(row.getCell(7)) || updatedCriteres[index].preuves,
-            preuves_encours: getCellText(row.getCell(8)) || updatedCriteres[index].preuves_encours,
-            attendus: getCellText(row.getCell(9)) || updatedCriteres[index].attendus,
-            notes: getCellText(row.getCell(10)) || updatedCriteres[index].notes,
+            preuves: getCellText(row.getCell(7)) || updatedCriteres[index].preuves || "",
+            preuves_encours: getCellText(row.getCell(8)) || updatedCriteres[index].preuves_encours || "",
+            attendus: getCellText(row.getCell(9)) || updatedCriteres[index].attendus || "",
+            notes: getCellText(row.getCell(10)) || updatedCriteres[index].notes || "",
           };
+
+          // 🚨 LE FAMEUX BOUCLIER ANTI-UNDEFINED
+          Object.keys(newCritere).forEach(key => {
+            if (newCritere[key] === undefined) {
+              newCritere[key] = "";
+            }
+          });
+
+          updatedCriteres[index] = newCritere;
           count++;
           logs.push(`Indicateur ${numClean} mis à jour avec succès.`);
         }
@@ -428,7 +437,6 @@ function MainApp() {
         .alert-ticker::-webkit-scrollbar-thumb { background: #fca5a5; border-radius: 10px; }
       `}</style>
 
-      {/* 👉 LE NOUVEAU MODAL DE DIAGNOSTIC D'IMPORT */}
       {importReport && (
         <div className="modal-overlay" style={{ position: "fixed", inset: 0, background: "rgba(15,23,42,0.8)", zIndex: 9999, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px", backdropFilter: "blur(4px)" }}>
            <div className="animate-fade-in" style={{ background: "white", borderRadius: "16px", padding: "32px", maxWidth: "500px", width: "100%", boxShadow: "0 25px 50px -12px rgba(0,0,0,0.25)" }}>
