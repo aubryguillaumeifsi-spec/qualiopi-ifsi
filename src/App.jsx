@@ -45,7 +45,7 @@ function BackupsTab({ backupsList, handleRestoreBackup }) {
               <p style={{ fontSize: "14px", color: "#64748b", margin: 0, lineHeight: "1.5" }}>L'application sauvegarde automatiquement l'état de l'IFSI une fois par jour et avant chaque importation Excel.</p>
           </div>
           {backupsList.length === 0 ? (
-              <div style={{ background: "white", padding: "40px", textAlign: "center", borderRadius: "14px", border: "1px dashed #cbd5e1", color: "#9ca3af", fontStyle: "italic" }}>Coffre-fort vide.</div>
+              <div style={{ background: "white", padding: "40px", textAlign: "center", borderRadius: "14px", border: "1px dashed #cbd5e1", color: "#9ca3af", fontStyle: "italic" }}>Le coffre-fort est vide.</div>
           ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {backupsList.map((b) => (
@@ -107,13 +107,16 @@ function MainApp() {
     transition: "all 0.2s"
   });
 
+  // RÉCUPÉRATION DES IFSI
   useEffect(() => {
-    onSnapshot(collection(db, "etablissements"), (snapshot) => {
+    const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = []; snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
       setIfsiList(list.sort((a, b) => String(a.name).localeCompare(b.name)));
     });
+    return () => unsub();
   }, []);
 
+  // GESTION DE L'AUTHENTIFICATION
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -142,6 +145,7 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
+  // RÉCUPÉRATION DE L'ÉQUIPE (USERS)
   useEffect(() => {
     let unsub = null;
     if (selectedIfsi && userProfile && userProfile.role !== "guest") {
@@ -153,6 +157,7 @@ function MainApp() {
     return () => unsub && unsub();
   }, [selectedIfsi, userProfile]);
 
+  // RÉCUPÉRATION DES DONNÉES QUALIOPI DE L'IFSI SÉLECTIONNÉ
   useEffect(() => {
     if (!selectedIfsi || !userProfile || userProfile.mustChangePassword || !auth.currentUser?.emailVerified) return;
     setCampaigns(null);
@@ -171,17 +176,20 @@ function MainApp() {
     return () => { unsub(); unsubIfsi(); };
   }, [selectedIfsi, userProfile]);
 
+  // FONCTION DE SAUVEGARDE GLOBALE
   const saveData = async (newCampaigns) => {
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
   };
 
+  // SYSTÈME DE BACKUP MANUEL
   const createManualBackup = async (label, dataToBackup) => {
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     const backupId = `${docId}_manual_${Date.now()}`;
     await setDoc(doc(db, "backups", backupId), { ifsiId: docId, timestamp: Date.now(), date: new Date().toISOString(), type: label, campaigns: dataToBackup });
   };
 
+  // SYSTÈME DE BACKUP QUOTIDIEN AUTOMATIQUE
   useEffect(() => {
     if (!campaigns || !selectedIfsi || campaigns.length === 0) return;
     if (dailyBackupDone.current === selectedIfsi) return; 
@@ -194,6 +202,7 @@ function MainApp() {
     });
   }, [selectedIfsi, campaigns]);
 
+  // RÉCUPÉRATION ET NETTOYAGE DES BACKUPS (Garde uniquement 10 jours)
   useEffect(() => {
     if (activeTab === "backups" && selectedIfsi) {
         const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
@@ -210,7 +219,7 @@ function MainApp() {
   }, [activeTab, selectedIfsi]);
 
   const handleRestoreBackup = async (backup) => {
-    if (window.confirm(`⚠️ Restaurer toute la base de données à l'état du ${new Date(backup.timestamp).toLocaleString()} ?`)) {
+    if (window.confirm(`⚠️ Restaurer toute la base de données à l'état du ${new Date(backup.timestamp).toLocaleString()} ?\nToutes les données récentes seront écrasées.`)) {
         await createManualBackup("Avant Restauration", campaigns); 
         const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
         await setDoc(doc(db, "qualiopi", docId), { campaigns: backup.campaigns, updatedAt: new Date().toISOString() }, { merge: true });
@@ -219,6 +228,7 @@ function MainApp() {
     }
   };
 
+  // ACTIONS DE SÉCURITÉ ET D'ACCÈS
   const handleSendResetEmail = async (userEmail) => {
     if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) {
       try { await sendPasswordResetEmail(auth, userEmail); alert(`✅ Email envoyé.`); } catch (error) { alert(error.message); }
@@ -228,14 +238,19 @@ function MainApp() {
   const handleResendVerification = async () => {
     try { await sendEmailVerification(auth.currentUser); setVerificationSent(true); } catch (e) { alert(e.message); }
   };
+  
+  const handleLogout = () => signOut(auth);
 
+  // DONNÉES MÉMORISÉES POUR L'AFFICHAGE
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
   const currentAuditDate = currentCampaign?.auditDate || "2026-10-15";
   const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
-  const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi), [teamUsers, selectedIfsi]);
+
+  // 👉 LE FAMEUX "GOD MODE" : on exclut le Superadmin de l'organigramme !
+  const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
   const allIfsiMembers = useMemo(() => [
     ...orgAccounts.map(u => ({ id: u.id, name: u.email.split('@')[0], roles: u.orgRoles || [], type: 'account', email: u.email })),
@@ -260,7 +275,7 @@ function MainApp() {
 
   const byPerson = useMemo(() => allIfsiMembers.map(m => ({ ...m, items: criteres.filter(c => c.responsables?.includes(m.name)) })).filter(p => p.items.length > 0 || p.roles.length > 0), [allIfsiMembers, criteres]);
 
-  // 👉 LE TRI DE L'EQUIPE RÉINTÉGRÉ !
+  // 👉 LE TRI DE L'ÉQUIPE (CORRIGÉ ET RÉINTÉGRÉ)
   const sortedTeamUsers = useMemo(() => {
     const filteredUsers = teamUsers.filter(u => {
       if (!teamSearchTerm) return true;
@@ -280,8 +295,19 @@ function MainApp() {
   }, [teamUsers, teamSearchTerm, teamSortConfig, ifsiList]);
 
   const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
-  const handleIfsiSwitch = async (e) => { if (e.target.value === "NEW") { const nom = prompt("Nom de l'établissement :"); if (nom?.trim()) { const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); setSelectedIfsi(id); } } else { setSelectedIfsi(e.target.value); } };
   
+  const handleIfsiSwitch = async (e) => { 
+    if (e.target.value === "NEW") { 
+      const nom = prompt("Nom de l'établissement :"); 
+      if (nom?.trim()) { 
+        const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); 
+        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); 
+        setSelectedIfsi(id); 
+      } 
+    } else { setSelectedIfsi(e.target.value); } 
+  };
+  
+  // DONNÉES TOUR DE CONTRÔLE
   const getIfsiGlobalStats = useCallback((id) => {
     const d = allQualiopiData[id === "demo_ifps_cham" ? "criteres" : id]?.campaigns?.at(-1)?.liste || [];
     const conforme = d.filter(c => c.statut === "conforme").length;
@@ -306,6 +332,7 @@ function MainApp() {
     return a.name.localeCompare(b.name);
   }), [tourData.active, tourSort]);
 
+  // FONCTIONS ORGANIGRAMME
   const getRoleColor = (roleName) => { 
     if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; 
     const idx = orgRoles.indexOf(roleName); 
@@ -313,8 +340,29 @@ function MainApp() {
   };
   const handleDragStartOrg = (e, type, id) => { e.dataTransfer.setData("type", type); e.dataTransfer.setData("id", id); };
   const handleDragOverOrg = (e) => { e.preventDefault(); };
-  const handleDropOrg = (e, targetRole) => { e.preventDefault(); const type = e.dataTransfer.getData("type"); const id = e.dataTransfer.getData("id"); if (type === "account") { const user = orgAccounts.find(u => u.id === id); const currentRoles = Array.isArray(user?.orgRoles) ? user.orgRoles : (user?.orgRole ? [user.orgRole] : []); if (!currentRoles.includes(targetRole)) setDoc(doc(db, "users", id), { orgRoles: [...currentRoles, targetRole], orgRole: "" }, { merge: true }); } else if (type === "manual") { const updatedManuals = manualUsers.map(u => { if (u.id === id) { const currentRoles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []); if (!currentRoles.includes(targetRole)) return { ...u, roles: [...currentRoles, targetRole], role: "" }; } return u; }); setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); } };
-  const removeRoleFromUser = (type, id, roleToRemove) => { if (type === "account") { const user = orgAccounts.find(u => u.id === id); const currentRoles = Array.isArray(user?.orgRoles) ? user.orgRoles : []; setDoc(doc(db, "users", id), { orgRoles: currentRoles.filter(r => r !== roleToRemove) }, { merge: true }); } else if (type === "manual") { const updatedManuals = manualUsers.map(u => { if (u.id === id) { const currentRoles = Array.isArray(u.roles) ? u.roles : []; return { ...u, roles: currentRoles.filter(r => r !== roleToRemove) }; } return u; }); setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); } };
+  const handleDropOrg = (e, targetRole) => { 
+    e.preventDefault(); const type = e.dataTransfer.getData("type"); const id = e.dataTransfer.getData("id"); 
+    if (type === "account") { 
+      const user = orgAccounts.find(u => u.id === id); const currentRoles = Array.isArray(user?.orgRoles) ? user.orgRoles : (user?.orgRole ? [user.orgRole] : []); 
+      if (!currentRoles.includes(targetRole)) setDoc(doc(db, "users", id), { orgRoles: [...currentRoles, targetRole], orgRole: "" }, { merge: true }); 
+    } else if (type === "manual") { 
+      const updatedManuals = manualUsers.map(u => { 
+        if (u.id === id) { const currentRoles = Array.isArray(u.roles) ? u.roles : (u.role ? [u.role] : []); if (!currentRoles.includes(targetRole)) return { ...u, roles: [...currentRoles, targetRole], role: "" }; } return u; 
+      }); 
+      setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); 
+    } 
+  };
+  const removeRoleFromUser = (type, id, roleToRemove) => { 
+    if (type === "account") { 
+      const user = orgAccounts.find(u => u.id === id); const currentRoles = Array.isArray(user?.orgRoles) ? user.orgRoles : []; 
+      setDoc(doc(db, "users", id), { orgRoles: currentRoles.filter(r => r !== roleToRemove) }, { merge: true }); 
+    } else if (type === "manual") { 
+      const updatedManuals = manualUsers.map(u => { 
+        if (u.id === id) { const currentRoles = Array.isArray(u.roles) ? u.roles : []; return { ...u, roles: currentRoles.filter(r => r !== roleToRemove) }; } return u; 
+      }); 
+      setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); 
+    } 
+  };
   const editOrgRole = async (oldRole) => { const newRole = prompt("Renommer la colonne :", oldRole); if (newRole && newRole.trim() !== "" && newRole !== oldRole) { const finalRole = newRole.trim(); if (orgRoles.includes(finalRole)) return alert("Ce rôle existe déjà."); const updatedRoles = orgRoles.map(r => r === oldRole ? finalRole : r); const updatedManuals = manualUsers.map(u => ({ ...u, roles: (Array.isArray(u.roles) ? u.roles : []).map(r => r === oldRole ? finalRole : r) })); for (const acc of orgAccounts) { const cRoles = Array.isArray(acc.orgRoles) ? acc.orgRoles : []; if (cRoles.includes(oldRole)) await setDoc(doc(db, "users", acc.id), { orgRoles: cRoles.map(r => r === oldRole ? finalRole : r) }, { merge: true }); } await setDoc(doc(db, "etablissements", selectedIfsi), { roles: updatedRoles, manualUsers: updatedManuals }, { merge: true }); } };
   const editManualUser = async (id, currentName) => { const newName = prompt("Modifier le nom de l'entité :", currentName); if (newName && newName.trim() !== "" && newName !== currentName) { const finalName = newName.trim(); const updatedManuals = manualUsers.map(u => u.id === id ? { ...u, name: finalName } : u); await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true }); if (campaigns && campaigns.length > 0) { const newCampaigns = campaigns.map(camp => { const newListe = camp.liste.map(c => { if (c.responsables && c.responsables.includes(currentName)) return { ...c, responsables: c.responsables.map(r => r === currentName ? finalName : r) }; return c; }); return { ...camp, liste: newListe }; }); saveData(newCampaigns); } } };
   const addOrgRole = () => { const r = newRoleInput.trim(); if (r && !orgRoles.includes(r)) { setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, r] }, { merge: true }); setNewRoleInput(""); } };
@@ -323,13 +371,11 @@ function MainApp() {
   const deleteManualUser = (idToDelete) => { if (window.confirm("Supprimer ce profil manuel ?")) setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true }); };
   const applyDefaultRoles = () => { if(window.confirm("Appliquer les colonnes par défaut ?")) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...new Set([...orgRoles, ...DEFAULT_ROLES])] }, { merge: true }); };
 
+  // FONCTIONS DE GESTION ADMINISTRATIVE
   const handleCreateUser = async () => { if (!newMember.email || !newMember.pwd) return alert("Requis."); if (newMember.pwd.length < 6) return alert("Mot de passe : 6 min."); setIsCreatingUser(true); try { const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd); const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi; await setDoc(doc(db, "users", userCredential.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true }); alert(`✅ Compte créé !`); setNewMember({ email: "", pwd: "", role: "user", ifsi: "" }); secondaryAuth.signOut(); } catch (error) { alert("Erreur : " + error.message); } setIsCreatingUser(false); };
   const handleDeleteUser = async (userId) => { if (!window.confirm(`Révoquer cet accès ?`)) return; try { await deleteDoc(doc(db, "users", userId)); } catch (e) { alert(e.message); } };
-  const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
-  const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
-  const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
-  const handleLogout = () => { signOut(auth); };
-
+  
+  // EXPORT / IMPORT EXCEL
   const exportToExcel = async () => {
     if (!criteres) return;
     if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
@@ -403,6 +449,7 @@ function MainApp() {
     e.target.value = null;
   };
 
+  // SAUVEGARDE DU MODAL
   const saveModal = (updated, action) => {
     if (isArchive) return setModalCritere(null);
     const oldCritere = criteres.find(c => c.id === updated.id) || updated; 
@@ -446,6 +493,8 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
+
+  // RENDERS
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
 
@@ -499,9 +548,6 @@ function MainApp() {
         @media (max-width: 1024px) { .responsive-grid-5 { grid-template-columns: 1fr 1fr; } .responsive-grid-2 { grid-template-columns: 1fr; } }
         .td-dash { transition: all 0.2s ease; border: 1px solid transparent; }
         .td-dash:hover { transform: translateY(-4px); box-shadow: 0 10px 20px -5px rgba(0,0,0,0.1) !important; border-color: #bfdbfe !important; }
-        .org-card { background: white; border: 1px solid #d1d5db; padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; cursor: grab; font-size: 13px; font-weight: 600; display: flex; flex-direction: column; gap: 6px; box-shadow: 0 1px 2px rgba(0,0,0,0.05); transition: all 0.2s; }
-        .org-card:hover { border-color: #9ca3af; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
-        .org-card:active { cursor: grabbing; opacity: 0.7; }
       `}</style>
 
       {importReport && (
@@ -536,6 +582,7 @@ function MainApp() {
         />
       )}
 
+      {/* NAVIGATION BAR */}
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", maxWidth: "1440px", margin: "0 auto", gap: "20px", flexWrap: "wrap" }}>
           
@@ -587,6 +634,7 @@ function MainApp() {
         </div>
       </div>
 
+      {/* CONTENU CENTRAL DE L'APPLICATION */}
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit Qualiopi" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={() => {}} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} />}
         
