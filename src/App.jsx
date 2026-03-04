@@ -10,7 +10,7 @@ import { CriteresTab, AxesTab, ResponsablesTab, LivreBlancTab } from "./componen
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -36,7 +36,6 @@ const today = new Date();
 const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
 const dayColor = d => { const daysLeft = days(d); if (isNaN(daysLeft)) return "#6b7280"; return daysLeft < 0 ? "#dc2626" : daysLeft < 30 ? "#d97706" : "#6b7280"; };
 
-// 👉 SOUS-COMPOSANT UI DE LA MACHINE A REMONTER LE TEMPS
 function BackupsTab({ backupsList, handleRestoreBackup }) {
   return (
       <div className="animate-fade-in" style={{ maxWidth: "800px", margin: "0 auto", marginTop: "20px" }}>
@@ -47,25 +46,19 @@ function BackupsTab({ backupsList, handleRestoreBackup }) {
           </div>
           
           {backupsList.length === 0 ? (
-              <div style={{ background: "white", padding: "40px", textAlign: "center", borderRadius: "14px", border: "1px dashed #cbd5e1", color: "#9ca3af", fontStyle: "italic" }}>
-                  Le coffre-fort est vide pour le moment.
-              </div>
+              <div style={{ background: "white", padding: "40px", textAlign: "center", borderRadius: "14px", border: "1px dashed #cbd5e1", color: "#9ca3af", fontStyle: "italic" }}>Le coffre-fort est vide pour le moment.</div>
           ) : (
               <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
                   {backupsList.map((b, idx) => (
                       <div key={b.id} className="td-dash" style={{ background: "white", border: "1px solid #e2e8f0", borderRadius: "12px", padding: "16px 20px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                           <div style={{ display: "flex", gap: "16px", alignItems: "center" }}>
-                              <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: idx === 0 ? "#eff6ff" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>
-                                {b.type.includes("Import") ? "📥" : "💾"}
-                              </div>
+                              <div style={{ width: "40px", height: "40px", borderRadius: "50%", background: idx === 0 ? "#eff6ff" : "#f1f5f9", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px" }}>{b.type.includes("Import") ? "📥" : "💾"}</div>
                               <div>
                                   <div style={{ fontSize: "15px", fontWeight: "800", color: "#1e3a5f" }}>{b.type}</div>
                                   <div style={{ fontSize: "13px", color: "#64748b", marginTop: "4px" }}>Enregistré le {new Date(b.timestamp).toLocaleString("fr-FR", { weekday: 'long', day: 'numeric', month: 'long', hour: '2-digit', minute:'2-digit' })}</div>
                               </div>
                           </div>
-                          <button onClick={() => handleRestoreBackup(b)} style={{ background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", padding: "8px 16px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "flex", gap: "8px", alignItems: "center", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background="#fee2e2"} onMouseOut={e=>e.currentTarget.style.background="#fef2f2"}>
-                              <span>⏪</span> Restaurer
-                          </button>
+                          <button onClick={() => handleRestoreBackup(b)} style={{ background: "#fef2f2", color: "#ef4444", border: "1px solid #fca5a5", padding: "8px 16px", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", display: "flex", gap: "8px", alignItems: "center", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background="#fee2e2"} onMouseOut={e=>e.currentTarget.style.background="#fef2f2"}><span>⏪</span> Restaurer</button>
                       </div>
                   ))}
               </div>
@@ -99,12 +92,9 @@ function MainApp() {
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
-  
   const [importReport, setImportReport] = useState(null);
-  
-  // 👉 NOUVEAUX ETATS POUR LES BACKUPS
   const [backupsList, setBackupsList] = useState([]);
-  const dailyBackupDone = useRef(null); // Pour ne déclencher le backup quotidien qu'une seule fois
+  const dailyBackupDone = useRef(null); 
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
@@ -119,6 +109,9 @@ function MainApp() {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
         setIsLoggedIn(true);
+        // 👉 CORRECTION : Forcer l'onglet Dashboard à chaque nouvelle connexion
+        setActiveTab("dashboard"); 
+        
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
           const profile = userSnap.data();
@@ -172,81 +165,48 @@ function MainApp() {
     await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
   };
 
-  // 👉 LA LOGIQUE DE LA MACHINE À REMONTER LE TEMPS
-  
-  // 1. Le Créateur de Backup Manuel
   const createManualBackup = async (label, dataToBackup) => {
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     const backupId = `${docId}_manual_${Date.now()}`;
-    await setDoc(doc(db, "backups", backupId), {
-        ifsiId: docId,
-        timestamp: Date.now(),
-        date: new Date().toISOString(),
-        type: label,
-        campaigns: dataToBackup
-    });
+    await setDoc(doc(db, "backups", backupId), { ifsiId: docId, timestamp: Date.now(), date: new Date().toISOString(), type: label, campaigns: dataToBackup });
   };
 
-  // 2. Le Fantôme Quotidien
   useEffect(() => {
     if (!campaigns || !selectedIfsi || campaigns.length === 0) return;
-    if (dailyBackupDone.current === selectedIfsi) return; // Déjà vérifié pour cette session
+    if (dailyBackupDone.current === selectedIfsi) return; 
     dailyBackupDone.current = selectedIfsi;
-    
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     const todayStr = new Date().toISOString().split('T')[0];
     const todayBackupId = `${docId}_daily_${todayStr}`;
-    
     getDoc(doc(db, "backups", todayBackupId)).then(snap => {
-        if (!snap.exists()) {
-            setDoc(doc(db, "backups", todayBackupId), {
-                ifsiId: docId,
-                timestamp: Date.now(),
-                date: new Date().toISOString(),
-                type: "Sauvegarde Quotidienne",
-                campaigns: campaigns
-            }).catch(e => console.log("Sauvegarde fantôme ignorée", e));
-        }
+        if (!snap.exists()) { setDoc(doc(db, "backups", todayBackupId), { ifsiId: docId, timestamp: Date.now(), date: new Date().toISOString(), type: "Sauvegarde Quotidienne", campaigns: campaigns }).catch(e => console.log("Sauvegarde fantôme ignorée", e)); }
     });
   }, [selectedIfsi, campaigns]);
 
-  // 3. Le Lecteur de Coffre-Fort (et le Balayeur 10 jours)
   useEffect(() => {
     if (activeTab === "backups" && selectedIfsi) {
         const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
         const unsub = onSnapshot(collection(db, "backups"), (snap) => {
-            const list = [];
-            const now = Date.now();
-            const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000; // 10 jours en millisecondes
-            
+            const list = []; const now = Date.now(); const tenDaysAgo = now - 10 * 24 * 60 * 60 * 1000; 
             snap.forEach(docSnap => {
                 const d = docSnap.data();
-                if (d.ifsiId === docId) {
-                    if (d.timestamp < tenDaysAgo) {
-                        deleteDoc(docSnap.ref); // Le balayeur détruit l'archive silencieusement
-                    } else {
-                        list.push({ id: docSnap.id, ...d });
-                    }
-                }
+                if (d.ifsiId === docId) { if (d.timestamp < tenDaysAgo) { deleteDoc(docSnap.ref); } else { list.push({ id: docSnap.id, ...d }); } }
             });
-            setBackupsList(list.sort((a,b) => b.timestamp - a.timestamp)); // Du plus récent au plus vieux
+            setBackupsList(list.sort((a,b) => b.timestamp - a.timestamp)); 
         });
         return () => unsub();
     }
   }, [activeTab, selectedIfsi]);
 
-  // 4. L'Action de Restauration
   const handleRestoreBackup = async (backup) => {
     if (window.confirm(`⚠️ ATTENTION ⚠️\n\nVous allez restaurer toute la base de données à l'état précis du :\n${new Date(backup.timestamp).toLocaleString()}\n\nToutes les modifications (textes, statuts, agents) faites depuis cette date seront écrasées et PERDUES.\n\nÊtes-vous absolument sûr ?`)) {
-        await createManualBackup("Avant Restauration", campaigns); // Sécurité Inception !
+        await createManualBackup("Avant Restauration", campaigns); 
         const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
         await setDoc(doc(db, "qualiopi", docId), { campaigns: backup.campaigns, updatedAt: new Date().toISOString() }, { merge: true });
         alert("✅ Restauration réussie ! L'application est revenue dans le passé.");
         setActiveTab("dashboard");
     }
   };
-
-  // --- FIN MACHINE A REMONTER LE TEMPS ---
 
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
@@ -351,6 +311,18 @@ function MainApp() {
   const handleDeleteCampaign = () => { if (campaigns.length <= 1) return alert("Impossible de supprimer la dernière."); if (window.confirm(`Supprimer cette évaluation ? IRRÉVERSIBLE.`)) { const u = campaigns.filter(c => c.id !== activeCampaignId); saveData(u); setActiveCampaignId(u[u.length - 1].id); } };
   const handleLogout = () => { signOut(auth); };
 
+  // 👉 FONCTION POUR FORCER L'ENVOI D'EMAIL DE RESET (SUPERADMIN)
+  const handleSendResetEmail = async (userEmail) => {
+    if (window.confirm(`Envoyer un email de réinitialisation de mot de passe à ${userEmail} ?`)) {
+      try {
+        await sendPasswordResetEmail(auth, userEmail);
+        alert(`✅ Email envoyé avec succès à ${userEmail}`);
+      } catch (error) {
+        alert("Erreur : " + error.message);
+      }
+    }
+  };
+
   const saveModal = (updated, action) => {
     try {
       if (isArchive) {
@@ -417,14 +389,14 @@ function MainApp() {
     if (!file) return;
 
     if (file.name.toLowerCase().endsWith('.csv')) {
-      setImportReport({ type: "warning", title: "Format inadapté", msg: "L'application attend un fichier Excel (.xlsx) et non un fichier CSV.", details: "" });
+      setImportReport({ type: "warning", title: "Format inadapté", msg: "L'application attend un fichier Excel (.xlsx) et non un fichier CSV. Veuillez ouvrir votre fichier et l'enregistrer au format Excel.", details: "" });
       return e.target.value = null;
     }
     if (typeof window.ExcelJS === "undefined") {
-      setImportReport({ type: "error", title: "Erreur Système", msg: "Moteur Excel non chargé.", details: "" });
+      setImportReport({ type: "error", title: "Erreur Système", msg: "Le moteur de lecture Excel n'est pas encore chargé.", details: "" });
       return e.target.value = null;
     }
-    if (!window.confirm("⚠️ L'import écrasera les données actuelles de cet établissement. Continuer ?")) {
+    if (!window.confirm("⚠️ L'import écrasera les données actuelles de cet établissement par celles du fichier. Continuer ?")) {
       return e.target.value = null;
     }
 
@@ -433,9 +405,8 @@ function MainApp() {
       const workbook = new window.ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
       const worksheet = workbook.worksheets[0];
-      if (!worksheet) throw new Error("Aucun onglet trouvé.");
+      if (!worksheet) throw new Error("Aucun onglet trouvé dans le fichier.");
 
-      // 🛑 SAUVEGARDE PARACHUTE AVANT IMPORT
       await createManualBackup("Avant Import Excel", campaigns);
 
       let updatedCriteres = [...criteres];
@@ -454,7 +425,6 @@ function MainApp() {
       };
 
       const normalize = str => str ? str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim() : "";
-
       const tagImport = (oldVal, newVal) => {
         const o = String(oldVal || "").trim(); const n = String(newVal || "").trim();
         if (!n || o === n) return o;
@@ -503,7 +473,6 @@ function MainApp() {
           };
 
           Object.keys(newCritere).forEach(key => { if (newCritere[key] === undefined) newCritere[key] = ""; });
-
           newCritere.historique = [...(newCritere.historique || []), { date: new Date().toISOString(), user: "Système d'Import", msg: "📥 Données synchronisées depuis un fichier Excel" }];
 
           updatedCriteres[index] = newCritere;
@@ -533,6 +502,21 @@ function MainApp() {
   if (!isLoggedIn) return <LoginPage />;
 
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
+
+  // 👉 ÉCRAN DE BLOCAGE : OBLIGATION DE CHANGER LE MOT DE PASSE (Pour les nouveaux comptes)
+  if (userProfile?.mustChangePassword) {
+    return (
+      <div style={{ minHeight: "100vh", background: "#f8fafc", padding: "20px", display: "flex", justifyContent: "center", alignItems: "center", fontFamily: "Outfit, sans-serif" }}>
+        <div className="animate-fade-in" style={{ background: "white", padding: "40px", borderRadius: "16px", boxShadow: "0 10px 25px rgba(0,0,0,0.1)", maxWidth: "500px", width: "100%" }}>
+           <div style={{ textAlign: "center", fontSize: "40px", marginBottom: "10px" }}>🔒</div>
+           <h2 style={{ color: "#ef4444", textAlign: "center", margin: "0 0 10px 0" }}>Sécurité du compte</h2>
+           <p style={{ textAlign: "center", color: "#64748b", marginBottom: "30px", fontSize: "14px", lineHeight: "1.5" }}>C'est votre première connexion. Pour protéger l'accès aux données de l'IFSI, vous devez impérativement créer votre propre mot de passe.</p>
+           <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={(e) => handleChangePassword(e, true)} />
+           <button onClick={handleLogout} style={{ marginTop: "20px", width: "100%", padding: "12px", background: "#f1f5f9", color: "#475569", border: "none", borderRadius: "8px", cursor: "pointer", fontWeight: "bold" }}>Se déconnecter</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ minHeight: "100vh", background: "#f8fafc", fontFamily: "Outfit,sans-serif", color: "#1e3a5f" }}>
@@ -601,10 +585,18 @@ function MainApp() {
               </div>
               <span style={{ fontSize: "18px", fontWeight: "800", color: "#1e3a5f" }}>QualiForma</span>
             </div>
-            <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db", fontWeight: "800", color: "#1d4ed8" }}>
-              {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-              {userProfile?.role === "superadmin" && <option value="NEW">+ Nouvel établissement</option>}
-            </select>
+            
+            {/* 👉 CADENAS SUR LE SÉLECTEUR D'IFSI */}
+            {userProfile?.role === "superadmin" ? (
+              <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ padding: "6px", borderRadius: "6px", border: "1px solid #d1d5db", fontWeight: "800", color: "#1d4ed8" }}>
+                {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+                <option value="NEW">+ Nouvel établissement</option>
+              </select>
+            ) : (
+              <div style={{ padding: "6px 12px", borderRadius: "6px", background: "#eff6ff", border: "1px solid #bfdbfe", fontWeight: "800", color: "#1d4ed8", fontSize: "14px" }}>
+                {currentIfsiName}
+              </div>
+            )}
           </div>
 
           <div className="nav-center">
@@ -619,7 +611,6 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {/* 👉 LE BOUTON D'ACCÈS AU COFFRE-FORT (SUPERADMIN UNIQUEMENT) */}
             {userProfile?.role === "superadmin" && <button onClick={() => setActiveTab("backups")} style={{ ...navBtn(activeTab === "backups"), color: "#1e3a5f", background: activeTab === "backups" ? "#e0e7ff" : "transparent", display: "flex", gap: "6px", padding: "6px 12px" }}><span>⏳</span> Backups</button>}
 
             {userProfile?.role === "superadmin" && !isArchive && (
@@ -640,14 +631,16 @@ function MainApp() {
       {/* CONTENU */}
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         {activeTab === "backups" && <BackupsTab backupsList={backupsList} handleRestoreBackup={handleRestoreBackup} />}
-        {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit Qualiopi" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={handleEditAuditDate} stats={stats} urgents={urgents} criteres={criteres} />}
+        {/* 👉 On passe userProfile à DashboardTab */}
+        {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit Qualiopi" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={handleEditAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} />}
         {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={totalUsersInNetwork} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} today={today} handleRenameIfsi={handleRenameIfsi} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} totalAlertsCount={tourData.alerts.length} />}
         {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleDragOverOrg={handleDragOverOrg} handleDropOrg={handleDropOrg} handleDragStartOrg={handleDragStartOrg} removeRoleFromUser={removeRoleFromUser} editOrgRole={editOrgRole} editManualUser={editManualUser} deleteManualUser={deleteManualUser} addManualUser={addManualUser} addOrgRole={addOrgRole} newManualUserInput={newManualUserInput} setNewManualUserInput={setNewManualUserInput} newRoleInput={newRoleInput} setNewRoleInput={setNewRoleInput} deleteOrgRole={deleteOrgRole} applyDefaultRoles={applyDefaultRoles} />}
         {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} />}
         {activeTab === "axes" && <AxesTab axes={axes} days={days} today={today} dayColor={dayColor} setModalCritere={setModalCritere} isArchive={isArchive} isAuditMode={isAuditMode} />}
         {activeTab === "responsables" && <ResponsablesTab byPerson={byPerson} setModalCritere={setModalCritere} isArchive={isArchive} getRoleColor={getRoleColor} />}
         {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} currentCampaign={currentCampaign} criteres={criteres} />}
-        {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} />}
+        {/* 👉 On passe handleSendResetEmail à EquipeTab */}
+        {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} auth={auth} handleSendResetEmail={handleSendResetEmail} />}
         {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={handleChangePassword} />}
       </div>
     </div>
