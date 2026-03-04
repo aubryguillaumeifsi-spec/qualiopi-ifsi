@@ -292,7 +292,7 @@ function MainApp() {
     const buffer = await workbook.xlsx.writeBuffer(); const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }); const url = URL.createObjectURL(blob); const safeName = currentCampaign.name.replace(/[^a-z0-9]/gi, '_').toLowerCase(); const link = document.createElement("a"); link.href = url; link.setAttribute("download", `QualiForma_Export_${safeName}_${new Date().toISOString().split('T')[0]}.xlsx`); document.body.appendChild(link); link.click(); document.body.removeChild(link);
   };
 
-  // 👉 LA FONCTION BLINDÉE POUR L'IMPORT
+  // 👉 LA FONCTION MAGIQUE ET ULTRA-ROBUSTE D'IMPORTATION
   const handleImportExcel = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -308,27 +308,48 @@ function MainApp() {
       const workbook = new window.ExcelJS.Workbook();
       await workbook.xlsx.load(arrayBuffer);
       const worksheet = workbook.worksheets[0];
+      
+      if (!worksheet) throw new Error("Aucun onglet lisible n'a été trouvé dans le fichier.");
 
       let updatedCriteres = [...criteres];
       let count = 0;
 
-      worksheet.eachRow((row, rowNumber) => {
-        if (rowNumber === 1) return; 
-        
-        let numCell = row.getCell(1).text || row.getCell(1).value;
-        if (!numCell) return;
-        numCell = String(numCell).trim();
+      // Extracteur sécurisé (Gère le format texte enrichi ou brut d'Excel)
+      const getCellText = (cell) => {
+        if (!cell) return "";
+        if (cell.text) return String(cell.text);
+        if (cell.value) {
+          if (typeof cell.value === "object" && cell.value.richText) return cell.value.richText.map(t => t.text).join("");
+          return String(cell.value);
+        }
+        return "";
+      };
 
-        const index = updatedCriteres.findIndex(c => String(c.num) === numCell);
+      // Normalisateur (Enlève les accents pour la comparaison de statut)
+      const normalize = str => str.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber === 1) return; // Ignore l'en-tête
+        
+        let numRaw = getCellText(row.getCell(1)).trim();
+        if (!numRaw) return;
+        
+        // Si le tableur a écrit "Indicateur 1", on ne récupère que le chiffre "1"
+        const numMatch = numRaw.match(/\d+/);
+        const numClean = numMatch ? numMatch[0] : numRaw;
+
+        // On cherche le bon indicateur dans notre base
+        const index = updatedCriteres.findIndex(c => String(c.num) === numClean || String(c.num) === numRaw);
+        
         if (index !== -1) {
-          const statutText = String(row.getCell(4).text || row.getCell(4).value || "").trim();
+          const statutText = getCellText(row.getCell(4)).trim();
           let statutKey = updatedCriteres[index].statut;
           if (statutText) {
-            const foundStatut = Object.entries(STATUT_CONFIG).find(([k,v]) => v.label.toLowerCase() === statutText.toLowerCase());
+            const foundStatut = Object.entries(STATUT_CONFIG).find(([k,v]) => normalize(v.label) === normalize(statutText));
             if (foundStatut) statutKey = foundStatut[0];
           }
 
-          const respText = String(row.getCell(6).text || row.getCell(6).value || "");
+          const respText = getCellText(row.getCell(6));
           let responsables = updatedCriteres[index].responsables || [];
           if (respText) responsables = respText.split(',').map(s => s.trim()).filter(s => s);
 
@@ -336,23 +357,27 @@ function MainApp() {
             ...updatedCriteres[index],
             statut: statutKey,
             responsables: responsables,
-            preuves: String(row.getCell(7).text || row.getCell(7).value || "") || updatedCriteres[index].preuves,
-            preuves_encours: String(row.getCell(8).text || row.getCell(8).value || "") || updatedCriteres[index].preuves_encours,
-            attendus: String(row.getCell(9).text || row.getCell(9).value || "") || updatedCriteres[index].attendus,
-            notes: String(row.getCell(10).text || row.getCell(10).value || "") || updatedCriteres[index].notes,
+            preuves: getCellText(row.getCell(7)) || updatedCriteres[index].preuves,
+            preuves_encours: getCellText(row.getCell(8)) || updatedCriteres[index].preuves_encours,
+            attendus: getCellText(row.getCell(9)) || updatedCriteres[index].attendus,
+            notes: getCellText(row.getCell(10)) || updatedCriteres[index].notes,
           };
           count++;
         }
       });
 
-      const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: updatedCriteres } : camp);
-      await saveData(newCampaigns);
-      alert(`✅ Import réussi ! ${count} indicateurs ont été mis à jour.`);
+      if (count === 0) {
+        alert("⚠️ Fichier lu, mais aucun numéro d'indicateur n'a pu être identifié. Assurez-vous d'importer un fichier généré via le bouton 'Excel'.");
+      } else {
+        const newCampaigns = campaigns.map(camp => camp.id === activeCampaignId ? { ...camp, liste: updatedCriteres } : camp);
+        await saveData(newCampaigns);
+        alert(`✅ Import réussi ! ${count} indicateurs ont été mis à jour avec succès.`);
+      }
     } catch (error) {
-      console.error("Erreur lors de l'import :", error);
-      alert("❌ Échec de l'importation :\n" + error.message + "\n\nAstuce : Assurez-vous que le fichier Excel n'est pas actuellement ouvert dans Microsoft Excel.");
+      console.error(error);
+      alert("❌ Échec de la lecture du fichier.\nMessage : " + error.message);
     }
-    e.target.value = null;
+    e.target.value = null; // Réinitialise le bouton
   };
 
   const navBtn = active => ({ padding: "8px 16px", borderRadius: "8px", border: "none", cursor: "pointer", fontSize: "13px", fontWeight: "600", background: active ? "linear-gradient(135deg,#1d4ed8,#3b82f6)" : "transparent", color: active ? "white" : "#4b5563", whiteSpace: "nowrap", transition: "all 0.2s" });
@@ -431,8 +456,8 @@ function MainApp() {
           </div>
 
           <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
-            {/* 👉 BOUTON IMPORT EXCEL RÉSERVÉ AU SUPERADMIN */}
-            {userProfile?.role === "superadmin" && !isArchive && (
+            {/* 👉 BOUTON IMPORT EXCEL RÉSERVÉ AU SUPERADMIN ET ADMIN */}
+            {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && !isArchive && (
               <>
                 <input type="file" id="import-excel" accept=".xlsx" style={{ display: 'none' }} onChange={handleImportExcel} />
                 <label htmlFor="import-excel" className="hide-mobile" style={{ ...navBtn(false), color: "#059669", background: "white", fontSize: "12px", border: "1px solid #d1d5db", display: "flex", gap: "6px", padding: "6px 12px", cursor: "pointer", margin: 0 }}>
