@@ -93,7 +93,6 @@ function MainApp() {
   const dailyBackupDone = useRef(null); 
   const [verificationSent, setVerificationSent] = useState(false);
 
-  // LA FONCTION DE STYLE DES BOUTONS DE NAV
   const navBtn = (active) => ({
     padding: "8px 16px",
     borderRadius: "8px",
@@ -107,7 +106,6 @@ function MainApp() {
     transition: "all 0.2s"
   });
 
-  // RÉCUPÉRATION DES IFSI
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = []; snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
@@ -116,7 +114,6 @@ function MainApp() {
     return () => unsub();
   }, []);
 
-  // GESTION DE L'AUTHENTIFICATION
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (user) => {
       if (user) {
@@ -145,7 +142,6 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
-  // RÉCUPÉRATION DE L'ÉQUIPE (USERS)
   useEffect(() => {
     let unsub = null;
     if (selectedIfsi && userProfile && userProfile.role !== "guest") {
@@ -157,7 +153,6 @@ function MainApp() {
     return () => unsub && unsub();
   }, [selectedIfsi, userProfile]);
 
-  // RÉCUPÉRATION DES DONNÉES QUALIOPI DE L'IFSI SÉLECTIONNÉ
   useEffect(() => {
     if (!selectedIfsi || !userProfile || userProfile.mustChangePassword || !auth.currentUser?.emailVerified) return;
     setCampaigns(null);
@@ -176,20 +171,17 @@ function MainApp() {
     return () => { unsub(); unsubIfsi(); };
   }, [selectedIfsi, userProfile]);
 
-  // FONCTION DE SAUVEGARDE GLOBALE
   const saveData = async (newCampaigns) => {
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
   };
 
-  // SYSTÈME DE BACKUP MANUEL
   const createManualBackup = async (label, dataToBackup) => {
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     const backupId = `${docId}_manual_${Date.now()}`;
     await setDoc(doc(db, "backups", backupId), { ifsiId: docId, timestamp: Date.now(), date: new Date().toISOString(), type: label, campaigns: dataToBackup });
   };
 
-  // SYSTÈME DE BACKUP QUOTIDIEN AUTOMATIQUE
   useEffect(() => {
     if (!campaigns || !selectedIfsi || campaigns.length === 0) return;
     if (dailyBackupDone.current === selectedIfsi) return; 
@@ -202,7 +194,6 @@ function MainApp() {
     });
   }, [selectedIfsi, campaigns]);
 
-  // RÉCUPÉRATION ET NETTOYAGE DES BACKUPS (Garde uniquement 10 jours)
   useEffect(() => {
     if (activeTab === "backups" && selectedIfsi) {
         const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
@@ -228,7 +219,6 @@ function MainApp() {
     }
   };
 
-  // ACTIONS DE SÉCURITÉ ET D'ACCÈS
   const handleSendResetEmail = async (userEmail) => {
     if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) {
       try { await sendPasswordResetEmail(auth, userEmail); alert(`✅ Email envoyé.`); } catch (error) { alert(error.message); }
@@ -241,7 +231,6 @@ function MainApp() {
   
   const handleLogout = () => signOut(auth);
 
-  // DONNÉES MÉMORISÉES POUR L'AFFICHAGE
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
@@ -249,7 +238,6 @@ function MainApp() {
   const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
 
-  // 👉 LE FAMEUX "GOD MODE" : on exclut le Superadmin de l'organigramme !
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
   const allIfsiMembers = useMemo(() => [
@@ -275,7 +263,6 @@ function MainApp() {
 
   const byPerson = useMemo(() => allIfsiMembers.map(m => ({ ...m, items: criteres.filter(c => c.responsables?.includes(m.name)) })).filter(p => p.items.length > 0 || p.roles.length > 0), [allIfsiMembers, criteres]);
 
-  // 👉 LE TRI DE L'ÉQUIPE (CORRIGÉ ET RÉINTÉGRÉ)
   const sortedTeamUsers = useMemo(() => {
     const filteredUsers = teamUsers.filter(u => {
       if (!teamSearchTerm) return true;
@@ -307,7 +294,6 @@ function MainApp() {
     } else { setSelectedIfsi(e.target.value); } 
   };
   
-  // DONNÉES TOUR DE CONTRÔLE
   const getIfsiGlobalStats = useCallback((id) => {
     const d = allQualiopiData[id === "demo_ifps_cham" ? "criteres" : id]?.campaigns?.at(-1)?.liste || [];
     const conforme = d.filter(c => c.statut === "conforme").length;
@@ -332,12 +318,30 @@ function MainApp() {
     return a.name.localeCompare(b.name);
   }), [tourData.active, tourSort]);
 
-  // FONCTIONS ORGANIGRAMME
+  // 👉 LES TROIS FONCTIONS DE LA TOUR DE CONTRÔLE RÉINTÉGRÉES ICI !
+  const handleRenameIfsi = async (id, currentName) => { 
+    const n = prompt("Nouveau nom :", currentName); 
+    if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); 
+  };
+  
+  const handleArchiveIfsi = async (id, name, status) => { 
+    if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); 
+  };
+  
+  const handleHardDeleteIfsi = async (id, name) => { 
+    if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { 
+      await deleteDoc(doc(db, "etablissements", id)); 
+      await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); 
+      if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); 
+    } 
+  };
+
   const getRoleColor = (roleName) => { 
     if (roleName === "Direction") return { bg: "#1e3a5f", border: "#0f172a", text: "#ffffff" }; 
     const idx = orgRoles.indexOf(roleName); 
     return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[7]; 
   };
+  
   const handleDragStartOrg = (e, type, id) => { e.dataTransfer.setData("type", type); e.dataTransfer.setData("id", id); };
   const handleDragOverOrg = (e) => { e.preventDefault(); };
   const handleDropOrg = (e, targetRole) => { 
@@ -371,11 +375,9 @@ function MainApp() {
   const deleteManualUser = (idToDelete) => { if (window.confirm("Supprimer ce profil manuel ?")) setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: manualUsers.filter(u => u.id !== idToDelete) }, { merge: true }); };
   const applyDefaultRoles = () => { if(window.confirm("Appliquer les colonnes par défaut ?")) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...new Set([...orgRoles, ...DEFAULT_ROLES])] }, { merge: true }); };
 
-  // FONCTIONS DE GESTION ADMINISTRATIVE
   const handleCreateUser = async () => { if (!newMember.email || !newMember.pwd) return alert("Requis."); if (newMember.pwd.length < 6) return alert("Mot de passe : 6 min."); setIsCreatingUser(true); try { const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd); const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi; await setDoc(doc(db, "users", userCredential.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true }); alert(`✅ Compte créé !`); setNewMember({ email: "", pwd: "", role: "user", ifsi: "" }); secondaryAuth.signOut(); } catch (error) { alert("Erreur : " + error.message); } setIsCreatingUser(false); };
   const handleDeleteUser = async (userId) => { if (!window.confirm(`Révoquer cet accès ?`)) return; try { await deleteDoc(doc(db, "users", userId)); } catch (e) { alert(e.message); } };
   
-  // EXPORT / IMPORT EXCEL
   const exportToExcel = async () => {
     if (!criteres) return;
     if (typeof window.ExcelJS === "undefined") { alert("Le moteur Excel est en cours de chargement."); return; }
@@ -449,7 +451,6 @@ function MainApp() {
     e.target.value = null;
   };
 
-  // SAUVEGARDE DU MODAL
   const saveModal = (updated, action) => {
     if (isArchive) return setModalCritere(null);
     const oldCritere = criteres.find(c => c.id === updated.id) || updated; 
@@ -494,7 +495,6 @@ function MainApp() {
   };
 
 
-  // RENDERS
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
 
@@ -582,7 +582,6 @@ function MainApp() {
         />
       )}
 
-      {/* NAVIGATION BAR */}
       <div className="no-print" style={{ background: "white", borderBottom: "1px solid #e2e8f0", padding: "0 32px", boxShadow: "0 1px 8px rgba(0,0,0,0.05)" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 0", maxWidth: "1440px", margin: "0 auto", gap: "20px", flexWrap: "wrap" }}>
           
@@ -634,7 +633,6 @@ function MainApp() {
         </div>
       </div>
 
-      {/* CONTENU CENTRAL DE L'APPLICATION */}
       <div className="animate-fade-in" style={{ maxWidth: "1440px", margin: "0 auto", padding: "28px 32px" }}>
         {activeTab === "dashboard" && campaigns && <DashboardTab bannerConfig={{ bg: "#eff6ff", border: "#bfdbfe", color: "#1d4ed8", icon: "🗓️", text: "Audit Qualiopi" }} currentAuditDate={currentAuditDate} isArchive={isArchive} handleEditAuditDate={() => {}} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} />}
         
