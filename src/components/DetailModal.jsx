@@ -152,6 +152,9 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
   };
 
   async function handleAnalyze(file) {
+    // 👉 ALERTE RGPD BLOQUANTE AVANT LE SCAN
+    if (!window.confirm("⚠️ ALERTE RGPD - CONFIDENTIALITÉ DES DONNÉES\n\nAvant de transmettre ce document à l'Intelligence Artificielle, veuillez confirmer qu'il ne contient AUCUNE donnée personnelle, médicale ou sensible (noms de patients, numéros de sécurité sociale, etc.).\n\nAvez-vous bien anonymisé ou biffé les informations sensibles ?")) return;
+
     if (!file.url) return;
     setIsAnalyzing(true); setAiReport("");
     try {
@@ -167,7 +170,7 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
          const genAI = new GoogleGenerativeAI(apiKey);
          const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
          
-         // 👉 LE NOUVEAU PROMPT INTRANSIGEANT EST LÀ :
+         // 👉 PROMPT IA INTRANSIGEANT ET STRICT
          const prompt = `CRITIQUE : Avant toute analyse, tu dois vérifier que le document fourni a un lien DIRECT et ÉVIDENT avec la formation professionnelle et le référentiel Qualiopi. Si le document n'a rien à voir (ex: politique, élection, recette de cuisine, publicité), TU DOIS REFUSER L'ANALYSE et répondre UNIQUEMENT : '❌ Document non pertinent : Ce document ne semble avoir aucun lien avec la formation professionnelle ou les exigences de cet indicateur Qualiopi.'
 
 Tu es un Auditeur Qualiopi expert et strict. Analyse ce document pour le critère ${data.num} : "${data.titre}".
