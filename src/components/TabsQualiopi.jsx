@@ -25,7 +25,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         .fil:hover { border-color:${t.accent}!important; background:${t.accentBg}!important; color:${t.accent}!important; }
       `}</style>
 
-      {/* ── 4 CARTES KPI (Aplaties, sans bulles) ── */}
+      {/* ── 4 CARTES KPI (Tassées, sans bulles) ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"12px" }}>
         {[
           { id:"conforme",     l:"Conformes",     v:statsCounts["conforme"],     c:t.green, bg:t.greenBg, bd:t.greenBd },
@@ -35,7 +35,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         ].map(s => {
           const isActive = filterStatut === s.id;
           return (
-            <div key={s.id} onClick={() => setFilterStatut(isActive ? "tous" : s.id)} className="stat-card" style={{ background: isActive ? s.bg : t.surface, borderColor: isActive ? s.bd : t.border, borderRadius:"10px", padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow: isActive ? t.shadowMd : t.shadowSm }}>
+            <div key={s.id} onClick={() => setFilterStatut(isActive ? "tous" : s.id)} className="stat-card" style={{ background: isActive ? s.bg : t.surface, borderColor: isActive ? s.bd : t.border, borderRadius:"10px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow: isActive ? t.shadowMd : t.shadowSm }}>
               <div>
                 <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"38px", color:t.text, lineHeight:1, letterSpacing:"-1px" }}>{s.v}</div>
                 <div style={{ fontSize:"12px", color:t.text2, fontWeight:"600", marginTop:"4px" }}>{s.l}</div>
@@ -48,10 +48,11 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         })}
       </div>
 
-      {/* ── BARRE DE RECHERCHE ET FILTRES ── */}
+      {/* ── BARRE DE RECHERCHE ET FILTRES (Taille ajustée) ── */}
       <div style={{ display:"flex", gap:"16px", alignItems:"center", flexWrap:"wrap" }}>
-        {/* Barre de recherche fixée pour éviter de chevaucher */}
-        <div style={{ position:"relative", flex:"1 1 250px", maxWidth:"350px" }}>
+        
+        {/* Barre de recherche fixée à max 300px pour éviter de chevaucher */}
+        <div style={{ position:"relative", width:"100%", maxWidth:"300px" }}>
           <span style={{ position:"absolute", left:"12px", top:"50%", transform:"translateY(-50%)", fontSize:"12px", color:t.text3 }}>🔍</span>
           <input 
             type="text" placeholder="Rechercher par N°, libellé..." 
@@ -83,7 +84,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"11px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── VUE TABLEAU (Compacte, 1 ligne, Typo Dashboard) ── */}
+      {/* ── VUE TABLEAU (Compacte, 1 ligne) ── */}
       {vue === "table" && (
         <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"visible", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           <div style={{ display:"grid", gridTemplateColumns:"70px minmax(0, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
@@ -107,12 +108,10 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                  return (
                    <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"70px minmax(0, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
                       
-                      {/* Numéro avec police Instrument Serif */}
                       <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:cConf.color, whiteSpace:"nowrap" }}>
                         Ind. {c.num.replace('C', '')}
                       </div>
 
-                      {/* Libellé sécurisé sur 1 ligne */}
                       <div style={{ minWidth: 0 }}>
                         <div style={{ fontSize:"12px", color:t.text, paddingRight:"16px", fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                           {c.titre}
@@ -124,9 +123,11 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                           {labelStatut}
                         </span>
                       </div>
+                      
                       <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                         {c.responsables?.[0] || "—"}
                       </span>
+                      
                       <span style={{ fontSize:"11px", fontWeight:"normal", color: d < 0 && c.statut !== "conforme" && c.statut !== "non-concerne" ? t.red : t.text3, fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
                         {c.delai ? new Date(c.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}
                       </span>
@@ -138,7 +139,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         </div>
       )}
 
-      {/* ── VUE VIGNETTES (IMAGE 2168e5) ── */}
+      {/* ── VUE VIGNETTES ── */}
       {vue === "cards" && (
         <div style={{ display:"flex", flexDirection:"column", gap:"24px", overflow:"visible", paddingBottom:"40px" }}>
           {[1,2,3,4,5,6,7].map(num => {
@@ -149,7 +150,6 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
             return (
               <div key={num} style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", boxShadow:t.shadowSm }}>
                 
-                {/* En-tête du Critère - Carré arrondi C1/C2 (Copie Image) */}
                 <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"16px" }}>
                    <div style={{ width:"28px", height:"28px", borderRadius:"6px", background:cConf.bg, border:`1px solid ${cConf.bd}`, display:"flex", alignItems:"center", justifyContent:"center", color:cConf.color, fontWeight:"800", fontSize:"12px" }}>C{num}</div>
                    <div>
@@ -158,13 +158,13 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                    </div>
                 </div>
                 
-                {/* Grille des cartes */}
                 <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(280px, 1fr))", gap:"12px" }}>
                    {inds.map(c => {
                       const isConforme = c.statut === "conforme";
                       const isNC = c.statut === "non-conforme";
                       const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : c.statut === "en-cours" ? "En cours" : "Non évalué";
-                      const themeStatut = { "conforme": { c:t.green, bg:t.surface }, "non-conforme": { c:t.red, bg:t.surface }, "en-cours": { c:t.amber, bg:t.surface }, "non-concerne": { c:t.text3, bg:t.surface } }[c.statut] || { c:t.text2, bg:t.surface };
+                      // Meme badges que la vue tableau
+                      const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd }, "non-concerne": { c:t.text3, bg:t.surface3, bd:t.border } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
                       
                       const preuvesCount = (c.fichiers?.length||0) + (c.chemins_reseau?.length||0) + (c.preuves ? 1 : 0);
                       const isComplete = preuvesCount > 0 && isConforme;
@@ -173,8 +173,8 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                          <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"14px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:t.shadowSm }}>
                             <div>
                               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px" }}>
-                                 <span style={{ fontSize:"13px", fontWeight:"800", color:cConf.color, fontFamily:"'Albert Sans',sans-serif" }}>{c.num}</span>
-                                 <span style={{ background:t.surface, border:`1px solid ${themeStatut.c}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"4px" }}>{labelStatut}</span>
+                                 <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>Ind. {c.num.replace('C','')}</span>
+                                 <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>{labelStatut}</span>
                               </div>
                               <div style={{ fontSize:"12px", color:t.text, fontWeight:"500", lineHeight:"1.4", marginBottom:"14px" }}>{c.titre}</div>
                             </div>
@@ -204,7 +204,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
 }
 
 // ----------------------------------------------------------------------
-// 🔥 ONGLET : PRIORITÉS
+// 🔥 ONGLET : PRIORITÉS (Design Pro sans cible)
 // ----------------------------------------------------------------------
 export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
   return (
@@ -234,7 +234,7 @@ export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
               <div key={c.id} onClick={() => setModalCritere(c)} style={{ background:t.surface, border:`1px solid ${isNC ? t.redBd : t.border}`, borderLeft:`4px solid ${isNC ? t.red : t.amber}`, borderRadius:"8px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", transition:"all 0.2s", boxShadow:t.shadowSm }} onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>
                 <div style={{ flex:1, paddingRight:"20px" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"6px" }}>
-                    <span style={{ fontSize:"13px", fontWeight:"800", color:cConf.color, fontFamily:"'Albert Sans',sans-serif" }}>{c.num}</span>
+                    <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>Ind. {c.num.replace('C','')}</span>
                     <span style={{ background:themeStatut.bg, color:themeStatut.c, border:`1px solid ${themeStatut.bd}`, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"4px", textTransform:"uppercase" }}>{labelStatut}</span>
                   </div>
                   <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", lineHeight:"1.4" }}>{c.titre}</div>
