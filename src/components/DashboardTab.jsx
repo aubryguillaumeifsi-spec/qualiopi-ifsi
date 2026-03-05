@@ -23,6 +23,9 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
 
   const hist = useMemo(() => [...safeCriteres].flatMap(c => Array.isArray(c.historique) ? c.historique.map(h => ({ ...h, num: c.num, critere: c.critere })) : []).sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5), [safeCriteres]);
 
+  // Utilitaire pour formater en "1.1", "2.4", etc.
+  const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
+
   return (
      <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", height:"100%" }}>
         <style>{`
@@ -39,12 +42,15 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {/* ── EN-TÊTE DASHBOARD & HISTORIQUE AUDITS ── */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:"4px", flexWrap:"wrap", gap:"12px" }}>
           <div>
-            <div style={{ fontSize:"11px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"6px" }}>Campagne d'audit active</div>
+            <div style={{ fontSize:"11px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Campagne d'audit active</div>
             <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-              <select value={activeCampaignId || ""} onChange={(e) => setActiveCampaignId(e.target.value)} style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.text, background:"transparent", border:"none", outline:"none", cursor:"pointer", padding:"0", appearance:"none" }}>
-                {campaigns?.map(c => <option key={c.id} value={c.id} style={{fontFamily:"sans-serif", fontSize:"14px", color:"black"}}>{c.name}</option>)}
-              </select>
-              <span style={{ fontSize:"20px", color:t.text }}>▾</span>
+              {/* Menu déroulant refait façon "SaaS Pro" */}
+              <div style={{ position: "relative", display: "inline-block" }}>
+                <select value={activeCampaignId || ""} onChange={(e) => setActiveCampaignId(e.target.value)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 36px 10px 16px", borderRadius:"8px", fontSize:"18px", fontWeight:"800", outline:"none", cursor:"pointer", appearance:"none", boxShadow:t.shadowSm, fontFamily:"'Instrument Serif',serif" }}>
+                  {campaigns?.map(c => <option key={c.id} value={c.id} style={{fontFamily:"'Albert Sans', sans-serif", fontSize:"14px", fontWeight:"500", color:"#000"}}>{c.name}</option>)}
+                </select>
+                <div style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: "12px", color: t.text3 }}>▼</div>
+              </div>
             </div>
           </div>
           
@@ -58,7 +64,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               )}
             </div>
             
-            {/* BOUTON NOUVEL AUDIT */}
             {userProfile?.role !== "lecteur" && (
               <button onClick={handleCreateCampaign} style={{ background:t.surface2, color:t.text, border:`1px solid ${t.border}`, padding:"10px 16px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=t.surface3} onMouseOut={e=>e.currentTarget.style.background=t.surface2}>
                 + Nouvel Audit
@@ -67,7 +72,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
           </div>
         </div>
 
-        {/* ── ROW 1 : HERO CONFORMITÉ + KPIs (Avec bordures et ombres colorées) ── */}
+        {/* ── ROW 1 : HERO CONFORMITÉ + KPIs ── */}
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:"12px" }}>
           
           <div className="ca" style={{ background:t.surface, border:`1px solid ${t.goldBd}`, borderRadius:"10px", padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowGold }}>
@@ -92,7 +97,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
             { v: stats?.enCours || 0,      l:"En cours",      c:t.amber,  bg:t.amberBg,  bd:t.amberBd,  pct: stats?.total ? Math.round(((stats.enCours||0)/stats.total)*100)+"%" : "0%" },
             { v: stats?.nonConforme || 0,  l:"Non conformes", c:t.red,    bg:t.redBg,    bd:t.redBd,    pct: stats?.total ? Math.round(((stats.nonConforme||0)/stats.total)*100)+"%" : "0%" },
           ].map((s, i) => (
-            /* Ajout de la bordure dynamique `border: 1px solid ${s.bd}` et ombre subtile `boxShadow: 0 4px 12px ${s.bg}` */
             <div key={i} className="ca" style={{ background:t.surface, border:`1px solid ${s.bd}`, borderRadius:"10px", padding:"14px 16px", boxShadow:`0 4px 12px ${s.bg}`, display:"flex", flexDirection:"column" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
                 <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"34px", color:t.text, lineHeight:1 }}>{s.v}</div>
@@ -118,8 +122,9 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
             </div>
             
             <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
-              <div style={{ minWidth: "600px" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+              <div style={{ minWidth: "550px" }}>
+                {/* Plus de place pour le libellé vu que le numéro est très court */}
+                <div style={{ display:"grid", gridTemplateColumns:"50px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                   {["N°","Libellé","Statut","Responsable","Date"].map(h => (
                     <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                   ))}
@@ -133,10 +138,11 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                     
                     return (
-                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"50px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                         
-                        <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:cConf.color, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} title={r.num}>
-                          {r.num}
+                        {/* Numéro compact type "1.1" */}
+                        <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:cConf.color, whiteSpace:"nowrap" }}>
+                          {formatInd(r.critere, r.num)}
                         </div>
                         
                         <div style={{ minWidth: 0 }}>
@@ -163,6 +169,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
           {/* ⚡ Panel de droite */}
           <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
             
+            {/* Échéances proches avec bulle réparée */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>🚨 Échéances proches</div>
               {safeUrgents.length === 0 ? (
@@ -176,8 +183,9 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     return (
                       <div key={i} className="ug" style={{ background: t.surface2, border:`1px solid ${t.border2}`, borderRadius:"8px", padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowSm }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px", flex:1, overflow:"hidden" }}>
+                          {/* Numéro dans la bulle colorée */}
                           <span style={{ background: cConf.bg, color: cConf.color, border: `1px solid ${cConf.bd}`, padding: "2px 6px", borderRadius: "6px", fontSize:"11px", fontWeight: "800", flexShrink: 0 }}>
-                            {u.num.substring(0, 4)} 
+                            {formatInd(u.critere, u.num)}
                           </span>
                           <span style={{ fontSize:"12px", fontWeight:"500", color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                             {u.titre}
@@ -212,7 +220,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                       </div>
                       <div>
                         <div style={{ fontSize:"11px", color:t.text2, lineHeight:"1.4" }}>
-                          <strong style={{ color:t.text }}>{h.user?.split('@')?.[0]}</strong> sur <strong style={{color:cConf.color}}>{h.num}</strong>: {h.msg}
+                          <strong style={{ color:t.text }}>{h.user?.split('@')?.[0]}</strong> sur <strong style={{color:cConf.color}}>{formatInd(h.critere, h.num)}</strong>: {h.msg}
                         </div>
                         <div style={{ fontFamily:"'DM Mono',monospace", fontSize:"9px", color:t.text3, marginTop:"3px" }}>{timeAgo(h.date)}</div>
                       </div>
