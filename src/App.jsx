@@ -14,16 +14,16 @@ import { db, auth, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
 // ----------------------------------------------------------------------
-// 🎨 TOKENS HAUTE FIDÉLITÉ "MIDNIGHT"
+// 🎨 TOKENS HAUTE FIDÉLITÉ (Mix Claude's Midnight & Final-V2)
 // ----------------------------------------------------------------------
 const GFONT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Albert+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap";
 
 function buildTokens(dark) {
   return dark ? {
-    bg:"#0c1118", nav:"#0d1422", sidebar:"#101520", surface:"#151c2a", surface2:"#1a2235", surface3:"#1e2840",
+    bg:"#0b111a", nav:"#0d1422", sidebar:"#0a101a", surface:"#151c2a", surface2:"#1a2235", surface3:"#1e2840",
     border:"#1f2d42", border2:"#192438", borderNav:"rgba(255,255,255,0.07)",
-    text:"#d6e3f5", text2:"#5a7299", text3:"#2e4060",
-    textNav:"rgba(255,255,255,0.85)", textNavSub:"rgba(255,255,255,0.35)",
+    text:"#d6e3f5", text2:"#748bac", text3:"#425675",
+    textNav:"rgba(255,255,255,0.9)", textNavSub:"rgba(255,255,255,0.4)",
     accent:"#4f82f5", accentBg:"rgba(79,130,245,0.12)", accentBd:"rgba(79,130,245,0.28)",
     gold:"#d4a030", goldBg:"rgba(212,160,48,0.12)", goldBd:"rgba(212,160,48,0.3)",
     green:"#2cc880", greenBg:"rgba(44,200,128,0.1)", greenBd:"rgba(44,200,128,0.25)",
@@ -31,16 +31,16 @@ function buildTokens(dark) {
     amber:"#f0a030", amberBg:"rgba(240,160,48,0.1)", amberBd:"rgba(240,160,48,0.25)",
     shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)"
   } : {
-    bg:"#e8edf5", nav:"#1e2d4a", sidebar:"#f2f5fa", surface:"#ffffff",
-    surface2:"#eaeff8", surface3:"#dfe6f3", border:"#cad4e8", border2:"#d8e0ee", borderNav:"rgba(255,255,255,0.08)",
-    text:"#0a1628", text2:"#4a5f80", text3:"#90a5c0",
-    textNav:"rgba(255,255,255,0.9)", textNavSub:"rgba(255,255,255,0.35)",
-    accent:"#1a52d4", accentBg:"#e6effe", accentBd:"#a8c0fc",
+    bg:"#eef2f6", nav:"#ffffff", sidebar:"#f4f7fb", surface:"#ffffff",
+    surface2:"#f8fafc", surface3:"#e2e8f0", border:"#d5ddef", border2:"#e2e8f0", borderNav:"#e2e8f0",
+    text:"#0f172a", text2:"#475569", text3:"#94a3b8",
+    textNav:"#0f172a", textNavSub:"#64748b",
+    accent:"#1d52d4", accentBg:"#eff6ff", accentBd:"#bfdbfe",
     gold:"#b07010", goldBg:"#fef4de", goldBd:"#f0cc70",
-    green:"#0e7a50", greenBg:"#e8f8f0", greenBd:"#90ddb8",
-    red:"#c42828", redBg:"#fdeaea", redBd:"#f4a0a0",
-    amber:"#b06010", amberBg:"#fef2e0", amberBd:"#f0c870",
-    shadow:"0 1px 3px rgba(10,22,40,0.08)", shadowSm:"0 1px 2px rgba(10,22,40,0.06)"
+    green:"#0e7a50", greenBg:"#e8f9f3", greenBd:"#9dddc5",
+    red:"#c42828", redBg:"#fdecea", redBd:"#f4a6a6",
+    amber:"#a85c07", amberBg:"#fef5e7", amberBd:"#f5ce84",
+    shadow:"0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)"
   };
 }
 
@@ -216,7 +216,6 @@ function MainApp() {
 
   const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
   
-  // Correction du bug Nouvel IFSI
   const handleIfsiSwitch = async (e) => { 
     const val = e.target.value;
     if (val === "NEW") { 
@@ -226,7 +225,6 @@ function MainApp() {
         await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); 
         setSelectedIfsi(id); 
       } else {
-        // Force React to reset the select visually if cancelled
         setSelectedIfsi(null);
         setTimeout(() => setSelectedIfsi(selectedIfsi), 0);
       }
@@ -282,15 +280,20 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
-  const menuBtn = (id, icon, label) => {
+  const menuBtn = (id, label) => {
     const act = activeTab === id;
     return (
       <button 
         onClick={() => { setActiveTab(id); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} 
         className="sidebar-btn"
-        style={{ width: "100%", display: "flex", alignItems: "center", gap: "12px", padding: "10px 14px", background: act ? (isDarkMode?"rgba(255,255,255,0.05)":"rgba(26,82,212,0.07)") : "transparent", color: act ? t.textNav : t.textNavSub, border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px", borderLeft: `2px solid ${act ? t.accent : "transparent"}` }}
+        style={{ 
+          width: "100%", display: "block", padding: "10px 16px", 
+          background: act ? (isDarkMode?"rgba(255,255,255,0.06)":"#e2e8f0") : "transparent", 
+          color: act ? t.textNav : t.textNavSub, border: "none", borderRadius: "8px", 
+          fontSize: "13px", fontWeight: act ? "700" : "500", cursor: "pointer", 
+          transition: "all 0.2s", textAlign: "left", marginBottom: "4px", 
+        }}
       >
-        <span style={{ fontSize: "14px", opacity: act ? 1 : 0.5 }}>{icon}</span>
         {label}
       </button>
     );
@@ -301,7 +304,7 @@ function MainApp() {
       <link href={GFONT} rel="stylesheet" />
       <style>{`
         @media print { .no-print { display: none !important; } body { background: white !important; } }
-        .sidebar-btn:hover { background: ${isDarkMode?"rgba(255,255,255,0.05)":"rgba(26,82,212,0.07)"} !important; color: ${t.textNav} !important; }
+        .sidebar-btn:hover { background: ${isDarkMode?"rgba(255,255,255,0.06)":"#e2e8f0"} !important; color: ${t.textNav} !important; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         main::-webkit-scrollbar { width: 8px; }
@@ -317,88 +320,89 @@ function MainApp() {
         />
       )}
 
-      {/* 🧭 SIDEBAR GAUCHE (Design "Midnight") */}
-      <aside className="no-print" style={{ width: "240px", background: t.sidebar, borderRight: `1px solid ${t.border}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50, boxShadow: isDarkMode?"3px 0 12px rgba(0,0,0,0.35)":"3px 0 12px rgba(14,25,41,0.06)" }}>
+      {/* 🧭 SIDEBAR GAUCHE (Design "Midnight" Épuré) */}
+      <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50, boxShadow: isDarkMode?"3px 0 12px rgba(0,0,0,0.35)":"3px 0 12px rgba(14,25,41,0.03)" }}>
         
-        {/* Logo */}
-        <div style={{ padding:"20px", display:"flex", alignItems:"center", gap:"12px", borderBottom:`1px solid ${t.border}` }}>
-          <div style={{ width:"32px", height:"32px", border:`2px solid ${t.gold}`, borderRadius:"8px", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 0 10px ${t.goldBd}` }}>
-            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.gold, fontStyle:"italic" }}>Q</span>
+        {/* Logo & Date */}
+        <div style={{ padding:"24px 20px 16px", display:"flex", alignItems:"center", gap:"14px" }}>
+          <div style={{ width:"38px", height:"38px", border:`2px solid ${t.gold}`, borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 0 10px ${t.goldBd}`, background:t.goldBg }}>
+            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:t.gold, fontStyle:"italic", lineHeight:1 }}>Q</span>
           </div>
           <div>
-            <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"0.2px" }}>QualiForma</div>
-            <div style={{ fontSize:"10px", color:t.text3, letterSpacing:"1.5px", textTransform:"uppercase", marginTop:"2px" }}>Pilotage Qualiopi</div>
+            <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.textNav, letterSpacing:"0.2px", lineHeight:1 }}>QualiForma</div>
+            <div style={{ fontSize:"9px", color:t.textNavSub, letterSpacing:"1px", textTransform:"uppercase", marginTop:"4px" }}>Pilotage Qualiopi</div>
           </div>
         </div>
 
-        {/* Date du jour */}
-        <div style={{ padding:"16px 20px 0", fontSize:"11px", color:t.text3, textTransform:"capitalize" }}>
+        <div style={{ padding:"0 20px 20px", fontSize:"12px", color:t.textNavSub, textTransform:"capitalize", fontWeight:"500", borderBottom:`1px solid ${t.borderNav}` }}>
           {dateJourFormat}
         </div>
 
         {/* Sélecteur IFSI */}
-        <div style={{ padding:"12px 20px 20px", borderBottom:`1px solid ${t.border2}` }}>
-          <div style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Établissement</div>
+        <div style={{ padding:"20px", borderBottom:`1px solid ${t.borderNav}` }}>
+          <div style={{ fontSize:"10px", fontWeight:"700", color:t.textNavSub, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"10px" }}>Établissement</div>
           {userProfile?.role === "superadmin" ? (
-             <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding: "10px", borderRadius: "8px", background: t.surface2, border: `1px solid ${t.border}`, color: t.text, fontSize: "12px", fontWeight: "600", outline: "none", cursor: "pointer", fontFamily:"inherit" }}>
+             <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", background: t.surface, border: `1px solid ${t.border}`, color: t.text, fontSize: "13px", fontWeight: "600", outline: "none", cursor: "pointer", fontFamily:"inherit", boxShadow:t.shadowSm }}>
                {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                <option value="NEW">+ Nouvel établissement</option>
              </select>
           ) : (
-            <div style={{ padding: "10px", borderRadius: "8px", background: t.surface2, border: `1px solid ${t.border}`, color: t.text, fontSize: "12px", fontWeight: "600" }}>
+            <div style={{ padding: "10px 12px", borderRadius: "8px", background: t.surface, border: `1px solid ${t.border}`, color: t.text, fontSize: "13px", fontWeight: "600", boxShadow:t.shadowSm }}>
               {currentIfsiName}
             </div>
           )}
         </div>
 
-        {/* Menu Principal */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 10px" }}>
-          <div style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", padding: "0 10px 10px" }}>Navigation</div>
-          {menuBtn("dashboard", "⊞", "Tableau de bord")}
-          {menuBtn("criteres", "☰", "Indicateurs")}
-          {menuBtn("axes", "🔥", "Priorités")}
-          {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("organigramme", "⊕", "Organigramme")}
-          <div style={{ margin:"16px 0", height:"1px", background:t.border }}/>
-          {menuBtn("livre_blanc", "📖", "Livre Blanc")}
-          {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("equipe", "⊛", "Administration")}
-          {userProfile?.role === "superadmin" && menuBtn("tour_controle", "◉", "Tour de Contrôle")}
+        {/* Menu Principal (Sans Emojis) */}
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 12px" }}>
+          <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
+          {menuBtn("dashboard", "Tableau de bord")}
+          {menuBtn("criteres", "Indicateurs")}
+          {menuBtn("axes", "Priorités")}
+          {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme")}
+          
+          <div style={{ margin:"16px 12px", height:"1px", background:t.borderNav }}/>
+          
+          {menuBtn("livre_blanc", "Livre Blanc")}
+          {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("equipe", "Administration")}
+          {userProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
         </div>
 
-        {/* ✦ Prochain audit — Badge Gold ✦ */}
-        <div style={{ margin:"0 16px 16px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"10px", boxShadow:t.shadowGold }}>
+        {/* ✦ Prochain audit — Badge Gold Intégré ✦ */}
+        <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px", boxShadow:t.shadowGold }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
-            <div style={{ fontSize:"9px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
-            <div style={{ background:t.gold, borderRadius:"5px", padding:"2px 8px", fontSize:"10px", fontWeight:"800", color:isDarkMode?"#0c1118":"white" }}>
+            <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
+            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:isDarkMode?"#0c1118":"white" }}>
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
-          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"17px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
             {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
           </div>
           <div style={{ height:"5px", background:isDarkMode?"rgba(212,160,48,0.15)":"rgba(176,112,16,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
             <div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, ${isDarkMode?"#f0c060":"#d4a030"})`, borderRadius:"3px" }}/>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:"10px", color:t.gold, fontWeight:"700" }}>{pctGlobal}% conforme</span>
+            <span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% conforme</span>
           </div>
         </div>
 
         {/* Profil & Logout */}
-        <div style={{ borderTop: `1px solid ${t.border}`, background:isDarkMode?"rgba(0,0,0,0.15)":t.surface2, padding:"12px 16px" }}>
+        <div style={{ borderTop: `1px solid ${t.borderNav}`, background:t.surface, padding:"16px" }}>
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "10px", overflow: "hidden" }}>
-              <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "12px", fontWeight: "800", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden" }}>
+              <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
                 {auth.currentUser?.email?.charAt(0).toUpperCase()}
               </div>
               <div style={{ overflow: "hidden" }}>
-                <div style={{ fontSize: "12px", fontWeight: "700", color: t.text, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{auth.currentUser?.email?.split('@')[0]}</div>
-                <div style={{ fontSize: "10px", color: t.text3, textTransform: "capitalize" }}>{userProfile?.role}</div>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{auth.currentUser?.email?.split('@')[0]}</div>
+                <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>{userProfile?.role}</div>
               </div>
             </div>
-            <button onClick={handleLogout} style={{ background: "transparent", border: "none", color: t.text3, cursor: "pointer", fontSize: "16px", transition: "color 0.2s" }} title="Se déconnecter" onMouseOver={e=>e.currentTarget.style.color=t.red} onMouseOut={e=>e.currentTarget.style.color=t.text3}>
-              ⏏
-            </button>
           </div>
+          <button onClick={handleLogout} style={{ width:"100%", marginTop:"12px", background: "transparent", border: `1px solid ${t.borderNav}`, borderRadius:"8px", padding:"8px", color: t.textNavSub, cursor: "pointer", fontSize: "12px", fontWeight:"600", transition: "all 0.2s" }} onMouseOver={e=>{e.currentTarget.style.color=t.red; e.currentTarget.style.borderColor=t.redBd;}} onMouseOut={e=>{e.currentTarget.style.color=t.textNavSub; e.currentTarget.style.borderColor=t.borderNav;}}>
+            Déconnexion
+          </button>
         </div>
       </aside>
 
@@ -406,19 +410,19 @@ function MainApp() {
       <main style={{ flex: 1, height: "100vh", overflowY: "auto", overflowX: "hidden", background: t.bg, position: "relative", display: "flex", flexDirection: "column" }}>
         
         {/* Sub-header global (Actions rapides) */}
-        <div className="no-print" style={{ height:"50px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
-          <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"17px", color:t.text, textTransform:"capitalize" }}>{activeTab.replace('_', ' ')}</span>
-            <span style={{ fontSize:"11px", color:t.text3 }}>· {currentIfsiName}</span>
+        <div className="no-print" style={{ height:"60px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
+          <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>{activeTab.replace('_', ' ')}</span>
+            <span style={{ fontSize:"12px", color:t.text3 }}>· {currentIfsiName}</span>
           </div>
-          <div style={{ display:"flex", gap:"10px" }}>
-            <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"5px 12px", borderRadius:"6px", fontSize:"11px", fontWeight:"600", color:t.text, cursor:"pointer", transition:"all 0.15s" }}>
-              {isDarkMode ? "☀️ Clair" : "🌙 Sombre"}
+          <div style={{ display:"flex", gap:"12px" }}>
+            <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 14px", borderRadius:"8px", fontSize:"12px", fontWeight:"600", color:t.text, cursor:"pointer", transition:"all 0.15s" }}>
+              {isDarkMode ? "☀️ Mode Clair" : "🌙 Mode Sombre"}
             </button>
           </div>
         </div>
 
-        <div className="animate-fade-in" style={{ flex: 1, padding: "24px 32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
+        <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
           {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} t={t} />}
@@ -428,6 +432,9 @@ function MainApp() {
           {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} t={t} />}
         </div>
         
+        <footer className="no-print" style={{ padding: "20px 32px", textAlign: "center", fontSize: "13px", color: t.text3, borderTop: `1px solid ${t.border}`, background: t.surface }}>
+          QualiForma <span style={{ background: t.accentBg, color: t.accent, padding: "2px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", marginLeft: "6px" }}>2.0</span>
+        </footer>
       </main>
     </div>
   );
