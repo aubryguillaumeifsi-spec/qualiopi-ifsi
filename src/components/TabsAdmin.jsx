@@ -1,154 +1,200 @@
 import React from "react";
 
-export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser, selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm, sortedTeamUsers, teamSortConfig, handleSortTeam, handleDeleteUser, auth, handleSendResetEmail, isDarkMode }) {
+// ----------------------------------------------------------------------
+// ⚙️ ONGLET : ADMINISTRATION (Équipe)
+// ----------------------------------------------------------------------
+export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser, selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm, sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t }) {
   
-  const bgCard = isDarkMode ? "#1e1f20" : "white";
-  const bgMain = isDarkMode ? "#131314" : "#f8fafc";
-  const textMain = isDarkMode ? "#e3e3e3" : "#1e3a5f";
-  const textMuted = isDarkMode ? "#9aa0a6" : "#64748b";
-  const borderCol = isDarkMode ? "#333537" : "#e2e8f0";
-
-  const card = { background: bgCard, border: `1px solid ${borderCol}`, borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
-  const input = { width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${borderCol}`, background: bgMain, color: textMain, fontSize: "13px", outline: "none", boxSizing: "border-box" };
-  const btn = { width: "100%", padding: "10px", background: isDarkMode ? "#8ab4f8" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: isDarkMode ? "#131314" : "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" };
-  const th = { textAlign: "left", padding: "12px 14px", fontSize: "12px", fontWeight: "700", color: textMuted, textTransform: "uppercase", borderBottom: `2px solid ${borderCol}`, cursor: "pointer", background: bgMain };
-  const td = { padding: "12px 14px", fontSize: "13px", borderBottom: `1px solid ${borderCol}`, verticalAlign: "middle", color: textMain };
+  // Protection anti-crash pour la recherche/tri
+  const safeUsers = Array.isArray(sortedTeamUsers) ? sortedTeamUsers : [];
 
   return (
-    <div className="animate-fade-in responsive-grid-2">
-      {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && (
-        <div style={card}>
-          <h2 style={{ fontSize: "18px", fontWeight: "800", color: textMain, margin: "0 0 16px" }}>Ajouter un compte</h2>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <input type="email" placeholder="Adresse email (ex: agent@ifsi.fr)" value={newMember.email} onChange={e => setNewMember({ ...newMember, email: e.target.value })} style={input} />
-            <input type="password" placeholder="Mot de passe provisoire (6 min.)" value={newMember.pwd} onChange={e => setNewMember({ ...newMember, pwd: e.target.value })} style={input} />
-            <select value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} style={input}>
-              <option value="user">Utilisateur (Édition IFSI)</option>
-              <option value="admin">Administrateur (Gestion Équipe & IFSI)</option>
-              {userProfile?.role === "superadmin" && <option value="superadmin">Super-Administrateur (Réseau complet)</option>}
+    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"24px", maxWidth:"1000px", margin:"0 auto" }}>
+      
+      {/* HEADER ADMINISTRATION */}
+      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"24px 32px", boxShadow:t.shadowSm, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+        <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
+          <div style={{ width:"48px", height:"48px", borderRadius:"12px", background:t.accentBg, border:`1px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px" }}>👥</div>
+          <div>
+            <h2 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"26px", color:t.text, margin:"0 0 4px 0" }}>Gestion des accès</h2>
+            <div style={{ fontSize:"13px", color:t.text2 }}>Gérez les utilisateurs autorisés à se connecter à l'application.</div>
+          </div>
+        </div>
+      </div>
+
+      {/* TABLEAU DES MEMBRES */}
+      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
+        <div style={{ padding:"16px 24px", borderBottom:`1px solid ${t.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2 }}>
+          <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>Membres du réseau</span>
+          <input 
+            type="text" placeholder="Rechercher un email..." 
+            value={teamSearchTerm} onChange={(e) => setTeamSearchTerm(e.target.value)}
+            style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"8px 14px", borderRadius:"6px", fontSize:"12px", outline:"none", width:"200px" }}
+          />
+        </div>
+
+        <div style={{ display:"grid", gridTemplateColumns:"minmax(200px, 1fr) 120px 200px 100px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+          {["Utilisateur", "Rôle", "Établissement rattaché", "Actions"].map(h => (
+            <span key={h} style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
+          ))}
+        </div>
+
+        <div style={{ overflowY:"auto", maxHeight:"400px" }}>
+          {safeUsers.length === 0 ? (
+            <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontSize:"13px", fontStyle:"italic" }}>Aucun utilisateur trouvé.</div>
+          ) : (
+            safeUsers.map(u => {
+              const ifsiName = ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId;
+              const isSuper = u.role === "superadmin";
+              const roleColor = isSuper ? t.gold : u.role === "admin" ? t.accent : t.green;
+              const roleBg = isSuper ? t.goldBg : u.role === "admin" ? t.accentBg : t.greenBg;
+
+              return (
+                <div key={u.id} style={{ display:"grid", gridTemplateColumns:"minmax(200px, 1fr) 120px 200px 100px", alignItems:"center", gap:"10px", padding:"12px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+                    <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:t.surface3, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"12px", fontWeight:"800", color:t.text }}>
+                      {u.email ? u.email.charAt(0).toUpperCase() : "?"}
+                    </div>
+                    <span style={{ fontSize:"13px", fontWeight:"600", color:t.text }}>{u.email}</span>
+                  </div>
+                  
+                  <div>
+                    <span style={{ background:roleBg, color:roleColor, border:`1px solid ${roleColor}40`, padding:"3px 8px", borderRadius:"6px", fontSize:"10px", fontWeight:"800", textTransform:"uppercase" }}>
+                      {u.role}
+                    </span>
+                  </div>
+
+                  <span style={{ fontSize:"12px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                    {isSuper ? "Tous (Réseau global)" : ifsiName}
+                  </span>
+
+                  <div style={{ display:"flex", gap:"8px" }}>
+                    <button onClick={() => handleSendResetEmail(u.email)} title="Reset Mdp" style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"6px", borderRadius:"6px", cursor:"pointer", color:t.text2 }}>🔑</button>
+                    {userProfile?.role === "superadmin" && !isSuper && (
+                      <button onClick={() => handleDeleteUser(u.id)} title="Supprimer" style={{ background:t.redBg, border:`1px solid ${t.redBd}`, padding:"6px", borderRadius:"6px", cursor:"pointer", color:t.red }}>🗑️</button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* AJOUTER UN MEMBRE */}
+      {userProfile?.role === "superadmin" && (
+        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"24px 32px", boxShadow:t.shadowSm }}>
+          <div style={{ fontSize:"14px", fontWeight:"800", color:t.text, marginBottom:"16px" }}>+ Inviter un nouveau membre</div>
+          <div style={{ display:"flex", gap:"12px", flexWrap:"wrap" }}>
+            <input type="email" placeholder="Adresse e-mail" value={newMember.email} onChange={e=>setNewMember({...newMember, email:e.target.value})} style={{ flex:1, minWidth:"200px", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"13px" }}/>
+            <input type="password" placeholder="Mot de passe temporaire" value={newMember.pwd} onChange={e=>setNewMember({...newMember, pwd:e.target.value})} style={{ flex:1, minWidth:"150px", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"13px" }}/>
+            <select value={newMember.role} onChange={e=>setNewMember({...newMember, role:e.target.value})} style={{ padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"13px", cursor:"pointer" }}>
+              <option value="user">Éditeur (Standard)</option>
+              <option value="admin">Administrateur IFSI</option>
             </select>
-            {userProfile?.role === "superadmin" && newMember.role !== "superadmin" && (
-              <select value={newMember.ifsi} onChange={e => setNewMember({ ...newMember, ifsi: e.target.value })} style={input}>
-                <option value="">Sélectionner l'établissement d'affectation...</option>
-                {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-              </select>
-            )}
-            <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ ...btn, opacity: isCreatingUser ? 0.7 : 1 }}>
-              {isCreatingUser ? "Création en cours..." : "+ Créer le compte"}
+            <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ background:t.accent, color:"white", border:"none", padding:"10px 20px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:isCreatingUser?"not-allowed":"pointer", boxShadow:`0 4px 10px ${t.accentBd}` }}>
+              {isCreatingUser ? "Création..." : "Envoyer l'invitation"}
             </button>
           </div>
         </div>
       )}
-
-      <div style={{ ...card, gridColumn: (userProfile?.role === "admin" || userProfile?.role === "superadmin") ? "span 1" : "1 / -1", overflow: "hidden" }}>
-        <h2 style={{ fontSize: "18px", fontWeight: "800", color: textMain, margin: "0 0 16px" }}>Annuaire de l'équipe</h2>
-        <input type="text" placeholder="Rechercher par email..." value={teamSearchTerm} onChange={e => setTeamSearchTerm(e.target.value)} style={{ ...input, marginBottom: "16px" }} />
-        
-        <div style={{ overflowX: "auto", borderRadius: "8px", border: `1px solid ${borderCol}`, background: bgCard }}>
-          <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "450px" }}>
-            <thead>
-              <tr>
-                <th style={th} onClick={() => handleSortTeam("email")}>Email {teamSortConfig.key==="email"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>
-                <th style={th} onClick={() => handleSortTeam("role")}>Rôle {teamSortConfig.key==="role"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>
-                {userProfile?.role === "superadmin" && <th style={th} onClick={() => handleSortTeam("ifsi")}>Établissement {teamSortConfig.key==="ifsi"?(teamSortConfig.direction==="asc"?"↑":"↓"):""}</th>}
-                <th style={{...th, textAlign:"right"}}>Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sortedTeamUsers.map(u => (
-                <tr key={u.id} style={{ transition: "background 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=isDarkMode?"#2a2b2f":"#f8fafc"} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
-                  <td style={{ ...td, fontWeight: "600" }}>
-                    {u.email} 
-                    {u.id === auth.currentUser?.uid && <span style={{fontSize:"10px", background: isDarkMode?"#0f382a":"#d1fae5", border:`1px solid ${isDarkMode?"#10b981":"#6ee7b7"}`, color: isDarkMode?"#81c995":"#065f46", padding:"2px 6px", borderRadius:"4px", marginLeft:"8px"}}>Vous</span>}
-                  </td>
-                  <td style={td}>
-                    <span style={{ fontSize: "11px", fontWeight: "800", background: u.role==="superadmin"?(isDarkMode?"#45320b":"#fef3c7"):u.role==="admin"?(isDarkMode?"#1a2332":"#e0e7ff"):(isDarkMode?"#2a2b2f":"#f1f5f9"), color: u.role==="superadmin"?(isDarkMode?"#fdd663":"#92400e"):u.role==="admin"?(isDarkMode?"#8ab4f8":"#1e40af"):(isDarkMode?"#9aa0a6":"#475569"), padding: "4px 10px", borderRadius: "6px", border: `1px solid ${u.role==="superadmin"?(isDarkMode?"#7a5912":"#fde68a"):u.role==="admin"?(isDarkMode?"#3b82f6":"#bfdbfe"):(isDarkMode?"#44474a":"#cbd5e1")}` }}>
-                      {u.role === "superadmin" ? "Superadmin" : u.role === "admin" ? "Admin" : "User"}
-                    </span>
-                  </td>
-                  {userProfile?.role === "superadmin" && <td style={{...td, fontSize:"12px", color: textMuted, fontStyle: u.role==="superadmin"?"italic":"normal"}}>{u.role === "superadmin" ? "Accès global Réseau" : (ifsiList.find(i=>i.id===u.etablissementId)?.name || "Aucun")}</td>}
-                  <td style={{ ...td, textAlign: "right" }}>
-                    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
-                      {(userProfile?.role === "superadmin" || userProfile?.role === "admin") && (
-                         <button onClick={() => handleSendResetEmail(u.email)} style={{ background: isDarkMode?"#1a2332":"#eff6ff", border: `1px solid ${isDarkMode?"#3b82f6":"#bfdbfe"}`, color: isDarkMode?"#8ab4f8":"#1d4ed8", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontSize:"12px", fontWeight:"700" }}>✉️ Reset</button>
-                      )}
-                      {userProfile?.role === "superadmin" && u.role !== "superadmin" && (
-                         <button onClick={() => handleDeleteUser(u.id)} style={{ background: isDarkMode?"#450a0a":"#fef2f2", border: `1px solid ${isDarkMode?"#7f1d1d":"#fca5a5"}`, color: isDarkMode?"#f28b82":"#ef4444", borderRadius: "6px", padding: "6px 10px", cursor: "pointer", fontWeight: "700", fontSize:"12px" }}>Supprimer</button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 }
 
-export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleChangePassword, isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode }) {
-  
-  const bgCard = isDarkMode ? "#1e1f20" : "white";
-  const bgMain = isDarkMode ? "#131314" : "#f8fafc";
-  const textMain = isDarkMode ? "#e3e3e3" : "#1e3a5f";
-  const textMuted = isDarkMode ? "#9aa0a6" : "#64748b";
-  const borderCol = isDarkMode ? "#333537" : "#e2e8f0";
-
-  const card = { background: bgCard, border: `1px solid ${borderCol}`, borderRadius: "14px", padding: "24px", boxShadow: "0 1px 4px rgba(0,0,0,0.04)" };
-  const input = { width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${borderCol}`, background: bgMain, color: textMain, fontSize: "13px", outline: "none", boxSizing: "border-box" };
-  const btn = { width: "100%", padding: "10px", background: isDarkMode ? "#8ab4f8" : "linear-gradient(135deg,#1d4ed8,#3b82f6)", color: isDarkMode ? "#131314" : "white", border: "none", borderRadius: "8px", fontWeight: "bold", cursor: "pointer", fontSize: "14px" };
-
+// ----------------------------------------------------------------------
+// 👤 ONGLET : COMPTE PERSONNEL (Design Claude "midnight-profil")
+// ----------------------------------------------------------------------
+export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleChangePassword, isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode, t }) {
   return (
-    <div className="animate-fade-in" style={{ maxWidth: "500px", margin: "0 auto" }}>
+    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"24px", maxWidth:"800px", margin:"0 auto", paddingBottom:"40px" }}>
       
-      <div style={card}>
-        <div style={{ textAlign: "center", marginBottom: "20px" }}>
-           <div style={{ width: "60px", height: "60px", background: bgMain, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto 12px", fontSize: "24px" }}>👤</div>
-           <h2 style={{ fontSize: "20px", fontWeight: "900", color: textMain, margin: "0 0 4px" }}>Mon Profil</h2>
-           <div style={{ color: textMuted, fontSize: "14px" }}>Connecté avec <strong style={{ color: isDarkMode ? "#8ab4f8" : "#1d4ed8" }}>{auth.currentUser?.email}</strong></div>
+      {/* 1. Header Profil */}
+      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"32px", display:"flex", alignItems:"center", gap:"24px", boxShadow:t.shadowSm }}>
+        <div style={{ width:"80px", height:"80px", borderRadius:"20px", background:t.accentBg, border:`2px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"32px", fontWeight:"800", color:t.accent, flexShrink:0 }}>
+          {auth.currentUser?.email?.charAt(0).toUpperCase()}
         </div>
-        
-        <form onSubmit={(e) => handleChangePassword(e, false)} style={{ display: "flex", flexDirection: "column", gap: "14px", background: bgMain, padding: "24px", borderRadius: "12px", border: `1px solid ${borderCol}` }}>
-          <h3 style={{ fontSize: "15px", fontWeight: "800", margin: "0 0 4px", color: textMain, display: "flex", alignItems: "center", gap: "6px" }}><span>🔐</span> Changer mon mot de passe</h3>
-          
-          <div>
-            <label style={{ fontSize: "12px", fontWeight: "700", color: textMuted, marginBottom: "4px", display: "block" }}>Nouveau mot de passe</label>
-            <input type="password" placeholder="8 caractères, 1 majuscule, 1 chiffre" value={pwdUpdate.p1} onChange={e => setPwdUpdate({ ...pwdUpdate, p1: e.target.value })} required style={input} />
+        <div>
+          <h2 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", color:t.text, margin:"0 0 6px 0" }}>Mon Profil</h2>
+          <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+            <span style={{ fontSize:"14px", color:t.text2, fontWeight:"500" }}>{auth.currentUser?.email}</span>
+            <span style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text3, fontSize:"10px", fontWeight:"800", padding:"3px 8px", borderRadius:"6px", textTransform:"uppercase" }}>
+              {userProfile?.role || "Utilisateur"}
+            </span>
           </div>
-          <div>
-            <label style={{ fontSize: "12px", fontWeight: "700", color: textMuted, marginBottom: "4px", display: "block" }}>Confirmez le mot de passe</label>
-            <input type="password" placeholder="Retapez le même mot de passe" value={pwdUpdate.p2} onChange={e => setPwdUpdate({ ...pwdUpdate, p2: e.target.value })} required style={input} />
-          </div>
-          <button type="submit" disabled={pwdUpdate.loading} style={{ ...btn, marginTop: "10px", padding: "12px" }}>
-            {pwdUpdate.loading ? "Mise à jour en cours..." : "Valider le nouveau mot de passe"}
-          </button>
-        </form>
+        </div>
       </div>
 
-      <div style={{ ...card, marginTop: "20px" }}>
-        <h3 style={{ fontSize: "16px", fontWeight: "900", color: textMain, margin: "0 0 16px 0", display: "flex", alignItems: "center", gap: "8px" }}>
-          <span style={{ background: isDarkMode?"#1a2332":"#eff6ff", padding: "6px", borderRadius: "8px", fontSize: "18px" }}>🎨</span> Accessibilité & Inclusion
-        </h3>
-        
-        <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+      {/* 2. Paramètres d'interface */}
+      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
+        <div style={{ padding:"16px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+          <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>🎨 Apparence & Accessibilité</span>
+        </div>
+        <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:"16px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:"16px", borderBottom:`1px solid ${t.border2}` }}>
+            <div>
+              <div style={{ fontSize:"14px", fontWeight:"600", color:t.text, marginBottom:"4px" }}>Thème sombre (Midnight)</div>
+              <div style={{ fontSize:"12px", color:t.text2 }}>Protège les yeux et réduit la fatigue visuelle.</div>
+            </div>
+            <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ background:isDarkMode?t.accent:t.surface2, color:isDarkMode?"white":t.text, border:`1px solid ${isDarkMode?t.accentBd:t.border}`, padding:"8px 16px", borderRadius:"8px", fontSize:"12px", fontWeight:"700", cursor:"pointer", transition:"all 0.2s" }}>
+              {isDarkMode ? "Activé" : "Désactivé"}
+            </button>
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ fontSize:"14px", fontWeight:"600", color:t.text, marginBottom:"4px" }}>Mode Daltonien</div>
+              <div style={{ fontSize:"12px", color:t.text2 }}>Remplace le rouge/vert par des couleurs plus contrastées.</div>
+            </div>
+            <button onClick={() => setIsColorblindMode(!isColorblindMode)} style={{ background:isColorblindMode?t.accent:t.surface2, color:isColorblindMode?"white":t.text, border:`1px solid ${isColorblindMode?t.accentBd:t.border}`, padding:"8px 16px", borderRadius:"8px", fontSize:"12px", fontWeight:"700", cursor:"pointer", transition:"all 0.2s" }}>
+              {isColorblindMode ? "Activé" : "Désactivé"}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* 3. Sécurité (Mot de passe) */}
+      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
+        <div style={{ padding:"16px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+          <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>🔒 Sécurité du compte</span>
+        </div>
+        <div style={{ padding:"24px" }}>
+          <div style={{ fontSize:"13px", color:t.text2, marginBottom:"16px" }}>Changer votre mot de passe (Minimum 6 caractères)</div>
+          <form onSubmit={handleChangePassword} style={{ display:"flex", gap:"12px", alignItems:"flex-start", flexWrap:"wrap" }}>
+            <div style={{ flex:1, minWidth:"200px" }}>
+              <input type="password" placeholder="Nouveau mot de passe" value={pwdUpdate.p1} onChange={e=>setPwdUpdate({...pwdUpdate, p1:e.target.value})} style={{ width:"100%", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"13px" }} required minLength={6}/>
+            </div>
+            <button type="submit" disabled={pwdUpdate.loading} style={{ background:t.accent, color:"white", border:"none", padding:"11px 20px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:pwdUpdate.loading?"not-allowed":"pointer", boxShadow:`0 4px 10px ${t.accentBd}`, whiteSpace:"nowrap" }}>
+              {pwdUpdate.loading ? "Mise à jour..." : "Mettre à jour"}
+            </button>
+          </form>
+          {pwdUpdate.error && <div style={{ color:t.red, fontSize:"12px", marginTop:"10px", fontWeight:"600", padding:"8px", background:t.redBg, borderRadius:"6px" }}>{pwdUpdate.error}</div>}
+          {pwdUpdate.success && <div style={{ color:t.green, fontSize:"12px", marginTop:"10px", fontWeight:"600", padding:"8px", background:t.greenBg, borderRadius:"6px" }}>{pwdUpdate.success}</div>}
+        </div>
+      </div>
+
+      {/* 4. Zone Danger (Copie parfaite de Claude) */}
+      <div style={{ background:t.surface, border:`1px solid ${t.dangerBd}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
+        <div style={{ padding:"20px 24px" }}>
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.danger, marginBottom:"6px" }}>⚠️ Zone dangereuse</div>
+          <div style={{ fontSize:"12px", color:t.text2, marginBottom:"20px" }}>Ces actions sont définitives et ne peuvent pas être annulées.</div>
           
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: bgMain, padding: "12px 16px", borderRadius: "10px", border: `1px solid ${borderCol}` }}>
-            <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: textMain }}>Mode Sombre (Gemini)</div>
-              <div style={{ fontSize: "11px", color: textMuted }}>Contraste élevé, idéal en basse lumière.</div>
+          <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"8px" }}>
+              <div>
+                <div style={{ fontSize:"13px", fontWeight:"700", color:t.text, marginBottom:"4px" }}>Exporter mes données</div>
+                <div style={{ fontSize:"11px", color:t.text3 }}>Télécharger toutes mes données au format JSON</div>
+              </div>
+              <button onClick={()=>alert("Export en cours (simulation)")} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"8px 16px", borderRadius:"6px", fontSize:"12px", fontWeight:"700", cursor:"pointer" }}>Exporter</button>
             </div>
-            <input type="checkbox" checked={isDarkMode} onChange={(e) => setIsDarkMode(e.target.checked)} style={{ width: "20px", height: "20px", accentColor: isDarkMode?"#8ab4f8":"#1d4ed8", cursor: "pointer" }} />
-          </label>
-
-          <label style={{ display: "flex", justifyContent: "space-between", alignItems: "center", cursor: "pointer", background: bgMain, padding: "12px 16px", borderRadius: "10px", border: `1px solid ${borderCol}` }}>
-            <div>
-              <div style={{ fontSize: "14px", fontWeight: "700", color: textMain }}>Mode Daltonien</div>
-              <div style={{ fontSize: "11px", color: textMuted }}>Remplace les couleurs Rouge/Vert par Orange/Bleu.</div>
+            
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", background:t.dangerBg, border:`1px solid ${t.dangerBd}`, borderRadius:"8px" }}>
+              <div>
+                <div style={{ fontSize:"13px", fontWeight:"700", color:t.danger, marginBottom:"4px" }}>Désactiver mon compte</div>
+                <div style={{ fontSize:"11px", color:t.danger, opacity:0.8 }}>Votre accès sera suspendu immédiatement</div>
+              </div>
+              <button onClick={()=>alert("Contactez votre Super Admin pour désactiver votre compte.")} style={{ background:t.danger, border:"none", color:"white", padding:"8px 16px", borderRadius:"6px", fontSize:"12px", fontWeight:"700", cursor:"pointer", boxShadow:`0 2px 8px ${t.dangerBd}` }}>Désactiver</button>
             </div>
-            <input type="checkbox" checked={isColorblindMode} onChange={(e) => setIsColorblindMode(e.target.checked)} style={{ width: "20px", height: "20px", accentColor: isDarkMode?"#8ab4f8":"#1d4ed8", cursor: "pointer" }} />
-          </label>
-
+          </div>
         </div>
       </div>
 
