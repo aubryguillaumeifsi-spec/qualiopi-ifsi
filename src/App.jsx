@@ -169,7 +169,7 @@ function MainApp() {
 
   const handleLogout = () => signOut(auth);
 
-  // Fonctions système sécurisées
+  // Fonctions de sécurité
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
@@ -202,7 +202,6 @@ function MainApp() {
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
-  // 🛡️ CORRECTION CRASH ORGANIGRAMME : Assure que prenom et nom existent toujours
   const allIfsiMembers = useMemo(() => [
     ...orgAccounts.map(u => ({ id: u.id, prenom: u.email ? u.email.split('@')[0] : "Utilisateur", nom: "", name: u.email ? u.email.split('@')[0] : "Utilisateur", roles: u.orgRoles || [], type: 'account', email: u.email })),
     ...manualUsers.map(u => {
@@ -228,6 +227,13 @@ function MainApp() {
   }, [criteres, filterStatut, filterCritere, searchTerm]);
 
   const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || userProfile?.role === "superadmin"), [teamUsers, userProfile]);
+  
+  // FIX: Fonction de tri pour l'équipe qui était manquante
+  const handleSortTeam = (key) => { 
+    let direction = "asc"; 
+    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; 
+    setTeamSortConfig({ key, direction }); 
+  };
   
   const handleIfsiSwitch = async (e) => { 
     const val = e.target.value;
@@ -292,6 +298,32 @@ function MainApp() {
     }
   };
 
+  // NOUVEAU : Édition de la date d'audit et création d'audit
+  const handleEditAuditDate = () => {
+    const currentFr = new Date(currentAuditDate).toLocaleDateString("fr-FR");
+    const newDateFr = prompt("Modifier la date de l'audit (Format demandé : JJ/MM/AAAA) :", currentFr);
+    if (newDateFr) {
+      const parts = newDateFr.split('/');
+      if (parts.length === 3) {
+        const isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
+        if (!isNaN(new Date(isoDate).getTime())) {
+          const newCampaigns = campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: isoDate } : c);
+          saveData(newCampaigns);
+        } else alert("Date invalide.");
+      } else alert("Format JJ/MM/AAAA requis.");
+    }
+  };
+
+  const handleCreateCampaign = () => {
+    const nom = prompt("Nom de la nouvelle campagne / Nouvel audit (ex: Renouvellement 2028) :");
+    if (nom?.trim()) {
+      const newId = Date.now().toString();
+      const newCamp = { id: newId, name: nom.trim(), auditDate: "2028-10-15", liste: DEFAULT_CRITERES, locked: false };
+      saveData([...campaigns, newCamp]);
+      setActiveCampaignId(newId);
+    }
+  };
+
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
   if (activeTab === "validation_requise") return <div style={{ minHeight: "100vh", background: t.bg, color: t.text, display: "flex", justifyContent: "center", alignItems: "center" }}>Vérification Email Requise</div>;
@@ -300,7 +332,6 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
-  // Design de l'encadré actif
   const menuBtn = (id, label) => {
     const act = activeTab === id;
     return (
@@ -329,6 +360,7 @@ function MainApp() {
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
       <link href={GFONT} rel="stylesheet" />
       <style>{`
+        /* CORRECTION MARGES GLOBALES */
         html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: ${t.bg}; }
         @media print { .no-print { display: none !important; } body { background: white !important; } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -424,7 +456,7 @@ function MainApp() {
         {/* Profil cliquable */}
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
           <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
+            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
               {auth.currentUser?.email?.charAt(0).toUpperCase()}
             </div>
             <div style={{ overflow: "hidden" }}>
@@ -451,7 +483,7 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} t={t} />}
+          {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={handleCreateCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
