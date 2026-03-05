@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { CRITERES_LABELS } from "../data";
 
-export default function DashboardTab({ currentAuditDate, stats, urgents, criteres, userProfile, handleEditAuditDate, handleCreateCampaign, t }) {
+export default function DashboardTab({ campaigns, activeCampaignId, setActiveCampaignId, currentAuditDate, stats, urgents, criteres, userProfile, handleEditAuditDate, handleCreateCampaign, t }) {
   
   const safeCriteres = Array.isArray(criteres) ? criteres : [];
   const safeUrgents = Array.isArray(urgents) ? urgents : [];
@@ -31,29 +31,43 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
           .ug:hover  { filter:brightness(1.04); transform:translateY(-2px); }
           .ca, .ug   { transition:all 0.18s ease; cursor: default; }
           .ro        { transition:background 0.12s; }
+          .scroll-container::-webkit-scrollbar { height: 6px; }
+          .scroll-container::-webkit-scrollbar-track { background: transparent; }
+          .scroll-container::-webkit-scrollbar-thumb { background: ${t.border2}; border-radius: 4px; }
         `}</style>
 
-        {/* ── EN-TÊTE DASHBOARD & AUDIT ── */}
-        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
+        {/* ── EN-TÊTE DASHBOARD & HISTORIQUE AUDITS ── */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:"4px", flexWrap:"wrap", gap:"12px" }}>
           <div>
-            <div style={{ fontSize:"11px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>Prochain Audit Qualiopi</div>
+            <div style={{ fontSize:"11px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"6px" }}>Campagne d'audit active</div>
             <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-              <h2 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.text, margin:0, fontWeight:"normal" }}>
-                {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
-              </h2>
-              {userProfile?.role !== "lecteur" && (
-                <button onClick={handleEditAuditDate} style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"6px", padding:"4px 8px", fontSize:"11px", color:t.text2, cursor:"pointer" }}>✏️ Modifier la date</button>
-              )}
+              {/* Menu déroulant pour changer d'audit */}
+              <select value={activeCampaignId || ""} onChange={(e) => setActiveCampaignId(e.target.value)} style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.text, background:"transparent", border:"none", outline:"none", cursor:"pointer", padding:"0", appearance:"none" }}>
+                {campaigns?.map(c => <option key={c.id} value={c.id} style={{fontFamily:"sans-serif", fontSize:"14px", color:"black"}}>{c.name}</option>)}
+              </select>
+              <span style={{ fontSize:"20px", color:t.text }}>▾</span>
             </div>
           </div>
-          {userProfile?.role !== "lecteur" && (
-            <button onClick={handleCreateCampaign} style={{ background:t.accent, color:"white", border:"none", padding:"8px 16px", borderRadius:"8px", fontSize:"12px", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 10px ${t.accentBd}` }}>
-              + Nouvel Audit (Vierge)
-            </button>
-          )}
+          
+          <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"8px", background:t.surface, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px", boxShadow:t.shadowSm }}>
+              <span style={{ fontSize:"12px", color:t.text2, fontWeight:"600" }}>Date d'évaluation :</span>
+              {userProfile?.role !== "lecteur" ? (
+                <input type="date" value={currentAuditDate} onChange={(e) => handleEditAuditDate(e.target.value)} style={{ background:t.surface2, border:`1px solid ${t.border2}`, borderRadius:"6px", padding:"4px 8px", fontSize:"12px", color:t.text, cursor:"pointer", colorScheme: "dark" }} />
+              ) : (
+                <span style={{ fontSize:"13px", color:t.text, fontWeight:"700" }}>{new Date(currentAuditDate).toLocaleDateString("fr-FR")}</span>
+              )}
+            </div>
+            
+            {userProfile?.role !== "lecteur" && (
+              <button onClick={handleCreateCampaign} style={{ background:t.accent, color:"white", border:"none", padding:"10px 16px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 10px ${t.accentBd}` }}>
+                + Nouvel Audit
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* ── ROW 1 : HERO CONFORMITÉ + KPIs (Applatis) ── */}
+        {/* ── ROW 1 : HERO CONFORMITÉ + KPIs (Tassés) ── */}
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:"12px" }}>
           
           <div className="ca" style={{ background:t.surface, border:`1px solid ${t.goldBd}`, borderRadius:"10px", padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowGold }}>
@@ -96,77 +110,90 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px", flex:1 }}>
           
-          {/* 📊 Table Aperçu */}
-          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "visible" }}>
+          {/* 📊 Table Aperçu : SCROLL HORIZONTAL pour empêcher la superposition */}
+          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
             </div>
             
-            <div style={{ display:"grid", gridTemplateColumns:"60px minmax(0, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-              {["N°","Libellé","Statut","Responsable","Date"].map(h => (
-                <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
-              ))}
-            </div>
-            
-            <div style={{ paddingBottom:"10px" }}>
-              {safeCriteres.slice(0, 20).map((r, i) => {
-                const cConf = CRITERES_LABELS[r.critere] || { color: t.text2 };
-                const isConforme = r.statut === "conforme";
-                const isNC = r.statut === "non-conforme";
-                const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
+            <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
+              <div style={{ minWidth: "600px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+                  {["N°","Libellé","Statut","Responsable","Date"].map(h => (
+                    <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
+                  ))}
+                </div>
                 
-                return (
-                  <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"60px minmax(0, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                <div style={{ paddingBottom:"10px" }}>
+                  {safeCriteres.slice(0, 20).map((r, i) => {
+                    const cConf = CRITERES_LABELS[r.critere] || { color: t.text2 };
+                    const isConforme = r.statut === "conforme";
+                    const isNC = r.statut === "non-conforme";
+                    const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                     
-                    {/* Numéro sur une ligne et même typo que la conformité */}
-                    <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:cConf.color, whiteSpace:"nowrap" }}>
-                      Ind. {r.num.replace('C', '')}
-                    </div>
-                    
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize:"12px", color:t.text, fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                        {r.titre}
+                    return (
+                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                        
+                        <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:cConf.color, whiteSpace:"nowrap" }}>
+                          Ind. {r.num.replace('C', '')}
+                        </div>
+                        
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ fontSize:"12px", color:t.text, fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                            {r.titre}
+                          </div>
+                        </div>
+                        
+                        <div>
+                          <span style={{ background: isConforme ? t.greenBg : isNC ? t.redBg : r.statut === "en-cours" ? t.amberBg : t.surface3, color: isConforme ? t.green : isNC ? t.red : r.statut === "en-cours" ? t.amber : t.text2, border: `1px solid ${isConforme ? t.greenBd : isNC ? t.redBd : r.statut === "en-cours" ? t.amberBd : t.border}`, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px", whiteSpace:"nowrap" }}>
+                            {labelStatut}
+                          </span>
+                        </div>
+                        <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
+                        <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"normal", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
                       </div>
-                    </div>
-                    
-                    <div>
-                      <span style={{ background: isConforme ? t.greenBg : isNC ? t.redBg : r.statut === "en-cours" ? t.amberBg : t.surface3, color: isConforme ? t.green : isNC ? t.red : r.statut === "en-cours" ? t.amber : t.text2, border: `1px solid ${isConforme ? t.greenBd : isNC ? t.redBd : r.statut === "en-cours" ? t.amberBd : t.border}`, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px", whiteSpace:"nowrap" }}>
-                        {labelStatut}
-                      </span>
-                    </div>
-                    <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
-                    {/* Date non-grasse */}
-                    <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"normal", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </div>
 
           {/* ⚡ Panel de droite */}
           <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
             
-            {/* Widget: Échéances proches (Bulles colorées) */}
+            {/* Échéances proches (Bulles séparées autour de l'indicateur Image 2) */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>🚨 Échéances proches</div>
               {safeUrgents.length === 0 ? (
                 <div style={{ fontSize:"12px", color:t.text2, fontStyle:"italic" }}>Aucune alerte.</div>
               ) : (
-                safeUrgents.slice(0,5).map((u, i) => {
-                  const d = days(u.delai);
-                  const cConf = CRITERES_LABELS[u.critere] || { bg:t.surface2, bd:t.border, color:t.text };
-                  
-                  return (
-                    <div key={i} className="ug" style={{ background: cConf.bg, border:`1px solid ${cConf.bd}`, borderRadius:"8px", padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", boxShadow:t.shadowSm }}>
-                      <span style={{ fontSize:"12px", fontWeight:"700", color: cConf.color, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.num} — {u.titre}</span>
-                      {d < 0 ? (
-                        <span style={{ color:t.red, fontSize:"11px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>DÉPASSÉ</span>
-                      ) : (
-                        <span style={{ fontSize:"11px", fontWeight:"800", color:t.red, marginLeft:"10px", whiteSpace:"nowrap" }}>J-{d}</span>
-                      )}
-                    </div>
-                  );
-                })
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {safeUrgents.slice(0,5).map((u, i) => {
+                    const d = days(u.delai);
+                    const cConf = CRITERES_LABELS[u.critere] || { bg:t.surface2, bd:t.border, color:t.text };
+                    
+                    return (
+                      <div key={i} className="ug" style={{ background: t.surface2, border:`1px solid ${t.border2}`, borderRadius:"8px", padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowSm }}>
+                        {/* Bulle spécifique autour du Numéro Indicator */}
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px", flex:1, overflow:"hidden" }}>
+                          <span style={{ background: cConf.bg, color: cConf.color, border: `1px solid ${cConf.bd}`, padding: "2px 6px", borderRadius: "6px", fontSize: "11px", fontWeight: "800", flexShrink: 0 }}>
+                            {u.num}
+                          </span>
+                          <span style={{ fontSize:"12px", fontWeight:"500", color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                            {u.titre}
+                          </span>
+                        </div>
+                        
+                        {d < 0 ? (
+                          <span style={{ background:t.redBg, color:t.red, border:`1px solid ${t.redBd}`, padding:"2px 6px", borderRadius:"4px", fontSize:"9px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>DÉPASSÉ</span>
+                        ) : (
+                          <span style={{ fontSize:"11px", fontWeight:"800", color:t.red, marginLeft:"10px", whiteSpace:"nowrap" }}>J-{d}</span>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
               )}
             </div>
 
