@@ -8,7 +8,6 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
 
   const pct = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
-  // Pour la jauge
   const r = 32; 
   const circ = 2 * Math.PI * r; 
   const offset = circ - (pct / 100) * circ;
@@ -38,7 +37,7 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
         {/* ── ROW 1 : HERO CONFORMITÉ + KPIs ── */}
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:"16px" }}>
           
-          {/* 🌟 Grande Carte Conformité Globale (Design Claude) */}
+          {/* 🌟 Grande Carte Conformité Globale */}
           <div className="ca" style={{ background:t.surface, border:`1px solid ${t.goldBd}`, borderRadius:"12px", padding:"24px 30px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowGold }}>
             <div style={{ flex: 1, paddingRight: "20px" }}>
               <div style={{ fontSize:"11px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1.5px", marginBottom:"12px" }}>Conformité globale</div>
@@ -56,7 +55,7 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
             </svg>
           </div>
 
-          {/* 3 Cartes KPIs (Style Claude épuré avec point) */}
+          {/* 3 Cartes KPIs */}
           {[
             { v: stats?.conforme || 0,     l:"Conformes",     c:t.green,  bg:t.greenBg,  bd:t.greenBd,  pct: stats?.total ? Math.round(((stats.conforme||0)/stats.total)*100)+"%" : "0%" },
             { v: stats?.enCours || 0,      l:"En cours",      c:t.amber,  bg:t.amberBg,  bd:t.amberBd,  pct: stats?.total ? Math.round(((stats.enCours||0)/stats.total)*100)+"%" : "0%" },
@@ -65,7 +64,7 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
             <div key={i} className="ca" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", boxShadow:t.shadow, display:"flex", flexDirection:"column" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px" }}>
                 <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"42px", fontWeight:"normal", color:t.text, letterSpacing:"-1px", lineHeight:1 }}>{s.v}</div>
-                <div style={{ width:"12px", height:"12px", borderRadius:"50%", background:s.c, marginTop:"6px", boxShadow:`0 0 8px ${s.bd}` }}/>
+                <div style={{ width:"14px", height:"14px", borderRadius:"50%", background:s.c, marginTop:"6px", boxShadow:`0 0 10px ${s.bd}` }}/>
               </div>
               <div style={{ fontSize:"13px", color:t.text2, fontWeight:"600", marginBottom:"auto", paddingBottom:"16px" }}>{s.l}</div>
               <div style={{ height:"4px", background:t.border2, borderRadius:"2px", marginBottom:"6px" }}>
@@ -88,8 +87,8 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text }}>Aperçu des indicateurs</span>
             </div>
             
-            {/* Header avec largeurs ajustées pour éviter les chevauchements */}
-            <div style={{ display:"grid", gridTemplateColumns:"70px minmax(150px, 1fr) 110px 120px 60px", gap:"10px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            {/* Grille corrigée pour éviter la superposition */}
+            <div style={{ display:"grid", gridTemplateColumns:"90px minmax(0, 1fr) 110px 120px 60px", gap:"12px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
               {["N°","Libellé","Statut","Responsable","Date"].map(h => (
                 <span key={h} style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
               ))}
@@ -103,14 +102,14 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
                 const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                 
                 return (
-                  <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(150px, 1fr) 110px 120px 60px", gap:"10px", alignItems:"center", padding:"14px 24px", borderBottom:`1px solid ${t.border2}` }}>
-                    {/* Numéro avec couleur du critère - Format "Indicateur X" inspiré de Claude */}
+                  <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"90px minmax(0, 1fr) 110px 120px 60px", gap:"12px", alignItems:"center", padding:"14px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                    {/* Numéro avec couleur du critère (Ex: "Indicateur 1.1") */}
                     <div>
-                      <div style={{ fontSize:"12px", fontWeight:"800", color:cConf.color }}>Indicateur</div>
+                      <div style={{ fontSize:"10px", color:t.text3, marginBottom:"2px" }}>Indicateur</div>
                       <div style={{ fontSize:"14px", fontWeight:"800", color:cConf.color, fontFamily:"'DM Mono',monospace" }}>{r.num.replace('C', '')}</div>
                     </div>
                     
-                    {/* Libellé (Ne dépasse plus grâce au minWidth: 0) */}
+                    {/* Libellé (minWidth: 0 empêche le texte de forcer la colonne à s'élargir) */}
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                         {r.titre}
@@ -146,7 +145,6 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
               ) : (
                 safeUrgents.slice(0,4).map((u, i) => {
                   const d = days(u.delai);
-                  // La bulle prend la couleur de l'urgence (comme sur ta capture d'écran)
                   const s = d < 0 ? { bg: t.redBg, bd: t.redBd, c: t.red } : d <= 15 ? { bg: t.redBg, bd: t.redBd, c: t.red } : d <= 30 ? { bg: t.amberBg, bd: t.amberBd, c: t.amber } : { bg: t.greenBg, bd: t.greenBd, c: t.green };
                   
                   return (
@@ -161,7 +159,7 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
               )}
             </div>
 
-            {/* Widget: Activité récente (Initiales propres) */}
+            {/* Widget: Activité récente */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", boxShadow:t.shadow, flex:1 }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"16px" }}>⚡ Activité récente</div>
               {hist.length === 0 ? (
@@ -173,7 +171,6 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
                   
                   return (
                     <div key={i} style={{ display:"flex", gap:"12px", marginBottom:"16px", alignItems:"flex-start" }}>
-                      {/* Initiales de l'utilisateur au lieu du point orange */}
                       <div style={{ width:"26px", height:"26px", borderRadius:"6px", background:cConf.bg, border:`1px solid ${cConf.bd}`, color:cConf.color, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"10px", fontWeight:"800", flexShrink:0, marginTop:"2px" }}>
                         {initiales}
                       </div>
@@ -188,7 +185,6 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
                 })
               )}
             </div>
-
           </div>
         </div>
      </div>
