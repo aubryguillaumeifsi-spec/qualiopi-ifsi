@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { CRITERES_LABELS, STATUT_CONFIG } from "../data";
 
+// ----------------------------------------------------------------------
+// 🎯 ONGLET : INDICATEURS
+// ----------------------------------------------------------------------
 export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilterStatut, filterCritere, setFilterCritere, filtered, days, setModalCritere, t }) {
   
   const [vue, setVue] = useState("table"); 
@@ -50,7 +53,6 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
 
       {/* ── BARRE DE RECHERCHE ET FILTRES ── */}
       <div style={{ display:"flex", gap:"16px", alignItems:"center", flexWrap:"wrap" }}>
-        {/* Barre de recherche fixée - FLEX 0 0 AUTO pour ne pas l'écraser */}
         <div style={{ position:"relative", width:"260px", flexShrink:0 }}>
           <span style={{ position:"absolute", left:"12px", top:"50%", transform:"translateY(-50%)", fontSize:"12px", color:t.text3 }}>🔍</span>
           <input 
@@ -88,8 +90,8 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           
           <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
-            <div style={{ minWidth: "700px" }}> {/* Largeur minimum pour forcer le scroll sur petits écrans */}
-              <div style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            <div style={{ minWidth: "750px" }}> {/* Largeur garantie pour ne pas écraser les colonnes */}
+              <div style={{ display:"grid", gridTemplateColumns:"110px minmax(200px, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                 {["N°", "Libellé", "Statut", "Responsable", "Échéance"].map(h => (
                   <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                 ))}
@@ -108,10 +110,11 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                      const d = days(c.delai);
 
                      return (
-                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"110px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
                           
-                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:cConf.color, whiteSpace:"nowrap" }}>
-                            Ind. {c.num.replace('C', '')}
+                          {/* Numéro avec l'espace sécurisé */}
+                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:cConf.color, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} title={c.num}>
+                            {c.num}
                           </div>
 
                           <div style={{ minWidth: 0 }}>
@@ -176,7 +179,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                          <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"14px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:t.shadowSm }}>
                             <div>
                               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px" }}>
-                                 <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>Ind. {c.num.replace('C','')}</span>
+                                 <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>{c.num}</span>
                                  <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>{labelStatut}</span>
                               </div>
                               <div style={{ fontSize:"12px", color:t.text, fontWeight:"500", lineHeight:"1.4", marginBottom:"14px" }}>{c.titre}</div>
@@ -206,6 +209,9 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
   );
 }
 
+// ----------------------------------------------------------------------
+// 🔥 ONGLET : PRIORITÉS
+// ----------------------------------------------------------------------
 export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
   return (
     <div className="animate-fade-in" style={{ maxWidth:"1000px", margin:"0 auto" }}>
@@ -234,7 +240,7 @@ export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
               <div key={c.id} onClick={() => setModalCritere(c)} style={{ background:t.surface, border:`1px solid ${isNC ? t.redBd : t.border}`, borderLeft:`4px solid ${isNC ? t.red : t.amber}`, borderRadius:"8px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", transition:"all 0.2s", boxShadow:t.shadowSm }} onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>
                 <div style={{ flex:1, paddingRight:"20px" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"6px" }}>
-                    <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>Ind. {c.num.replace('C','')}</span>
+                    <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>{c.num}</span>
                     <span style={{ background:themeStatut.bg, color:themeStatut.c, border:`1px solid ${themeStatut.bd}`, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"4px", textTransform:"uppercase" }}>{labelStatut}</span>
                   </div>
                   <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", lineHeight:"1.4" }}>{c.titre}</div>
