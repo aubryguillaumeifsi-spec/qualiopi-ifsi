@@ -5,7 +5,7 @@ import DetailModal from "./components/DetailModal";
 import DashboardTab from "./components/DashboardTab";
 import TourControleTab from "./components/TourControleTab";
 import OrganigrammeTab from "./components/OrganigrammeTab";
-import { CriteresTab, AxesTab, ResponsablesTab, LivreBlancTab } from "./components/TabsQualiopi";
+import { CriteresTab, AxesTab, LivreBlancTab } from "./components/TabsQualiopi";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
@@ -13,16 +13,13 @@ import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePass
 import { db, auth, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
-// ----------------------------------------------------------------------
-// 🎨 TOKENS HAUTE FIDÉLITÉ (SIDEBAR BLEU NUIT)
-// ----------------------------------------------------------------------
 const GFONT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Albert+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap";
 
 function buildTokens(dark) {
   return dark ? {
     bg:"#0b111a", surface:"#151c2a", surface2:"#1a2235", surface3:"#1e2840",
     border:"#1f2d42", border2:"#192438", borderNav:"rgba(255,255,255,0.07)",
-    sidebar:"#0a101a", nav:"#0a101a", // Bleu Nuit encore plus sombre
+    sidebar:"#0a101a", nav:"#0a101a", 
     text:"#d6e3f5", text2:"#748bac", text3:"#425675",
     textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.5)",
     accent:"#4f82f5", accentBg:"rgba(79,130,245,0.12)", accentBd:"rgba(79,130,245,0.28)",
@@ -34,7 +31,7 @@ function buildTokens(dark) {
   } : {
     bg:"#eef2f6", surface:"#ffffff", surface2:"#f8fafc", surface3:"#e2e8f0",
     border:"#d5ddef", border2:"#e2e8f0", borderNav:"rgba(255,255,255,0.08)",
-    sidebar:"#162040", nav:"#162040", // Le fameux Bleu Nuit de Claude
+    sidebar:"#162040", nav:"#162040", 
     text:"#0f172a", text2:"#475569", text3:"#94a3b8",
     textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.6)",
     accent:"#1d52d4", accentBg:"#eff6ff", accentBd:"#bfdbfe",
@@ -104,8 +101,6 @@ function MainApp() {
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
-  const [newRoleInput, setNewRoleInput] = useState("");
-  const [newManualUser, setNewManualUser] = useState({ prenom: "", nom: "" });
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
@@ -174,9 +169,7 @@ function MainApp() {
 
   const handleLogout = () => signOut(auth);
 
-  // ----------------------------------------------------------------------
-  // 🛡️ FONCTIONS SYSTÈME (Rétablies pour empêcher les crashs)
-  // ----------------------------------------------------------------------
+  // Fonctions de sécurité pour empêcher les crashs
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
@@ -201,7 +194,6 @@ function MainApp() {
     return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[5]; 
   }, [ifsiData, t]);
 
-  // Mémos et calculs
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || false;
@@ -210,10 +202,9 @@ function MainApp() {
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
-  // RÉTABLISSEMENT DE PRENOM/NOM POUR L'ORGANIGRAMME (Évite le crash "undefined prenom")
   const allIfsiMembers = useMemo(() => [
-    ...orgAccounts.map(u => ({ id: u.id, prenom: u.email.split('@')[0], nom: "", name: u.email.split('@')[0], roles: u.orgRoles || [], type: 'account', email: u.email })),
-    ...manualUsers.map(u => ({ id: u.id, prenom: u.name?.split(' ')[0] || "Membre", nom: u.name?.split(' ').slice(1).join(' ') || "", name: u.name, roles: u.roles || [], type: 'manual' }))
+    ...orgAccounts.map(u => ({ id: u.id, prenom: u.email?u.email.split('@')[0]:"User", nom: "", name: u.email?u.email.split('@')[0]:"User", roles: u.orgRoles || [], type: 'account', email: u.email })),
+    ...manualUsers.map(u => ({ id: u.id, prenom: u.name?.split(' ')[0] || "Membre", nom: u.name?.split(' ').slice(1).join(' ') || "", name: u.name||"Membre", roles: u.roles || [], type: 'manual' }))
   ].sort((a,b) => a.name.localeCompare(b.name)), [orgAccounts, manualUsers]);
 
   const { stats, urgents, filtered, axes } = useMemo(() => {
@@ -272,6 +263,11 @@ function MainApp() {
     return a.name.localeCompare(b.name);
   }), [tourData.active, tourSort]);
 
+  const saveData = async (newCampaigns) => {
+    const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
+    await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
+  };
+
   const handleAutoSave = (updated) => {
     if (isArchive) return;
     const newListe = criteres.map(c => c.id === updated.id ? updated : c);
@@ -279,11 +275,19 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  const saveModal = (updated, action) => { handleAutoSave(updated); if (action === "close" || action === undefined) setModalCritere(null); };
+  const saveModal = (updated, action) => { 
+    handleAutoSave(updated); 
+    if (action === "close" || !action) setModalCritere(null); 
+    else if (action === "next") {
+       const idx = filtered.findIndex(c => c.id === updated.id);
+       if (idx < filtered.length - 1) setModalCritere(filtered[idx + 1]);
+    }
+    else if (action === "prev") {
+       const idx = filtered.findIndex(c => c.id === updated.id);
+       if (idx > 0) setModalCritere(filtered[idx - 1]);
+    }
+  };
 
-  // ----------------------------------------------------------------------
-  // 🖥️ AFFICHAGE PRINCIPAL
-  // ----------------------------------------------------------------------
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
   if (activeTab === "validation_requise") return <div style={{ minHeight: "100vh", background: t.bg, color: t.text, display: "flex", justifyContent: "center", alignItems: "center" }}>Vérification Email Requise</div>;
@@ -304,10 +308,17 @@ function MainApp() {
     );
   };
 
+  // Calcul du currentIndex pour la modal
+  const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
       <link href={GFONT} rel="stylesheet" />
       <style>{`
+        /* CORRECTION DU CADRE BLANC */
+        html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: ${t.bg}; }
         @media print { .no-print { display: none !important; } body { background: white !important; } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
@@ -317,10 +328,23 @@ function MainApp() {
       `}</style>
 
       {modalCritere && (
-        <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} onAutoSave={handleAutoSave} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} hasPrev={false} hasNext={false} />
+        <DetailModal 
+          critere={modalCritere} 
+          onClose={() => setModalCritere(null)} 
+          onSave={saveModal} 
+          onAutoSave={handleAutoSave} 
+          saveData={saveData} // Répare le bug "saveData is not defined"
+          isReadOnly={isArchive} 
+          isAuditMode={isAuditMode} 
+          allMembers={allIfsiMembers} 
+          rolePalette={ROLE_PALETTE} 
+          orgRoles={orgRoles} 
+          hasPrev={hasPrev} 
+          hasNext={hasNext} 
+        />
       )}
 
-      {/* 🧭 SIDEBAR GAUCHE (Bleu Nuit Profond garanti) */}
+      {/* 🧭 SIDEBAR GAUCHE (Bleu Nuit) */}
       <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50 }}>
         
         {/* Logo & Date */}
@@ -356,7 +380,7 @@ function MainApp() {
         {/* Menu Principal */}
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 12px" }}>
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
-          {menuBtn("dashboard", "Dashboard")}
+          {menuBtn("dashboard", "Tableau de bord")}
           {menuBtn("criteres", "Indicateurs")}
           {menuBtn("axes", "Priorités")}
           {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme")}
@@ -367,18 +391,17 @@ function MainApp() {
           {menuBtn("livre_blanc", "Livre Blanc")}
           {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("equipe", "Administration")}
           {userProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
-          {menuBtn("compte", "Compte personnel")}
         </div>
 
         {/* ✦ Prochain audit ✦ */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
-            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#0c1118" }}>
+            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#ffffff" }}>
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
-          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.textNav, letterSpacing:"-0.2px", marginBottom:"12px" }}>
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
             {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
           </div>
           <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
@@ -391,16 +414,16 @@ function MainApp() {
 
         {/* Profil & Logout */}
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden" }}>
+          <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px" }}>
             <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
               {auth.currentUser?.email?.charAt(0).toUpperCase()}
             </div>
             <div style={{ overflow: "hidden" }}>
               <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{auth.currentUser?.email?.split('@')[0]}</div>
-              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>{userProfile?.role}</div>
+              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>Mon compte ⚙️</div>
             </div>
           </div>
-          <button onClick={handleLogout} style={{ width:"100%", marginTop:"12px", background: "transparent", border: `1px solid ${t.borderNav}`, borderRadius:"8px", padding:"8px", color: t.textNavSub, cursor: "pointer", fontSize: "12px", fontWeight:"600", transition: "all 0.2s" }} onMouseOver={e=>{e.currentTarget.style.color=t.red; e.currentTarget.style.borderColor=t.redBd;}} onMouseOut={e=>{e.currentTarget.style.color=t.textNavSub; e.currentTarget.style.borderColor=t.borderNav;}}>
+          <button onClick={handleLogout} style={{ width:"100%", background: "transparent", border: `1px solid ${t.borderNav}`, borderRadius:"8px", padding:"8px", color: t.textNavSub, cursor: "pointer", fontSize: "12px", fontWeight:"600", transition: "all 0.2s" }} onMouseOver={e=>{e.currentTarget.style.color=t.red; e.currentTarget.style.borderColor=t.redBd;}} onMouseOut={e=>{e.currentTarget.style.color=t.textNavSub; e.currentTarget.style.borderColor=t.borderNav;}}>
             Déconnexion
           </button>
         </div>
@@ -412,7 +435,7 @@ function MainApp() {
         {/* Sub-header global */}
         <div className="no-print" style={{ height:"60px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>{activeTab === 'dashboard' ? 'Dashboard' : activeTab.replace('_', ' ')}</span>
+            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>{activeTab === 'dashboard' ? 'Tableau de bord' : activeTab.replace('_', ' ')}</span>
             <span style={{ fontSize:"12px", color:t.text3 }}>{currentIfsiName ? `· ${currentIfsiName}` : ""}</span>
           </div>
           <div style={{ display:"flex", gap:"12px" }}>
@@ -423,7 +446,6 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {/* TOUTES LES PROPS SONT PASSÉES POUR ÉVITER LE MOINDRE CRASH */}
           {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
