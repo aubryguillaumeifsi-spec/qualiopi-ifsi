@@ -7,7 +7,6 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
   const safeUrgents = Array.isArray(urgents) ? urgents : [];
 
   const pct = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
-  
   const r = 32; 
   const circ = 2 * Math.PI * r; 
   const offset = circ - (pct / 100) * circ;
@@ -37,7 +36,6 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
         {/* ── ROW 1 : HERO CONFORMITÉ + KPIs ── */}
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:"16px" }}>
           
-          {/* 🌟 Grande Carte Conformité Globale */}
           <div className="ca" style={{ background:t.surface, border:`1px solid ${t.goldBd}`, borderRadius:"12px", padding:"24px 30px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowGold }}>
             <div style={{ flex: 1, paddingRight: "20px" }}>
               <div style={{ fontSize:"11px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1.5px", marginBottom:"12px" }}>Conformité globale</div>
@@ -55,7 +53,6 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
             </svg>
           </div>
 
-          {/* 3 Cartes KPIs */}
           {[
             { v: stats?.conforme || 0,     l:"Conformes",     c:t.green,  bg:t.greenBg,  bd:t.greenBd,  pct: stats?.total ? Math.round(((stats.conforme||0)/stats.total)*100)+"%" : "0%" },
             { v: stats?.enCours || 0,      l:"En cours",      c:t.amber,  bg:t.amberBg,  bd:t.amberBd,  pct: stats?.total ? Math.round(((stats.enCours||0)/stats.total)*100)+"%" : "0%" },
@@ -81,52 +78,46 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"20px", flex:1 }}>
           
-          {/* 📊 Table Aperçu des Indicateurs */}
-          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadow, display:"flex", flexDirection:"column", minWidth: 0 }}>
+          {/* 📊 Table Aperçu (Ne bloque plus le scroll, s'étend avec la page) */}
+          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", boxShadow:t.shadow, display:"flex", flexDirection:"column", minWidth: 0, overflow: "visible" }}>
             <div style={{ padding:"16px 24px", borderBottom:`1px solid ${t.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text }}>Aperçu des indicateurs</span>
             </div>
             
-            {/* Grille corrigée pour éviter la superposition */}
-            <div style={{ display:"grid", gridTemplateColumns:"90px minmax(0, 1fr) 110px 120px 60px", gap:"12px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-              {["N°","Libellé","Statut","Responsable","Date"].map(h => (
+            <div style={{ display:"grid", gridTemplateColumns:"120px minmax(0, 1fr) 110px 120px 60px", gap:"12px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+              {["N°","LIBELLÉ","STATUT","RESPONSABLE","DATE"].map(h => (
                 <span key={h} style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
               ))}
             </div>
             
-            <div style={{ overflowY:"auto", flex:1, maxHeight:"450px" }}>
-              {safeCriteres.slice(0, 15).map((r, i) => {
+            <div style={{ paddingBottom:"10px" }}>
+              {safeCriteres.slice(0, 20).map((r, i) => {
                 const cConf = CRITERES_LABELS[r.critere] || { color: t.text2 };
                 const isConforme = r.statut === "conforme";
                 const isNC = r.statut === "non-conforme";
                 const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                 
                 return (
-                  <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"90px minmax(0, 1fr) 110px 120px 60px", gap:"12px", alignItems:"center", padding:"14px 24px", borderBottom:`1px solid ${t.border2}` }}>
-                    {/* Numéro avec couleur du critère (Ex: "Indicateur 1.1") */}
-                    <div>
-                      <div style={{ fontSize:"10px", color:t.text3, marginBottom:"2px" }}>Indicateur</div>
-                      <div style={{ fontSize:"14px", fontWeight:"800", color:cConf.color, fontFamily:"'DM Mono',monospace" }}>{r.num.replace('C', '')}</div>
+                  <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"120px minmax(0, 1fr) 110px 120px 60px", gap:"12px", alignItems:"center", padding:"14px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                    
+                    {/* Numéro stylisé */}
+                    <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:cConf.color, whiteSpace:"nowrap" }}>
+                      Indicateur {r.num.replace('C', '')}
                     </div>
                     
-                    {/* Libellé (minWidth: 0 empêche le texte de forcer la colonne à s'élargir) */}
+                    {/* Libellé */}
                     <div style={{ minWidth: 0 }}>
                       <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                         {r.titre}
                       </div>
                     </div>
                     
-                    {/* Badge Statut */}
                     <div>
                       <span style={{ background: isConforme ? t.greenBg : isNC ? t.redBg : r.statut === "en-cours" ? t.amberBg : t.surface3, color: isConforme ? t.green : isNC ? t.red : r.statut === "en-cours" ? t.amber : t.text2, border: `1px solid ${isConforme ? t.greenBd : isNC ? t.redBd : r.statut === "en-cours" ? t.amberBd : t.border}`, fontSize:"10px", fontWeight:"800", padding:"4px 10px", borderRadius:"6px", whiteSpace:"nowrap" }}>
                         {labelStatut}
                       </span>
                     </div>
-                    
-                    {/* Responsable */}
                     <span style={{ fontSize:"12px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
-                    
-                    {/* Date */}
                     <span style={{ fontSize:"12px", color:t.text3, textAlign:"right", fontWeight:"600", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
                   </div>
                 );
@@ -137,29 +128,35 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
           {/* ⚡ Panel de droite */}
           <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
             
-            {/* Widget: Échéances proches (Bulles colorées) */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", boxShadow:t.shadow }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"16px" }}>🚨 Échéances proches</div>
               {safeUrgents.length === 0 ? (
                 <div style={{ fontSize:"13px", color:t.text2, fontStyle:"italic" }}>Aucune alerte.</div>
               ) : (
-                safeUrgents.slice(0,4).map((u, i) => {
+                safeUrgents.slice(0,5).map((u, i) => {
                   const d = days(u.delai);
-                  const s = d < 0 ? { bg: t.redBg, bd: t.redBd, c: t.red } : d <= 15 ? { bg: t.redBg, bd: t.redBd, c: t.red } : d <= 30 ? { bg: t.amberBg, bd: t.amberBd, c: t.amber } : { bg: t.greenBg, bd: t.greenBd, c: t.green };
+                  const cConf = CRITERES_LABELS[u.critere] || { bg:t.surface2, bd:t.border, color:t.text };
                   
                   return (
-                    <div key={i} className="ug" style={{ background: s.bg, border:`1px solid ${s.bd}`, borderRadius:"8px", padding:"12px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
-                      <span style={{ fontSize:"12px", fontWeight:"600", color:t.text, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.num} — {u.titre}</span>
-                      <span style={{ fontSize:"12px", fontWeight:"800", color:s.c, marginLeft:"10px", whiteSpace:"nowrap" }}>
-                        {d < 0 ? "DÉPASSÉ" : `J-${d}`}
-                      </span>
+                    <div key={i} className="ug" style={{ background: cConf.bg, border:`1px solid ${cConf.bd}`, borderRadius:"8px", padding:"12px 14px", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+                      <span style={{ fontSize:"12px", fontWeight:"700", color: cConf.color, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.num} — {u.titre}</span>
+                      
+                      {/* J-12 ou DÉPASSÉ */}
+                      {d < 0 ? (
+                        <span style={{ background:t.redBg, color:t.red, padding:"2px 6px", borderRadius:"4px", fontSize:"10px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>
+                          DÉPASSÉ
+                        </span>
+                      ) : (
+                        <span style={{ fontSize:"12px", fontWeight:"800", color:t.red, marginLeft:"10px", whiteSpace:"nowrap" }}>
+                          J-{d}
+                        </span>
+                      )}
                     </div>
                   );
                 })
               )}
             </div>
 
-            {/* Widget: Activité récente */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", boxShadow:t.shadow, flex:1 }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"16px" }}>⚡ Activité récente</div>
               {hist.length === 0 ? (
