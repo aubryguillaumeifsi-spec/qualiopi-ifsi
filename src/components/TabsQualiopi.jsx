@@ -1,9 +1,12 @@
 import React, { useState } from "react";
 import { CRITERES_LABELS, STATUT_CONFIG } from "../data";
 
-export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilterStatut, filterCritere, setFilterCritere, filtered, days, dayColor, setModalCritere, isArchive, t }) {
+// ----------------------------------------------------------------------
+// 🎯 ONGLET : INDICATEURS
+// ----------------------------------------------------------------------
+export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilterStatut, filterCritere, setFilterCritere, filtered, days, setModalCritere, t }) {
   
-  const [vue, setVue] = useState("table"); // "table" ou "cards"
+  const [vue, setVue] = useState("table"); 
 
   const statsCounts = {
     conforme: filtered.filter(c => c.statut === "conforme").length,
@@ -37,19 +40,18 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                 <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"42px", color:t.text, lineHeight:1, letterSpacing:"-1px" }}>{s.v}</div>
                 <div style={{ fontSize:"13px", color:t.text2, fontWeight:"600", marginTop:"6px" }}>{s.l}</div>
               </div>
-              {/* Plus de bulle autour, juste le joli point lumineux */}
               <div style={{ width:"14px", height:"14px", borderRadius:"50%", background:s.c, boxShadow:`0 0 10px ${s.bd}` }}/>
             </div>
           );
         })}
       </div>
 
-      {/* ── BARRE DE RECHERCHE ET FILTRES (Flottants sur le fond) ── */}
+      {/* ── BARRE DE RECHERCHE ET FILTRES ── */}
       <div style={{ display:"flex", gap:"16px", alignItems:"center", flexWrap:"wrap" }}>
-        <div style={{ position:"relative", flex:1, minWidth:"250px" }}>
+        <div style={{ position:"relative", flex:1, minWidth:"250px", maxWidth:"400px" }}>
           <span style={{ position:"absolute", left:"14px", top:"50%", transform:"translateY(-50%)", fontSize:"14px", color:t.text3 }}>🔍</span>
           <input 
-            type="text" placeholder="Rechercher par N°, libellé, responsable..." 
+            type="text" placeholder="Rechercher par N°, libellé..." 
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
             style={{ width:"100%", background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 14px 10px 40px", fontSize:"13px", outline:"none", borderRadius:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
           />
@@ -66,8 +68,8 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
           ))}
         </div>
 
-        {/* Le Toggle d'Affichage (Grille / Liste) */}
-        <div style={{ display:"flex", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"4px", boxShadow:t.shadowSm }}>
+        {/* Toggle d'Affichage (Grille / Liste) */}
+        <div style={{ display:"flex", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"4px", boxShadow:t.shadowSm, marginLeft:"auto" }}>
           <button onClick={() => setVue("table")} style={{ padding:"6px 12px", borderRadius:"6px", border:"none", background: vue==="table"?t.surface2:"transparent", color: vue==="table"?t.text:t.text3, cursor:"pointer", fontSize:"14px", boxShadow: vue==="table"?t.shadowSm:"none" }}>
             ☰
           </button>
@@ -79,42 +81,65 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"13px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── AFFICHAGE TABLEAU (LISTE) ── */}
+      {/* ── VUE TABLEAU (Superposition corrigée & Polices) ── */}
       {vue === "table" && (
-        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"60px 1fr 180px 130px 140px 100px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-            {["N°", "Indicateur", "Critère d'appartenance", "Statut", "Responsable", "Échéance"].map(h => (
+        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"visible", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
+          <div style={{ display:"grid", gridTemplateColumns:"120px minmax(200px, 1fr) 140px 120px 120px 80px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            {["N°", "Indicateur", "Critère", "Statut", "Responsable", "Échéance"].map(h => (
               <span key={h} style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
             ))}
           </div>
-          <div style={{ overflowY:"auto", flex:1, paddingBottom:"10px" }}>
-            {filtered.map(c => {
-               const cConf = CRITERES_LABELS[c.critere] || { color: t.text, bg: t.surface2, bd: t.border };
-               const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"];
-               const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd }, "non-concerne": { c:t.text3, bg:t.surface3, bd:t.border }, "non-evalue": { c:t.text2, bg:t.surface2, bd:t.border } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
-               const d = days(c.delai);
+          
+          <div style={{ paddingBottom:"10px" }}>
+            {filtered.length === 0 ? (
+              <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontStyle:"italic", fontSize:"14px" }}>Aucun indicateur.</div>
+            ) : (
+              filtered.map(c => {
+                 const cConf = CRITERES_LABELS[c.critere] || { color: t.text };
+                 const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"];
+                 const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
+                 const d = days(c.delai);
 
-               return (
-                 <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"60px 1fr 180px 130px 140px 100px", alignItems:"center", gap:"10px", padding:"16px 24px", borderBottom:`1px solid ${t.border2}` }}>
-                    <span style={{ fontSize:"14px", fontWeight:"800", color:cConf.color, fontFamily:"'DM Mono',monospace" }}>{c.num}</span>
-                    <span style={{ fontSize:"14px", color:t.text, paddingRight:"16px", fontWeight:"600", lineHeight:"1.4" }}>{c.titre}</span>
-                    <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                      <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:cConf.color }}/>
-                      <span style={{ fontSize:"12px", color:t.text2 }}>Critère {c.critere}</span>
-                    </div>
-                    <div><span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"11px", fontWeight:"800", padding:"4px 10px", borderRadius:"6px" }}>{sConf.label}</span></div>
-                    <span style={{ fontSize:"13px", color:t.text2 }}>{c.responsables?.[0] || "—"}</span>
-                    <span style={{ fontSize:"13px", fontWeight:"700", color: d < 0 && c.statut !== "conforme" && c.statut !== "non-concerne" ? t.red : t.text3, fontFamily:"'DM Mono',monospace" }}>{c.delai ? new Date(c.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
-                 </div>
-               )
-            })}
+                 return (
+                   <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"120px minmax(200px, 1fr) 140px 120px 120px 80px", alignItems:"center", gap:"12px", padding:"16px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                      
+                      <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:cConf.color, whiteSpace:"nowrap" }}>
+                        Indicateur {c.num.replace('C', '')}
+                      </div>
+                      
+                      <span style={{ fontSize:"14px", color:t.text, paddingRight:"16px", fontWeight:"600", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        {c.titre}
+                      </span>
+                      
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                        <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:cConf.color }}/>
+                        <span style={{ fontSize:"12px", color:t.text2 }}>Critère {c.critere}</span>
+                      </div>
+                      
+                      <div>
+                        <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"11px", fontWeight:"800", padding:"4px 10px", borderRadius:"6px" }}>
+                          {sConf.label}
+                        </span>
+                      </div>
+                      
+                      <span style={{ fontSize:"13px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                        {c.responsables?.[0] || "—"}
+                      </span>
+                      
+                      <span style={{ fontSize:"13px", fontWeight:"700", color: d < 0 && c.statut !== "conforme" && c.statut !== "non-concerne" ? t.red : t.text3, fontFamily:"'DM Mono',monospace" }}>
+                        {c.delai ? new Date(c.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}
+                      </span>
+                   </div>
+                 )
+              })
+            )}
           </div>
         </div>
       )}
 
-      {/* ── AFFICHAGE VIGNETTES (GRILLE PAR CRITÈRE) ── */}
+      {/* ── VUE VIGNETTES (MOCKUP REPRODUIT À L'IDENTIQUE) ── */}
       {vue === "cards" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:"32px", overflowY:"auto", paddingRight:"8px" }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:"32px", overflow:"visible", paddingBottom:"40px" }}>
           {[1,2,3,4,5,6,7].map(num => {
             const inds = filtered.filter(c => c.critere === num);
             if (inds.length === 0) return null;
@@ -122,37 +147,43 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
 
             return (
               <div key={num}>
-                {/* En-tête du Critère */}
-                <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"16px", borderBottom:`2px solid ${cConf.bg}`, paddingBottom:"8px" }}>
+                {/* En-tête du Critère façon Mockup */}
+                <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"16px", paddingBottom:"8px" }}>
                    <div style={{ width:"32px", height:"32px", borderRadius:"8px", background:cConf.bg, border:`1px solid ${cConf.bd}`, display:"flex", alignItems:"center", justifyContent:"center", color:cConf.color, fontWeight:"800", fontSize:"14px" }}>C{num}</div>
-                   <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color }}>Critère {num}</span>
-                   <span style={{ fontSize:"13px", color:t.text2, marginLeft:"auto", background:t.surface, padding:"4px 12px", borderRadius:"20px", border:`1px solid ${t.border}` }}>{inds.length} indicateur{inds.length>1?'s':''}</span>
+                   <div>
+                     <div style={{ fontSize:"16px", fontWeight:"800", color:cConf.color }}>Critère {num}</div>
+                     <div style={{ fontSize:"11px", color:t.text3 }}>{inds.length} indicateurs filtrés</div>
+                   </div>
                 </div>
                 
                 {/* Grille des cartes */}
-                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(300px, 1fr))", gap:"16px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(320px, 1fr))", gap:"16px" }}>
                    {inds.map(c => {
                       const sConf = STATUT_CONFIG[c.statut] || STATUT_CONFIG["non-evalue"];
-                      const d = days(c.delai);
+                      const themeStatut = { "conforme": { c:t.green, bg:t.surface }, "non-conforme": { c:t.red, bg:t.surface }, "en-cours": { c:t.amber, bg:t.surface }, "non-concerne": { c:t.text3, bg:t.surface } }[c.statut] || { c:t.text2, bg:t.surface };
+                      
                       const preuvesCount = (c.fichiers?.length||0) + (c.chemins_reseau?.length||0) + (c.preuves ? 1 : 0);
+                      const isComplete = preuvesCount > 0 && c.statut === "conforme";
 
                       return (
-                         <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", display:"flex", flexDirection:"column", justifyContent:"space-between" }}>
+                         <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"16px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:t.shadowSm }}>
                             <div>
-                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"12px" }}>
-                                 <span style={{ fontSize:"16px", fontWeight:"800", color:cConf.color, fontFamily:"'DM Mono',monospace" }}>{c.num}</span>
-                                 <span style={{ background:sConf.bg, border:`1px solid ${sConf.bd}`, color:sConf.c, fontSize:"10px", fontWeight:"800", padding:"4px 8px", borderRadius:"6px" }}>{sConf.label}</span>
+                              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
+                                 <span style={{ fontSize:"14px", fontWeight:"800", color:cConf.color, fontFamily:"'DM Mono',monospace" }}>{c.num}</span>
+                                 <span style={{ background:t.surface, border:`1px solid ${themeStatut.c}`, color:themeStatut.c, fontSize:"10px", fontWeight:"800", padding:"3px 8px", borderRadius:"4px" }}>{sConf.label}</span>
                               </div>
-                              <div style={{ fontSize:"14px", color:t.text, fontWeight:"600", lineHeight:"1.4", marginBottom:"20px" }}>{c.titre}</div>
+                              <div style={{ fontSize:"13px", color:t.text, fontWeight:"600", lineHeight:"1.4", marginBottom:"16px" }}>{c.titre}</div>
                             </div>
-                            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", borderTop:`1px solid ${t.border2}`, paddingTop:"16px" }}>
-                               <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                                 <span style={{ fontSize:"14px" }}>👤</span>
-                                 <span style={{ fontSize:"12px", color:t.text2 }}>{c.responsables?.[0]||"—"}</span>
+                            
+                            <div style={{ marginTop:"auto" }}>
+                               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:"12px", marginBottom:"8px" }}>
+                                 <span style={{ color:t.text2 }}>👤 {c.responsables?.[0]||"—"}</span>
+                                 <span style={{ fontWeight:"800", color: isComplete ? t.green : preuvesCount === 0 ? t.red : t.text }}>
+                                   {preuvesCount}/{preuvesCount>0?preuvesCount:1} preuves
+                                 </span>
                                </div>
-                               <div style={{ display:"flex", gap:"8px", alignItems:"center" }}>
-                                 {preuvesCount > 0 && <span style={{ fontSize:"10px", background:t.surface2, border:`1px solid ${t.border}`, padding:"2px 6px", borderRadius:"4px" }}>📎 {preuvesCount}</span>}
-                                 <span style={{ fontSize:"12px", fontWeight:"700", color: d < 0 && c.statut !== "conforme" && c.statut !== "non-concerne" ? t.red : t.text3, fontFamily:"'DM Mono',monospace" }}>{c.delai ? new Date(c.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
+                               <div style={{ height:"3px", background:t.border, borderRadius:"2px" }}>
+                                 <div style={{ width: isComplete ? "100%" : preuvesCount>0 ? "50%" : "0%", height:"100%", background: isComplete ? t.green : t.amber, borderRadius:"2px" }}/>
                                </div>
                             </div>
                          </div>
