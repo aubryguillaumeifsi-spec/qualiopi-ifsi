@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 
 export default function TourControleTab({ globalScore, activeIfsis, topAlerts, sortedTourIfsis, setSelectedIfsi, archivedIfsis, handleArchiveIfsi, handleHardDeleteIfsi, handleRenameIfsi, setActiveTab, tourSort, setTourSort, t }) {
   
@@ -11,24 +11,32 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
     audit: e.auditDate ? new Date(e.auditDate).toLocaleDateString("fr-FR") : "-",
     jours: e.auditDate ? Math.round((new Date(e.auditDate) - new Date()) / 86400000) : 0,
     statut: (e.pct < 65 || (e.liste?.filter(c => c.statut === "non-conforme").length || 0) > 10) ? "critique" : (e.pct < 80) ? "alerte" : "actif",
-    users: e.users || 0
+    users: e.users || 0 // Nombre d'utilisateurs
   }));
 
   const critiques = etablissements.filter(e => e.statut === "critique").length;
   const conformiteMoy = globalScore || 0;
 
-  const alertesActives = topAlerts.map(a => ({
-    id: a.id,
-    type: a.type === "non-conforme" ? "critique" : "alerte",
-    etab: a.ifsiName,
-    msg: a.type === "non-conforme" ? `Indicateur ${a.critere?.num} non conforme` : `Échéance dépassée sur ${a.critere?.num}`,
-    rawId: a.ifsiId
-  }));
+  // Tri des alertes par gravité
+  const alertesActives = useMemo(() => {
+    const list = topAlerts.map(a => {
+      let type = "info";
+      let poid = 0;
+      let msg = "";
+      if (a.type === "non-conforme") { type = "critique"; poid = 3; msg = `L'indicateur ${a.critere?.num} est déclaré non conforme.`; }
+      else if (a.type === "depasse" && a.days > 0) { type = "avertissement"; poid = 2; msg = `L'échéance de l'indicateur ${a.critere?.num} est dépassée depuis ${a.days} jours.`; }
+      else { type = "info"; poid = 1; msg = `Rappel pour l'indicateur ${a.critere?.num}.`; }
+      return { id: a.id, type, etab: a.ifsiName, msg, rawId: a.ifsiId, poid };
+    });
+    return list.sort((a,b) => b.poid - a.poid);
+  }, [topAlerts]);
 
   const ONGLETS = [
-    { id:"vue",     label:"État du réseau", icon:"📊" },
-    { id:"alertes", label:"Alertes",        icon:"🚨", badge: alertesActives.length },
-    { id:"config",  label:"Configuration",  icon:"⚙️" }
+    { id:"vue",      label:"État du réseau",  icon:"📊" },
+    { id:"alertes",  label:"Alertes",         icon:"🚨", badge: alertesActives.length },
+    { id:"users",    label:"Utilisateurs",    icon:"👥" },
+    { id:"journal",  label:"Journal système", icon:"📋" },
+    { id:"config",   label:"Configuration",   icon:"⚙️" }
   ];
 
   return (
@@ -39,7 +47,7 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
         .ro:hover { background:${t.surface2}!important; cursor:pointer; }
       `}</style>
 
-      {/* SUB-HEADER (Plus de redondance du titre) */}
+      {/* SUB-HEADER */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:t.shadowSm }}>
         <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
           <div style={{ width:"48px", height:"48px", borderRadius:"12px", background:t.goldBg, border:`1px solid ${t.goldBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px" }}>🛸</div>
@@ -65,9 +73,9 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
       </div>
 
       {/* ONGLETS */}
-      <div style={{ display:"flex", gap:"6px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"4px", boxShadow:t.shadowSm }}>
+      <div style={{ display:"flex", gap:"6px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"4px", boxShadow:t.shadowSm, overflowX:"auto" }}>
         {ONGLETS.map(o => (
-          <button key={o.id} onClick={() => setOnglet(o.id)} className={onglet===o.id?"":"tab-btn"} style={{ flex:1, display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", padding:"10px 14px", borderRadius:"8px", border:"none", background:onglet===o.id?t.accentBg:"transparent", color:onglet===o.id?t.accent:t.text2, fontSize:"13px", fontWeight:onglet===o.id?"800":"600", cursor:"pointer", transition:"all 0.15s" }}>
+          <button key={o.id} onClick={() => setOnglet(o.id)} className={onglet===o.id?"":"tab-btn"} style={{ flex:1, whiteSpace:"nowrap", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", padding:"10px 14px", borderRadius:"8px", border:"none", background:onglet===o.id?t.accentBg:"transparent", color:onglet===o.id?t.accent:t.text2, fontSize:"13px", fontWeight:onglet===o.id?"800":"600", cursor:"pointer", transition:"all 0.15s" }}>
             <span>{o.icon}</span>
             {o.label}
             {o.badge > 0 && <span style={{ background:t.red, color:"white", fontSize:"10px", fontWeight:"800", padding:"2px 8px", borderRadius:"12px", marginLeft:"4px" }}>{o.badge}</span>}
@@ -94,7 +102,6 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
 
           <div style={{ overflowY:"auto" }}>
             {etablissements.map(e => {
-              // Nouveau format de statut (Pastille de couleur + Texte)
               const statCfg = {
                 actif:    { label:"Sain",     c:t.green },
                 alerte:   { label:"Alerte",   c:t.amber },
@@ -117,13 +124,11 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
                     </div>
                   </div>
                   
-                  {/* Statut Style Claude (Pastille + Texte) */}
                   <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                    <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:statCfg.c, boxShadow:`0 0 8px ${statCfg.c}80` }}/>
+                    <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:statCfg.c, boxShadow:`0 0 8px ${statCfg.c}80` }}/>
                     <span style={{ fontSize:"12px", fontWeight:"600", color:t.text2 }}>{statCfg.label}</span>
                   </div>
 
-                  {/* Colonne Utilisateurs */}
                   <div style={{ display:"flex", alignItems:"center", gap:"6px", color:t.text2, fontSize:"13px", fontWeight:"600" }}>
                     <span>👥</span> {e.users}
                   </div>
@@ -133,6 +138,7 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
                   <span style={{ fontSize:"12px", color:t.text2, fontFamily:"'DM Mono',monospace" }}>{e.audit}</span>
                   <span style={{ fontFamily:"'DM Mono',monospace", fontSize:"13px", fontWeight:"800", color:e.jours < 0 ? t.red : e.jours < 60 ? t.amber : t.green }}>{e.jours < 0 ? "Dépassé" : `J‑${e.jours}`}</span>
                   
+                  {/* Note: Ce bouton déclenche window.confirm qui fait perdre le focus à Vercel (INP block). C'est normal sur navigateur. */}
                   <button onClick={(ev) => { ev.stopPropagation(); handleArchiveIfsi(e.id, e.nom, true); }} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text2, padding:"6px 12px", borderRadius:"6px", cursor:"pointer", fontSize:"11px", fontWeight:"700", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.color=t.amber} onMouseOut={e=>e.currentTarget.style.color=t.text2}>
                     Archiver
                   </button>
@@ -143,42 +149,77 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
         </div>
       )}
 
-      {/* ONGLET : ALERTES (Style Claude) */}
+      {/* ONGLET : ALERTES (Design fin et trié par gravité) */}
       {onglet === "alertes" && (
-        <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+        <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
           {alertesActives.length === 0 ? (
             <div style={{ background:t.greenBg, border:`1px solid ${t.greenBd}`, borderRadius:"12px", padding:"40px", textAlign:"center" }}>
               <div style={{ fontSize:"40px", marginBottom:"12px" }}>✅</div>
-              <div style={{ fontSize:"18px", fontWeight:"800", color:t.green }}>Aucune alerte critique</div>
-              <div style={{ fontSize:"13px", color:t.green, opacity:0.8, marginTop:"6px" }}>Tous les établissements respectent les délais et la conformité.</div>
+              <div style={{ fontSize:"18px", fontWeight:"800", color:t.green }}>Aucune alerte réseau</div>
+              <div style={{ fontSize:"13px", color:t.green, opacity:0.8, marginTop:"6px" }}>Tous les établissements sont à jour.</div>
             </div>
           ) : (
-            alertesActives.map(a => (
-              <div key={a.id} style={{ background:t.surface, border:`1px solid ${a.type==="critique"?t.redBd:t.amberBd}`, borderLeft:`6px solid ${a.type==="critique"?t.red:t.amber}`, borderRadius:"10px", padding:"16px 24px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:t.shadowSm }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"20px" }}>
-                  <div style={{ width:"40px", height:"40px", borderRadius:"10px", background:a.type==="critique"?t.redBg:t.amberBg, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"20px" }}>
-                    {a.type === "critique" ? "🚨" : "⚠️"}
-                  </div>
-                  <div>
-                    <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"4px" }}>
-                      <span style={{ fontSize:"16px", fontWeight:"800", color:t.text }}>{a.etab}</span>
-                      <span style={{ background:a.type==="critique"?t.redBg:t.amberBg, color:a.type==="critique"?t.red:t.amber, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"4px", textTransform:"uppercase" }}>
-                        {a.type === "critique" ? "Action requise" : "Avertissement"}
-                      </span>
+            alertesActives.map(a => {
+              const ui = {
+                critique: { bg:t.redBg, bd:t.redBd, c:t.red, icon:"🚨", label:"Critique" },
+                avertissement: { bg:t.amberBg, bd:t.amberBd, c:t.amber, icon:"⚠️", label:"Avertissement" },
+                info: { bg:t.accentBg, bd:t.accentBd, c:t.accent, icon:"ℹ️", label:"Information" }
+              }[a.type];
+
+              return (
+                <div key={a.id} style={{ background:t.surface, border:`1px solid ${ui.bd}`, borderLeft:`4px solid ${ui.c}`, borderRadius:"8px", padding:"12px 16px", display:"flex", alignItems:"center", justifyContent:"space-between", boxShadow:t.shadowSm }}>
+                  <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
+                    <div style={{ fontSize:"16px" }}>{ui.icon}</div>
+                    <div>
+                      <div style={{ display:"flex", alignItems:"center", gap:"10px", marginBottom:"2px" }}>
+                        <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>{a.etab}</span>
+                        <span style={{ background:ui.bg, color:ui.c, border:`1px solid ${ui.bd}`, fontSize:"9px", fontWeight:"800", padding:"2px 6px", borderRadius:"4px", textTransform:"uppercase" }}>
+                          {ui.label}
+                        </span>
+                      </div>
+                      <div style={{ fontSize:"12px", color:t.text2 }}>{a.msg}</div>
                     </div>
-                    <div style={{ fontSize:"13px", color:t.text2 }}>{a.msg}</div>
                   </div>
+                  <button onClick={() => { setSelectedIfsi(a.rawId); setActiveTab("criteres"); }} style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"6px 12px", borderRadius:"6px", fontSize:"11px", fontWeight:"700", color:t.text, cursor:"pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=t.accentBg} onMouseOut={e=>e.currentTarget.style.background=t.surface2}>
+                    Consulter
+                  </button>
                 </div>
-                <button onClick={() => { setSelectedIfsi(a.rawId); setActiveTab("criteres"); }} style={{ background:t.accent, border:"none", padding:"10px 20px", borderRadius:"8px", fontSize:"12px", fontWeight:"700", color:"white", cursor:"pointer", boxShadow:`0 4px 10px ${t.accentBd}` }}>
-                  Intervenir
-                </button>
-              </div>
-            ))
+              )
+            })
           )}
         </div>
       )}
 
-      {/* ONGLET : CONFIGURATION (Style Claude) */}
+      {/* ONGLET : UTILISATEURS (Vue Réseau) */}
+      {onglet === "users" && (
+        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"40px", textAlign:"center" }}>
+           <div style={{ fontSize:"40px", marginBottom:"16px" }}>👥</div>
+           <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"24px", color:t.text, margin:"0 0 8px 0" }}>Annuaire Global du Réseau</h3>
+           <p style={{ color:t.text2, fontSize:"14px", maxWidth:"500px", margin:"0 auto" }}>Cet onglet regroupera prochainement la liste complète de tous les utilisateurs inter-IFSI, avec la possibilité de leur envoyer des messages groupés.</p>
+        </div>
+      )}
+
+      {/* ONGLET : JOURNAL SYSTÈME */}
+      {onglet === "journal" && (
+        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", display:"flex", flexDirection:"column", gap:"12px" }}>
+           <div style={{ fontSize:"16px", fontWeight:"800", color:t.text, borderBottom:`1px solid ${t.border}`, paddingBottom:"12px", marginBottom:"12px" }}>Historique des connexions & actions critiques</div>
+           {[
+             { id:1, u:"superadmin@reseau.fr", a:"A archivé l'établissement IFSI de Lyon", t:"Il y a 10 min", c:t.red },
+             { id:2, u:"superadmin@reseau.fr", a:"A exporté la base de données JSON", t:"Il y a 2h", c:t.accent },
+             { id:3, u:"directeur@ifsi-lyon.fr", a:"Connexion réussie", t:"Hier à 08:30", c:t.green },
+           ].map(j => (
+             <div key={j.id} style={{ display:"flex", alignItems:"flex-start", gap:"12px", paddingBottom:"12px", borderBottom:`1px dashed ${t.border2}` }}>
+               <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:j.c, marginTop:"4px" }}/>
+               <div>
+                 <div style={{ fontSize:"13px", color:t.text }}><strong style={{color:t.text}}>{j.u}</strong> : {j.a}</div>
+                 <div style={{ fontSize:"11px", color:t.text3, marginTop:"2px", fontFamily:"'DM Mono',monospace" }}>{j.t}</div>
+               </div>
+             </div>
+           ))}
+        </div>
+      )}
+
+      {/* ONGLET : CONFIGURATION (Archives & Backups globaux) */}
       {onglet === "config" && (
         <div style={{ display:"grid", gridTemplateColumns:"1fr", gap:"24px" }}>
           
@@ -207,9 +248,13 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
             </div>
           </div>
 
+          {/* Section Archives et Restaurations */}
           {archivedIfsis && archivedIfsis.length > 0 && (
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden" }}>
               <div style={{ padding:"16px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}`, color:t.text, fontWeight:"800" }}>📦 Établissements Archivés</div>
+              <div style={{ padding:"16px 24px", fontSize:"12px", color:t.text2, fontStyle:"italic", borderBottom:`1px solid ${t.border2}` }}>
+                C'est ici que se trouvent les IFSI que vous avez archivés depuis le tableau de bord.
+              </div>
               {archivedIfsis.map(a => (
                 <div key={a.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"16px 24px", borderBottom:`1px solid ${t.border2}` }}>
                   <div style={{ color:t.text2, fontWeight:"600" }}>{a.name}</div>
