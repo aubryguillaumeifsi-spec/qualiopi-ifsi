@@ -105,6 +105,9 @@ function MainApp() {
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
 
+  // NOUVEAU : État pour la modale d'Audit (Remplace le prompt bloquant)
+  const [auditModal, setAuditModal] = useState({ show: false, name: "", date: "" });
+
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
       const list = []; snapshot.forEach(doc => list.push({ id: doc.id, ...doc.data() }));
@@ -227,13 +230,7 @@ function MainApp() {
   }, [criteres, filterStatut, filterCritere, searchTerm]);
 
   const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || userProfile?.role === "superadmin"), [teamUsers, userProfile]);
-  
-  // FIX: Fonction de tri pour l'équipe qui était manquante
-  const handleSortTeam = (key) => { 
-    let direction = "asc"; 
-    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; 
-    setTeamSortConfig({ key, direction }); 
-  };
+  const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
   
   const handleIfsiSwitch = async (e) => { 
     const val = e.target.value;
@@ -298,30 +295,29 @@ function MainApp() {
     }
   };
 
-  // NOUVEAU : Édition de la date d'audit et création d'audit
-  const handleEditAuditDate = () => {
-    const currentFr = new Date(currentAuditDate).toLocaleDateString("fr-FR");
-    const newDateFr = prompt("Modifier la date de l'audit (Format demandé : JJ/MM/AAAA) :", currentFr);
-    if (newDateFr) {
-      const parts = newDateFr.split('/');
-      if (parts.length === 3) {
-        const isoDate = `${parts[2]}-${parts[1].padStart(2, '0')}-${parts[0].padStart(2, '0')}`;
-        if (!isNaN(new Date(isoDate).getTime())) {
-          const newCampaigns = campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: isoDate } : c);
-          saveData(newCampaigns);
-        } else alert("Date invalide.");
-      } else alert("Format JJ/MM/AAAA requis.");
-    }
+  // NOUVEAU : Édition Date / Création Campagne (Sans INP blocking)
+  const submitAuditModal = () => {
+    if(!auditModal.name || !auditModal.date) return alert("Veuillez remplir tous les champs.");
+    const newId = Date.now().toString();
+    const newCamp = { id: newId, name: auditModal.name, auditDate: auditModal.date, liste: DEFAULT_CRITERES, locked: false };
+    saveData([...campaigns, newCamp]);
+    setActiveCampaignId(newId);
+    setAuditModal({ show: false, name: "", date: "" });
   };
 
-  const handleCreateCampaign = () => {
-    const nom = prompt("Nom de la nouvelle campagne / Nouvel audit (ex: Renouvellement 2028) :");
-    if (nom?.trim()) {
-      const newId = Date.now().toString();
-      const newCamp = { id: newId, name: nom.trim(), auditDate: "2028-10-15", liste: DEFAULT_CRITERES, locked: false };
-      saveData([...campaigns, newCamp]);
-      setActiveCampaignId(newId);
-    }
+  const handleEditAuditDate = (newDate) => {
+    const newCampaigns = campaigns.map(c => c.id === activeCampaignId ? { ...c, auditDate: newDate } : c);
+    saveData(newCampaigns);
+  };
+
+  // NOUVEAU : Fonctions Organigramme (Passées en props)
+  const handleAddOrgRole = (newRole) => {
+    if (newRole && !orgRoles.includes(newRole)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, newRole] }, { merge: true });
+  };
+  const handleAddManualUser = (prenom, nom) => {
+    const fullName = `${prenom} ${nom.toUpperCase()}`;
+    const newUser = { id: 'm_' + Date.now(), name: fullName, roles: [] };
+    setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
 
   if (!authChecked) return null;
@@ -332,6 +328,7 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
+  // Onglets Sidebar : L'onglet actif a le fond rgba(255,255,255,0.06)
   const menuBtn = (id, label) => {
     const act = activeTab === id;
     return (
@@ -339,10 +336,9 @@ function MainApp() {
         onClick={() => { setActiveTab(id); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} 
         style={{ 
           width: "100%", display: "block", padding: "10px 16px", 
-          background: act ? "rgba(212,160,48,0.05)" : "transparent", 
+          background: act ? "rgba(255,255,255,0.06)" : "transparent", 
           color: act ? t.textNav : t.textNavSub, 
-          border: act ? `1px solid rgba(212,160,48,0.4)` : "1px solid transparent", 
-          boxShadow: act ? `0 0 10px rgba(212,160,48,0.1)` : "none",
+          border: "none",
           borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", 
           cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px" 
         }}
@@ -360,7 +356,6 @@ function MainApp() {
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
       <link href={GFONT} rel="stylesheet" />
       <style>{`
-        /* CORRECTION MARGES GLOBALES */
         html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: ${t.bg}; }
         @media print { .no-print { display: none !important; } body { background: white !important; } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -370,27 +365,34 @@ function MainApp() {
         main::-webkit-scrollbar-thumb { background: ${t.border}; border-radius: 4px; }
       `}</style>
 
+      {/* Modale Nouvel Audit (Remplace le Prompt bloquant) */}
+      {auditModal.show && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
+          <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"32px", width:"400px", boxShadow:t.shadowLg }}>
+            <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"26px", color:t.text, margin:"0 0 16px 0" }}>Nouveau Cycle d'Audit</h3>
+            <div style={{ marginBottom:"16px" }}>
+              <label style={{ display:"block", fontSize:"12px", color:t.text2, marginBottom:"6px" }}>Nom de l'audit</label>
+              <input type="text" value={auditModal.name} onChange={e=>setAuditModal({...auditModal, name:e.target.value})} placeholder="ex: Renouvellement 2028" style={{ width:"100%", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px" }} />
+            </div>
+            <div style={{ marginBottom:"24px" }}>
+              <label style={{ display:"block", fontSize:"12px", color:t.text2, marginBottom:"6px" }}>Date prévue de l'audit</label>
+              <input type="date" value={auditModal.date} onChange={e=>setAuditModal({...auditModal, date:e.target.value})} style={{ width:"100%", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", colorScheme:"dark" }} />
+            </div>
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:"12px" }}>
+              <button onClick={()=>setAuditModal({show:false, name:"", date:""})} style={{ padding:"10px 16px", borderRadius:"8px", border:"none", background:"transparent", color:t.text2, fontWeight:"600", cursor:"pointer" }}>Annuler</button>
+              <button onClick={submitAuditModal} style={{ padding:"10px 24px", borderRadius:"8px", border:"none", background:t.accent, color:"white", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}` }}>Créer l'audit vierge</button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {modalCritere && (
-        <DetailModal 
-          critere={modalCritere} 
-          onClose={() => setModalCritere(null)} 
-          onSave={saveModal} 
-          onAutoSave={handleAutoSave} 
-          saveData={saveData} 
-          isReadOnly={isArchive} 
-          isAuditMode={isAuditMode} 
-          allMembers={allIfsiMembers} 
-          rolePalette={ROLE_PALETTE} 
-          orgRoles={orgRoles} 
-          hasPrev={hasPrev} 
-          hasNext={hasNext} 
-        />
+        <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} onAutoSave={handleAutoSave} saveData={saveData} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} hasPrev={hasPrev} hasNext={hasNext} />
       )}
 
       {/* 🧭 SIDEBAR GAUCHE */}
       <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50 }}>
         
-        {/* Logo Cliquable */}
         <div onClick={() => setActiveTab('dashboard')} style={{ padding:"24px 20px 16px", display:"flex", alignItems:"center", gap:"14px", cursor:"pointer" }}>
           <div style={{ width:"38px", height:"38px", border:`2px solid ${t.gold}`, borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 0 10px ${t.goldBd}`, background:t.goldBg }}>
             <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:t.gold, fontStyle:"italic", lineHeight:1 }}>Q</span>
@@ -405,21 +407,41 @@ function MainApp() {
           {dateJourFormat}
         </div>
 
-        <div style={{ padding:"20px", borderBottom:`1px solid ${t.borderNav}` }}>
+        <div style={{ padding:"20px" }}>
           <div style={{ fontSize:"10px", fontWeight:"700", color:t.textNavSub, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"10px" }}>Établissement</div>
           {userProfile?.role === "superadmin" ? (
-             <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: `1px solid rgba(255,255,255,0.1)`, color: t.textNav, fontSize: "13px", fontWeight: "600", outline: "none", cursor: "pointer", fontFamily:"inherit" }}>
+             <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding:"10px 12px", borderRadius:"8px", background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, color:t.textNav, fontSize:"13px", fontWeight:"600", outline:"none", cursor:"pointer" }}>
                {ifsiList.map(i => <option key={i.id} value={i.id} style={{ color:"black" }}>{i.name}</option>)}
                <option value="NEW" style={{ color:"black" }}>+ Nouvel établissement</option>
              </select>
           ) : (
-            <div style={{ padding: "10px 12px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: `1px solid rgba(255,255,255,0.1)`, color: t.textNav, fontSize: "13px", fontWeight: "600" }}>
+            <div style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, color:t.textNav, fontSize:"13px", fontWeight:"600" }}>
               {currentIfsiName || "Chargement..."}
             </div>
           )}
         </div>
 
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 12px" }}>
+        {/* Prochain audit placé SOUS le sélecteur d'établissement */}
+        <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+            <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
+            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#0c1118" }}>
+               {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
+            </div>
+          </div>
+          {/* Couleur de la date corrigée pour être lisible (t.text -> blanc cassé/noir selon thème) */}
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
+            {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
+          </div>
+          <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
+            <div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #f0c060)`, borderRadius:"3px" }}/>
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between" }}>
+            <span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% conforme</span>
+          </div>
+        </div>
+
+        <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
           {menuBtn("dashboard", "Tableau de bord")}
           {menuBtn("criteres", "Indicateurs")}
@@ -434,34 +456,14 @@ function MainApp() {
           {userProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
         </div>
 
-        {/* Prochain audit */}
-        <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
-          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
-            <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
-            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#ffffff" }}>
-               {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
-            </div>
-          </div>
-          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.textNav, letterSpacing:"-0.2px", marginBottom:"12px" }}>
-            {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
-          </div>
-          <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
-            <div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #f0c060)`, borderRadius:"3px" }}/>
-          </div>
-          <div style={{ display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% conforme</span>
-          </div>
-        </div>
-
-        {/* Profil cliquable */}
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
           <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
+            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background:t.accentBg, border:`1px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", color:t.accent, fontSize:"14px", fontWeight:"800", flexShrink:0 }}>
               {auth.currentUser?.email?.charAt(0).toUpperCase()}
             </div>
             <div style={{ overflow: "hidden" }}>
               <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{auth.currentUser?.email?.split('@')[0]}</div>
-              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>Mon compte ⚙️</div>
+              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>Mon profil ⚙️</div>
             </div>
           </div>
         </div>
@@ -483,9 +485,9 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={handleCreateCampaign} t={t} />}
-          {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
+          {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} t={t} />}
+          {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "axes" && <AxesTab axes={axes} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
