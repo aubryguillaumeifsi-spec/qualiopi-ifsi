@@ -15,12 +15,14 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
     "non-concerne": filtered.filter(c => c.statut === "non-concerne").length
   };
 
+  const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
+
   return (
     <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", height:"100%" }}>
       <style>{`
         .ro { transition:background 0.15s; cursor:pointer; }
         .ro:hover { background:${t.surface2}!important; }
-        .stat-card { transition:all 0.2s; cursor:pointer; border:1px solid ${t.border}; }
+        .stat-card { transition:all 0.2s; cursor:pointer; }
         .stat-card:hover { transform:translateY(-2px); box-shadow:${t.shadowMd}!important; }
         .fil:hover { border-color:${t.accent}!important; background:${t.accentBg}!important; color:${t.accent}!important; }
         .scroll-container::-webkit-scrollbar { height: 6px; }
@@ -28,7 +30,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         .scroll-container::-webkit-scrollbar-thumb { background: ${t.border2}; border-radius: 4px; }
       `}</style>
 
-      {/* ── 4 CARTES KPI ── */}
+      {/* ── 4 CARTES KPI (Avec bordures et ombres colorées comme le Dashboard) ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"12px" }}>
         {[
           { id:"conforme",     l:"Conformes",     v:statsCounts["conforme"],     c:t.green, bg:t.greenBg, bd:t.greenBd },
@@ -38,7 +40,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         ].map(s => {
           const isActive = filterStatut === s.id;
           return (
-            <div key={s.id} onClick={() => setFilterStatut(isActive ? "tous" : s.id)} className="stat-card" style={{ background: isActive ? s.bg : t.surface, borderColor: isActive ? s.bd : t.border, borderRadius:"10px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow: isActive ? t.shadowMd : t.shadowSm }}>
+            <div key={s.id} onClick={() => setFilterStatut(isActive ? "tous" : s.id)} className="stat-card" style={{ background: isActive ? s.bg : t.surface, border: `1px solid ${s.bd}`, borderRadius:"10px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow: `0 4px 12px ${s.bg}` }}>
               <div>
                 <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"38px", color:t.text, lineHeight:1, letterSpacing:"-1px" }}>{s.v}</div>
                 <div style={{ fontSize:"12px", color:t.text2, fontWeight:"600", marginTop:"4px" }}>{s.l}</div>
@@ -85,13 +87,13 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"11px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── VUE TABLEAU (Anti-Superposition via Scroll X) ── */}
+      {/* ── VUE TABLEAU ── */}
       {vue === "table" && (
         <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           
           <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
-            <div style={{ minWidth: "750px" }}> {/* Largeur garantie pour ne pas écraser les colonnes */}
-              <div style={{ display:"grid", gridTemplateColumns:"110px minmax(200px, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            <div style={{ minWidth: "600px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                 {["N°", "Libellé", "Statut", "Responsable", "Échéance"].map(h => (
                   <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                 ))}
@@ -110,11 +112,10 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                      const d = days(c.delai);
 
                      return (
-                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"110px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
                           
-                          {/* Numéro avec l'espace sécurisé */}
-                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:cConf.color, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} title={c.num}>
-                            {c.num}
+                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:cConf.color, whiteSpace:"nowrap" }}>
+                            {formatInd(c.critere, c.num)}
                           </div>
 
                           <div style={{ minWidth: 0 }}>
@@ -179,7 +180,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                          <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"14px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:t.shadowSm }}>
                             <div>
                               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px" }}>
-                                 <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>{c.num}</span>
+                                 <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>{formatInd(c.critere, c.num)}</span>
                                  <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>{labelStatut}</span>
                               </div>
                               <div style={{ fontSize:"12px", color:t.text, fontWeight:"500", lineHeight:"1.4", marginBottom:"14px" }}>{c.titre}</div>
@@ -210,9 +211,11 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
 }
 
 // ----------------------------------------------------------------------
-// 🔥 ONGLET : PRIORITÉS
+// 🔥 ONGLET : PRIORITÉS 
 // ----------------------------------------------------------------------
 export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
+  const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
+
   return (
     <div className="animate-fade-in" style={{ maxWidth:"1000px", margin:"0 auto" }}>
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"20px 24px", marginBottom:"20px", boxShadow:t.shadowSm, display:"flex", alignItems:"center", gap:"16px" }}>
@@ -240,7 +243,7 @@ export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
               <div key={c.id} onClick={() => setModalCritere(c)} style={{ background:t.surface, border:`1px solid ${isNC ? t.redBd : t.border}`, borderLeft:`4px solid ${isNC ? t.red : t.amber}`, borderRadius:"8px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", transition:"all 0.2s", boxShadow:t.shadowSm }} onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>
                 <div style={{ flex:1, paddingRight:"20px" }}>
                   <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"6px" }}>
-                    <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>{c.num}</span>
+                    <span style={{ fontSize:"18px", fontWeight:"800", color:cConf.color, fontFamily:"'Instrument Serif',serif" }}>{formatInd(c.critere, c.num)}</span>
                     <span style={{ background:themeStatut.bg, color:themeStatut.c, border:`1px solid ${themeStatut.bd}`, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"4px", textTransform:"uppercase" }}>{labelStatut}</span>
                   </div>
                   <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", lineHeight:"1.4" }}>{c.titre}</div>
