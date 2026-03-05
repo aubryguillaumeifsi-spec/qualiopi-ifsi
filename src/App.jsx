@@ -14,38 +14,40 @@ import { db, auth, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
 // ----------------------------------------------------------------------
-// 🎨 TOKENS HAUTE FIDÉLITÉ (Mix Claude's Midnight & Final-V2)
+// 🎨 TOKENS HAUTE FIDÉLITÉ (SIDEBAR BLEU NUIT)
 // ----------------------------------------------------------------------
 const GFONT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Albert+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap";
 
 function buildTokens(dark) {
   return dark ? {
-    bg:"#0b111a", nav:"#0d1422", sidebar:"#0a101a", surface:"#151c2a", surface2:"#1a2235", surface3:"#1e2840",
+    bg:"#0b111a", surface:"#151c2a", surface2:"#1a2235", surface3:"#1e2840",
     border:"#1f2d42", border2:"#192438", borderNav:"rgba(255,255,255,0.07)",
+    sidebar:"#0a101a", nav:"#0a101a", // Bleu Nuit encore plus sombre
     text:"#d6e3f5", text2:"#748bac", text3:"#425675",
-    textNav:"rgba(255,255,255,0.9)", textNavSub:"rgba(255,255,255,0.4)",
+    textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.5)",
     accent:"#4f82f5", accentBg:"rgba(79,130,245,0.12)", accentBd:"rgba(79,130,245,0.28)",
     gold:"#d4a030", goldBg:"rgba(212,160,48,0.12)", goldBd:"rgba(212,160,48,0.3)",
     green:"#2cc880", greenBg:"rgba(44,200,128,0.1)", greenBd:"rgba(44,200,128,0.25)",
     red:"#f07070", redBg:"rgba(240,112,112,0.1)", redBd:"rgba(240,112,112,0.25)",
     amber:"#f0a030", amberBg:"rgba(240,160,48,0.1)", amberBd:"rgba(240,160,48,0.25)",
-    shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)"
+    shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)", shadowGold:"0 4px 16px rgba(212,160,48,0.18)",
   } : {
-    bg:"#eef2f6", nav:"#ffffff", sidebar:"#f4f7fb", surface:"#ffffff",
-    surface2:"#f8fafc", surface3:"#e2e8f0", border:"#d5ddef", border2:"#e2e8f0", borderNav:"#e2e8f0",
+    bg:"#eef2f6", surface:"#ffffff", surface2:"#f8fafc", surface3:"#e2e8f0",
+    border:"#d5ddef", border2:"#e2e8f0", borderNav:"rgba(255,255,255,0.08)",
+    sidebar:"#162040", nav:"#162040", // Le fameux Bleu Nuit de Claude
     text:"#0f172a", text2:"#475569", text3:"#94a3b8",
-    textNav:"#0f172a", textNavSub:"#64748b",
+    textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.6)",
     accent:"#1d52d4", accentBg:"#eff6ff", accentBd:"#bfdbfe",
     gold:"#b07010", goldBg:"#fef4de", goldBd:"#f0cc70",
     green:"#0e7a50", greenBg:"#e8f9f3", greenBd:"#9dddc5",
     red:"#c42828", redBg:"#fdecea", redBd:"#f4a6a6",
     amber:"#a85c07", amberBg:"#fef5e7", amberBd:"#f5ce84",
-    shadow:"0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -1px rgba(0,0,0,0.03)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)"
+    shadow:"0 4px 6px -1px rgba(0,0,0,0.05)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)", shadowGold:"0 4px 16px rgba(176,112,16,0.18)",
   };
 }
 
 const DEFAULT_ROLES = ["Direction", "Qualité", "Secrétariat", "Pôle Stages", "Formateurs IFSI", "Formateurs IFAS"];
-const ROLE_PALETTE = [ { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, { bg: "#dcfce7", border: "#86efac", text: "#166534" }, { bg: "#fef3c7", border: "#fde68a", text: "#92400e" }, { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" }, { bg: "#fee2e2", border: "#fca5a5", text: "#991b1b" }, { bg: "#ccfbf1", border: "#67e8f9", text: "#155e75" }, { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, { bg: "#f1f5f9", border: "#cbd5e1", text: "#334155" } ];
+const ROLE_PALETTE = [ { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, { bg: "#dcfce7", border: "#86efac", text: "#166534" }, { bg: "#fef3c7", border: "#fde68a", text: "#92400e" }, { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" }, { bg: "#fee2e2", border: "#fca5a5", text: "#991b1b" }, { bg: "#ccfbf1", border: "#67e8f9", text: "#155e75" } ];
 
 const today = new Date();
 const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
@@ -107,10 +109,6 @@ function MainApp() {
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
-  const [importReport, setImportReport] = useState(null);
-  const [backupsList, setBackupsList] = useState([]);
-  const dailyBackupDone = useRef(null); 
-  const [verificationSent, setVerificationSent] = useState(false);
 
   useEffect(() => {
     const unsub = onSnapshot(collection(db, "etablissements"), (snapshot) => {
@@ -174,12 +172,34 @@ function MainApp() {
     return () => { unsub(); unsubIfsi(); };
   }, [selectedIfsi, userProfile]);
 
-  const saveData = async (newCampaigns) => {
-    const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
-    await setDoc(doc(db, "qualiopi", docId), { campaigns: newCampaigns, updatedAt: new Date().toISOString() }, { merge: true });
-  };
-
   const handleLogout = () => signOut(auth);
+
+  // ----------------------------------------------------------------------
+  // 🛡️ FONCTIONS SYSTÈME (Rétablies pour empêcher les crashs)
+  // ----------------------------------------------------------------------
+  const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
+  const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
+  const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
+  const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
+  const handleDeleteUser = async (userId) => { if (window.confirm("Révoquer cet accès ?")) await deleteDoc(doc(db, "users", userId)); };
+  const handleCreateUser = async () => {
+    if (!newMember.email || !newMember.pwd) return alert("Requis.");
+    setIsCreatingUser(true);
+    try {
+      const cred = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
+      const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
+      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true });
+      alert("✅ Compte créé !");
+      setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
+      secondaryAuth.signOut();
+    } catch (error) { alert(error.message); }
+    setIsCreatingUser(false);
+  };
+  const getRoleColor = useCallback((roleName) => { 
+    if (roleName === "Direction") return { bg: t.surface3, border: t.border, text: t.text }; 
+    const idx = (ifsiData?.roles || []).indexOf(roleName); 
+    return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[5]; 
+  }, [ifsiData, t]);
 
   // Mémos et calculs
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
@@ -188,12 +208,12 @@ function MainApp() {
   const currentAuditDate = currentCampaign?.auditDate || "2026-10-15";
   const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
-
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
+  // RÉTABLISSEMENT DE PRENOM/NOM POUR L'ORGANIGRAMME (Évite le crash "undefined prenom")
   const allIfsiMembers = useMemo(() => [
-    ...orgAccounts.map(u => ({ id: u.id, name: u.email.split('@')[0], roles: u.orgRoles || [], type: 'account', email: u.email })),
-    ...manualUsers.map(u => ({ id: u.id, name: u.name, roles: u.roles || [], type: 'manual' }))
+    ...orgAccounts.map(u => ({ id: u.id, prenom: u.email.split('@')[0], nom: "", name: u.email.split('@')[0], roles: u.orgRoles || [], type: 'account', email: u.email })),
+    ...manualUsers.map(u => ({ id: u.id, prenom: u.name?.split(' ')[0] || "Membre", nom: u.name?.split(' ').slice(1).join(' ') || "", name: u.name, roles: u.roles || [], type: 'manual' }))
   ].sort((a,b) => a.name.localeCompare(b.name)), [orgAccounts, manualUsers]);
 
   const { stats, urgents, filtered, axes } = useMemo(() => {
@@ -213,8 +233,6 @@ function MainApp() {
   }, [criteres, filterStatut, filterCritere, searchTerm]);
 
   const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || userProfile?.role === "superadmin"), [teamUsers, userProfile]);
-
-  const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
   
   const handleIfsiSwitch = async (e) => { 
     const val = e.target.value;
@@ -225,12 +243,9 @@ function MainApp() {
         await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); 
         setSelectedIfsi(id); 
       } else {
-        setSelectedIfsi(null);
-        setTimeout(() => setSelectedIfsi(selectedIfsi), 0);
+        setSelectedIfsi(null); setTimeout(() => setSelectedIfsi(selectedIfsi), 0);
       }
-    } else { 
-      setSelectedIfsi(val); 
-    } 
+    } else { setSelectedIfsi(val); } 
   };
 
   const getIfsiGlobalStats = useCallback((id) => {
@@ -264,10 +279,7 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  const saveModal = (updated, action) => {
-    handleAutoSave(updated);
-    if (action === "close" || action === undefined) setModalCritere(null);
-  };
+  const saveModal = (updated, action) => { handleAutoSave(updated); if (action === "close" || action === undefined) setModalCritere(null); };
 
   // ----------------------------------------------------------------------
   // 🖥️ AFFICHAGE PRINCIPAL
@@ -277,7 +289,7 @@ function MainApp() {
   if (activeTab === "validation_requise") return <div style={{ minHeight: "100vh", background: t.bg, color: t.text, display: "flex", justifyContent: "center", alignItems: "center" }}>Vérification Email Requise</div>;
   if (userProfile?.mustChangePassword) return <div style={{ minHeight: "100vh", background: t.bg, color: t.text, display: "flex", justifyContent: "center", alignItems: "center" }}>Veuillez changer votre mot de passe.</div>;
 
-  const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "Chargement...";
+  const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
   const menuBtn = (id, label) => {
@@ -285,14 +297,7 @@ function MainApp() {
     return (
       <button 
         onClick={() => { setActiveTab(id); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} 
-        className="sidebar-btn"
-        style={{ 
-          width: "100%", display: "block", padding: "10px 16px", 
-          background: act ? (isDarkMode?"rgba(255,255,255,0.06)":"#e2e8f0") : "transparent", 
-          color: act ? t.textNav : t.textNavSub, border: "none", borderRadius: "8px", 
-          fontSize: "13px", fontWeight: act ? "700" : "500", cursor: "pointer", 
-          transition: "all 0.2s", textAlign: "left", marginBottom: "4px", 
-        }}
+        style={{ width: "100%", display: "block", padding: "10px 16px", background: act ? "rgba(255,255,255,0.12)" : "transparent", color: act ? t.textNav : t.textNavSub, border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px" }}
       >
         {label}
       </button>
@@ -304,7 +309,6 @@ function MainApp() {
       <link href={GFONT} rel="stylesheet" />
       <style>{`
         @media print { .no-print { display: none !important; } body { background: white !important; } }
-        .sidebar-btn:hover { background: ${isDarkMode?"rgba(255,255,255,0.06)":"#e2e8f0"} !important; color: ${t.textNav} !important; }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
         @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         main::-webkit-scrollbar { width: 8px; }
@@ -313,15 +317,11 @@ function MainApp() {
       `}</style>
 
       {modalCritere && (
-        <DetailModal 
-          critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} onAutoSave={handleAutoSave} 
-          isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} 
-          hasPrev={false} hasNext={false} 
-        />
+        <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} onAutoSave={handleAutoSave} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} hasPrev={false} hasNext={false} />
       )}
 
-      {/* 🧭 SIDEBAR GAUCHE (Design "Midnight" Épuré) */}
-      <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50, boxShadow: isDarkMode?"3px 0 12px rgba(0,0,0,0.35)":"3px 0 12px rgba(14,25,41,0.03)" }}>
+      {/* 🧭 SIDEBAR GAUCHE (Bleu Nuit Profond garanti) */}
+      <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50 }}>
         
         {/* Logo & Date */}
         <div style={{ padding:"24px 20px 16px", display:"flex", alignItems:"center", gap:"14px" }}>
@@ -342,45 +342,47 @@ function MainApp() {
         <div style={{ padding:"20px", borderBottom:`1px solid ${t.borderNav}` }}>
           <div style={{ fontSize:"10px", fontWeight:"700", color:t.textNavSub, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"10px" }}>Établissement</div>
           {userProfile?.role === "superadmin" ? (
-             <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", background: t.surface, border: `1px solid ${t.border}`, color: t.text, fontSize: "13px", fontWeight: "600", outline: "none", cursor: "pointer", fontFamily:"inherit", boxShadow:t.shadowSm }}>
-               {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-               <option value="NEW">+ Nouvel établissement</option>
+             <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: `1px solid rgba(255,255,255,0.1)`, color: t.textNav, fontSize: "13px", fontWeight: "600", outline: "none", cursor: "pointer", fontFamily:"inherit" }}>
+               {ifsiList.map(i => <option key={i.id} value={i.id} style={{ color:"black" }}>{i.name}</option>)}
+               <option value="NEW" style={{ color:"black" }}>+ Nouvel établissement</option>
              </select>
           ) : (
-            <div style={{ padding: "10px 12px", borderRadius: "8px", background: t.surface, border: `1px solid ${t.border}`, color: t.text, fontSize: "13px", fontWeight: "600", boxShadow:t.shadowSm }}>
-              {currentIfsiName}
+            <div style={{ padding: "10px 12px", borderRadius: "8px", background: "rgba(255,255,255,0.05)", border: `1px solid rgba(255,255,255,0.1)`, color: t.textNav, fontSize: "13px", fontWeight: "600" }}>
+              {currentIfsiName || "Chargement..."}
             </div>
           )}
         </div>
 
-        {/* Menu Principal (Sans Emojis) */}
+        {/* Menu Principal */}
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 12px" }}>
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
-          {menuBtn("dashboard", "Tableau de bord")}
+          {menuBtn("dashboard", "Dashboard")}
           {menuBtn("criteres", "Indicateurs")}
           {menuBtn("axes", "Priorités")}
           {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme")}
           
           <div style={{ margin:"16px 12px", height:"1px", background:t.borderNav }}/>
           
+          <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Outils</div>
           {menuBtn("livre_blanc", "Livre Blanc")}
           {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("equipe", "Administration")}
           {userProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
+          {menuBtn("compte", "Compte personnel")}
         </div>
 
-        {/* ✦ Prochain audit — Badge Gold Intégré ✦ */}
-        <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px", boxShadow:t.shadowGold }}>
+        {/* ✦ Prochain audit ✦ */}
+        <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
-            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:isDarkMode?"#0c1118":"white" }}>
+            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#0c1118" }}>
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
-          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.textNav, letterSpacing:"-0.2px", marginBottom:"12px" }}>
             {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
           </div>
-          <div style={{ height:"5px", background:isDarkMode?"rgba(212,160,48,0.15)":"rgba(176,112,16,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
-            <div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, ${isDarkMode?"#f0c060":"#d4a030"})`, borderRadius:"3px" }}/>
+          <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
+            <div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #f0c060)`, borderRadius:"3px" }}/>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between" }}>
             <span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% conforme</span>
@@ -388,16 +390,14 @@ function MainApp() {
         </div>
 
         {/* Profil & Logout */}
-        <div style={{ borderTop: `1px solid ${t.borderNav}`, background:t.surface, padding:"16px" }}>
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden" }}>
-              <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
-                {auth.currentUser?.email?.charAt(0).toUpperCase()}
-              </div>
-              <div style={{ overflow: "hidden" }}>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{auth.currentUser?.email?.split('@')[0]}</div>
-                <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>{userProfile?.role}</div>
-              </div>
+        <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden" }}>
+            <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
+              {auth.currentUser?.email?.charAt(0).toUpperCase()}
+            </div>
+            <div style={{ overflow: "hidden" }}>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{auth.currentUser?.email?.split('@')[0]}</div>
+              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>{userProfile?.role}</div>
             </div>
           </div>
           <button onClick={handleLogout} style={{ width:"100%", marginTop:"12px", background: "transparent", border: `1px solid ${t.borderNav}`, borderRadius:"8px", padding:"8px", color: t.textNavSub, cursor: "pointer", fontSize: "12px", fontWeight:"600", transition: "all 0.2s" }} onMouseOver={e=>{e.currentTarget.style.color=t.red; e.currentTarget.style.borderColor=t.redBd;}} onMouseOut={e=>{e.currentTarget.style.color=t.textNavSub; e.currentTarget.style.borderColor=t.borderNav;}}>
@@ -409,11 +409,11 @@ function MainApp() {
       {/* 🖥️ MAIN CONTENT */}
       <main style={{ flex: 1, height: "100vh", overflowY: "auto", overflowX: "hidden", background: t.bg, position: "relative", display: "flex", flexDirection: "column" }}>
         
-        {/* Sub-header global (Actions rapides) */}
+        {/* Sub-header global */}
         <div className="no-print" style={{ height:"60px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>{activeTab.replace('_', ' ')}</span>
-            <span style={{ fontSize:"12px", color:t.text3 }}>· {currentIfsiName}</span>
+            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>{activeTab === 'dashboard' ? 'Dashboard' : activeTab.replace('_', ' ')}</span>
+            <span style={{ fontSize:"12px", color:t.text3 }}>{currentIfsiName ? `· ${currentIfsiName}` : ""}</span>
           </div>
           <div style={{ display:"flex", gap:"12px" }}>
             <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 14px", borderRadius:"8px", fontSize:"12px", fontWeight:"600", color:t.text, cursor:"pointer", transition:"all 0.15s" }}>
@@ -423,18 +423,16 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
+          {/* TOUTES LES PROPS SONT PASSÉES POUR ÉVITER LE MOINDRE CRASH */}
           {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} t={t} />}
-          {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} t={t} />}
+          {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} totalUsersInNetwork={teamUsers.length} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "axes" && <AxesTab axes={axes} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
-          {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} t={t} />}
+          {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} t={t} />}
+          {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
         </div>
-        
-        <footer className="no-print" style={{ padding: "20px 32px", textAlign: "center", fontSize: "13px", color: t.text3, borderTop: `1px solid ${t.border}`, background: t.surface }}>
-          QualiForma <span style={{ background: t.accentBg, color: t.accent, padding: "2px 6px", borderRadius: "4px", fontSize: "11px", fontWeight: "700", marginLeft: "6px" }}>2.0</span>
-        </footer>
       </main>
     </div>
   );
