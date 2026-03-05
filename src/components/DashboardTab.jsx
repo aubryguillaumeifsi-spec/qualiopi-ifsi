@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { CRITERES_LABELS } from "../data";
 
-export default function DashboardTab({ currentAuditDate, stats, urgents, criteres, t }) {
+export default function DashboardTab({ currentAuditDate, stats, urgents, criteres, userProfile, handleEditAuditDate, handleCreateCampaign, t }) {
   
   const safeCriteres = Array.isArray(criteres) ? criteres : [];
   const safeUrgents = Array.isArray(urgents) ? urgents : [];
@@ -28,9 +28,30 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
         <style>{`
           .ca:hover  { transform:translateY(-2px); box-shadow:${t.shadowLg}!important; }
           .ro:hover  { background:${t.surface2}!important; cursor:default; }
-          .ca        { transition:all 0.18s ease; cursor: default; }
+          .ug:hover  { filter:brightness(1.04); transform:translateY(-2px); }
+          .ca, .ug   { transition:all 0.18s ease; cursor: default; }
           .ro        { transition:background 0.12s; }
         `}</style>
+
+        {/* ── EN-TÊTE DASHBOARD & AUDIT ── */}
+        <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"4px" }}>
+          <div>
+            <div style={{ fontSize:"11px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>Prochain Audit Qualiopi</div>
+            <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
+              <h2 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.text, margin:0, fontWeight:"normal" }}>
+                {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
+              </h2>
+              {userProfile?.role !== "lecteur" && (
+                <button onClick={handleEditAuditDate} style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"6px", padding:"4px 8px", fontSize:"11px", color:t.text2, cursor:"pointer" }}>✏️ Modifier la date</button>
+              )}
+            </div>
+          </div>
+          {userProfile?.role !== "lecteur" && (
+            <button onClick={handleCreateCampaign} style={{ background:t.accent, color:"white", border:"none", padding:"8px 16px", borderRadius:"8px", fontSize:"12px", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 10px ${t.accentBd}` }}>
+              + Nouvel Audit (Vierge)
+            </button>
+          )}
+        </div>
 
         {/* ── ROW 1 : HERO CONFORMITÉ + KPIs (Applatis) ── */}
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:"12px" }}>
@@ -60,7 +81,9 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
             <div key={i} className="ca" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"14px 16px", boxShadow:t.shadow, display:"flex", flexDirection:"column" }}>
               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"6px" }}>
                 <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"34px", color:t.text, lineHeight:1 }}>{s.v}</div>
-                <div style={{ width:"12px", height:"12px", borderRadius:"50%", background:s.c, marginTop:"4px", boxShadow:`0 0 8px ${s.bd}` }}/>
+                <div style={{ width:"12px", height:"12px", borderRadius:"50%", background:s.bg, border:`1px solid ${s.bd}`, display:"flex", alignItems:"center", justifyContent:"center" }}>
+                   <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:s.c }}/>
+                </div>
               </div>
               <div style={{ fontSize:"12px", color:t.text2, fontWeight:"600", marginBottom:"auto", paddingBottom:"10px" }}>{s.l}</div>
               <div style={{ height:"4px", background:t.border2, borderRadius:"2px", marginBottom:"6px" }}>
@@ -71,15 +94,15 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
         </div>
 
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 280px", gap:"16px", flex:1 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px", flex:1 }}>
           
-          {/* 📊 Table Aperçu (Ultra compacte, sans scroll intégré) */}
+          {/* 📊 Table Aperçu */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "visible" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
             </div>
             
-            <div style={{ display:"grid", gridTemplateColumns:"50px minmax(0, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            <div style={{ display:"grid", gridTemplateColumns:"60px minmax(0, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
               {["N°","Libellé","Statut","Responsable","Date"].map(h => (
                 <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
               ))}
@@ -93,11 +116,11 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
                 const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                 
                 return (
-                  <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"50px minmax(0, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                  <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"60px minmax(0, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                     
-                    {/* Numéro compact coloré */}
-                    <div style={{ fontSize:"13px", fontWeight:"800", color:cConf.color, fontFamily:"'Albert Sans',sans-serif" }}>
-                      {r.num}
+                    {/* Numéro sur une ligne et même typo que la conformité */}
+                    <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:cConf.color, whiteSpace:"nowrap" }}>
+                      Ind. {r.num.replace('C', '')}
                     </div>
                     
                     <div style={{ minWidth: 0 }}>
@@ -112,7 +135,8 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
                       </span>
                     </div>
                     <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
-                    <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"600", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
+                    {/* Date non-grasse */}
+                    <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"normal", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
                   </div>
                 );
               })}
@@ -122,7 +146,7 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
           {/* ⚡ Panel de droite */}
           <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
             
-            {/* Widget: Échéances proches (Coloré selon le critère) */}
+            {/* Widget: Échéances proches (Bulles colorées) */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>🚨 Échéances proches</div>
               {safeUrgents.length === 0 ? (
@@ -133,10 +157,10 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
                   const cConf = CRITERES_LABELS[u.critere] || { bg:t.surface2, bd:t.border, color:t.text };
                   
                   return (
-                    <div key={i} style={{ background: cConf.bg, border:`1px solid ${cConf.bd}`, borderRadius:"8px", padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px" }}>
+                    <div key={i} className="ug" style={{ background: cConf.bg, border:`1px solid ${cConf.bd}`, borderRadius:"8px", padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"8px", boxShadow:t.shadowSm }}>
                       <span style={{ fontSize:"12px", fontWeight:"700", color: cConf.color, flex:1, overflow:"hidden", textOverflow:"ellipsis", whiteSpace:"nowrap" }}>{u.num} — {u.titre}</span>
                       {d < 0 ? (
-                        <span style={{ background:t.redBg, color:t.red, padding:"2px 6px", borderRadius:"4px", fontSize:"9px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>DÉPASSÉ</span>
+                        <span style={{ color:t.red, fontSize:"11px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>DÉPASSÉ</span>
                       ) : (
                         <span style={{ fontSize:"11px", fontWeight:"800", color:t.red, marginLeft:"10px", whiteSpace:"nowrap" }}>J-{d}</span>
                       )}
@@ -146,6 +170,7 @@ export default function DashboardTab({ currentAuditDate, stats, urgents, critere
               )}
             </div>
 
+            {/* Widget: Activité récente */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow, flex:1 }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"14px" }}>⚡ Activité récente</div>
               {hist.length === 0 ? (
