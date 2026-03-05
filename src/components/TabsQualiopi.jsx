@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { CRITERES_LABELS, STATUT_CONFIG } from "../data";
 
-// ----------------------------------------------------------------------
-// 🎯 ONGLET : INDICATEURS
-// ----------------------------------------------------------------------
 export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilterStatut, filterCritere, setFilterCritere, filtered, days, setModalCritere, t }) {
   
   const [vue, setVue] = useState("table"); 
@@ -23,9 +20,12 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         .stat-card { transition:all 0.2s; cursor:pointer; border:1px solid ${t.border}; }
         .stat-card:hover { transform:translateY(-2px); box-shadow:${t.shadowMd}!important; }
         .fil:hover { border-color:${t.accent}!important; background:${t.accentBg}!important; color:${t.accent}!important; }
+        .scroll-container::-webkit-scrollbar { height: 6px; }
+        .scroll-container::-webkit-scrollbar-track { background: transparent; }
+        .scroll-container::-webkit-scrollbar-thumb { background: ${t.border2}; border-radius: 4px; }
       `}</style>
 
-      {/* ── 4 CARTES KPI (Tassées, sans bulles) ── */}
+      {/* ── 4 CARTES KPI ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"12px" }}>
         {[
           { id:"conforme",     l:"Conformes",     v:statsCounts["conforme"],     c:t.green, bg:t.greenBg, bd:t.greenBd },
@@ -48,22 +48,21 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         })}
       </div>
 
-      {/* ── BARRE DE RECHERCHE ET FILTRES (Taille ajustée) ── */}
+      {/* ── BARRE DE RECHERCHE ET FILTRES ── */}
       <div style={{ display:"flex", gap:"16px", alignItems:"center", flexWrap:"wrap" }}>
-        
-        {/* Barre de recherche fixée à max 300px pour éviter de chevaucher */}
-        <div style={{ position:"relative", width:"100%", maxWidth:"300px" }}>
+        {/* Barre de recherche fixée - FLEX 0 0 AUTO pour ne pas l'écraser */}
+        <div style={{ position:"relative", width:"260px", flexShrink:0 }}>
           <span style={{ position:"absolute", left:"12px", top:"50%", transform:"translateY(-50%)", fontSize:"12px", color:t.text3 }}>🔍</span>
           <input 
             type="text" placeholder="Rechercher par N°, libellé..." 
             value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)}
-            style={{ width:"100%", background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"8px 12px 8px 34px", fontSize:"12px", outline:"none", borderRadius:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
+            style={{ width:"100%", background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"8px 12px 8px 34px", fontSize:"12px", outline:"none", borderRadius:"8px", transition:"all 0.2s", boxShadow:t.shadowSm, boxSizing: "border-box" }}
           />
         </div>
         
         <div style={{ display:"flex", gap:"6px", flexWrap:"wrap" }}>
           <button onClick={() => setFilterCritere("tous")} className="fil" style={{ padding:"7px 12px", borderRadius:"7px", border:`1px solid ${filterCritere==="tous"?t.accent:t.border}`, background:filterCritere==="tous"?t.accentBg:t.surface, color:filterCritere==="tous"?t.accent:t.text2, fontSize:"11px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}>
-            Tous les critères
+            Tous
           </button>
           {[1,2,3,4,5,6,7].map(num => (
             <button key={num} onClick={() => setFilterCritere(num)} className="fil" style={{ padding:"7px 10px", borderRadius:"7px", border:`1px solid ${filterCritere===num?t.accent:t.border}`, background:filterCritere===num?t.accentBg:t.surface, color:filterCritere===num?t.accent:t.text2, fontSize:"11px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}>
@@ -84,57 +83,62 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"11px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── VUE TABLEAU (Compacte, 1 ligne) ── */}
+      {/* ── VUE TABLEAU (Anti-Superposition via Scroll X) ── */}
       {vue === "table" && (
-        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"visible", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
-          <div style={{ display:"grid", gridTemplateColumns:"70px minmax(0, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-            {["N°", "Libellé", "Statut", "Responsable", "Échéance"].map(h => (
-              <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
-            ))}
-          </div>
+        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           
-          <div style={{ paddingBottom:"10px" }}>
-            {filtered.length === 0 ? (
-              <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontStyle:"italic", fontSize:"13px" }}>Aucun indicateur.</div>
-            ) : (
-              filtered.map(c => {
-                 const cConf = CRITERES_LABELS[c.critere] || { color: t.text };
-                 const isConforme = c.statut === "conforme";
-                 const isNC = c.statut === "non-conforme";
-                 const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : c.statut === "en-cours" ? "En cours" : "Non évalué";
-                 const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd }, "non-concerne": { c:t.text3, bg:t.surface3, bd:t.border } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
-                 const d = days(c.delai);
+          <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
+            <div style={{ minWidth: "700px" }}> {/* Largeur minimum pour forcer le scroll sur petits écrans */}
+              <div style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+                {["N°", "Libellé", "Statut", "Responsable", "Échéance"].map(h => (
+                  <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
+                ))}
+              </div>
+              
+              <div style={{ paddingBottom:"10px" }}>
+                {filtered.length === 0 ? (
+                  <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontStyle:"italic", fontSize:"13px" }}>Aucun indicateur.</div>
+                ) : (
+                  filtered.map(c => {
+                     const cConf = CRITERES_LABELS[c.critere] || { color: t.text };
+                     const isConforme = c.statut === "conforme";
+                     const isNC = c.statut === "non-conforme";
+                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : c.statut === "en-cours" ? "En cours" : "Non évalué";
+                     const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd }, "non-concerne": { c:t.text3, bg:t.surface3, bd:t.border } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
+                     const d = days(c.delai);
 
-                 return (
-                   <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"70px minmax(0, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
-                      
-                      <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:cConf.color, whiteSpace:"nowrap" }}>
-                        Ind. {c.num.replace('C', '')}
-                      </div>
+                     return (
+                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                          
+                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:cConf.color, whiteSpace:"nowrap" }}>
+                            Ind. {c.num.replace('C', '')}
+                          </div>
 
-                      <div style={{ minWidth: 0 }}>
-                        <div style={{ fontSize:"12px", color:t.text, paddingRight:"16px", fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                          {c.titre}
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>
-                          {labelStatut}
-                        </span>
-                      </div>
-                      
-                      <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                        {c.responsables?.[0] || "—"}
-                      </span>
-                      
-                      <span style={{ fontSize:"11px", fontWeight:"normal", color: d < 0 && c.statut !== "conforme" && c.statut !== "non-concerne" ? t.red : t.text3, fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
-                        {c.delai ? new Date(c.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}
-                      </span>
-                   </div>
-                 )
-              })
-            )}
+                          <div style={{ minWidth: 0 }}>
+                            <div style={{ fontSize:"12px", color:t.text, paddingRight:"16px", fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                              {c.titre}
+                            </div>
+                          </div>
+                          
+                          <div>
+                            <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>
+                              {labelStatut}
+                            </span>
+                          </div>
+                          
+                          <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                            {c.responsables?.[0] || "—"}
+                          </span>
+                          
+                          <span style={{ fontSize:"11px", fontWeight:"normal", color: d < 0 && c.statut !== "conforme" && c.statut !== "non-concerne" ? t.red : t.text3, fontFamily:"'DM Mono',monospace", textAlign:"right" }}>
+                            {c.delai ? new Date(c.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}
+                          </span>
+                       </div>
+                     )
+                  })
+                )}
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -163,7 +167,6 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                       const isConforme = c.statut === "conforme";
                       const isNC = c.statut === "non-conforme";
                       const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : c.statut === "en-cours" ? "En cours" : "Non évalué";
-                      // Meme badges que la vue tableau
                       const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd }, "non-concerne": { c:t.text3, bg:t.surface3, bd:t.border } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
                       
                       const preuvesCount = (c.fichiers?.length||0) + (c.chemins_reseau?.length||0) + (c.preuves ? 1 : 0);
@@ -203,9 +206,6 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
   );
 }
 
-// ----------------------------------------------------------------------
-// 🔥 ONGLET : PRIORITÉS (Design Pro sans cible)
-// ----------------------------------------------------------------------
 export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
   return (
     <div className="animate-fade-in" style={{ maxWidth:"1000px", margin:"0 auto" }}>
