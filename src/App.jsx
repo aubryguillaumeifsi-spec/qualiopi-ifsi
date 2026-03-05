@@ -57,7 +57,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) return (
       <div style={{ padding: "40px", textAlign: "center", fontFamily: "Albert Sans, sans-serif" }}>
         <h1 style={{ color: "#f05050" }}>⚠️ Erreur Système</h1>
-        <pre style={{ background: "rgba(240,80,80,0.12)", padding: "20px", borderRadius: "8px", overflowX: "auto" }}>{this.state.error?.toString()}</pre>
+        <pre style={{ background: "rgba(240,80,80,0.12)", padding: "20px", borderRadius: "8px", overflowX: "auto", maxWidth: "800px", margin: "0 auto" }}>{this.state.error?.toString()}</pre>
         <button onClick={() => window.location.reload()} style={{ marginTop: "20px", padding: "10px 20px", background: "#4f80f0", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>Recharger l'application</button>
       </div>
     );
@@ -169,7 +169,7 @@ function MainApp() {
 
   const handleLogout = () => signOut(auth);
 
-  // Fonctions de sécurité pour empêcher les crashs
+  // Fonctions système sécurisées
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
@@ -202,10 +202,14 @@ function MainApp() {
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
+  // 🛡️ CORRECTION CRASH ORGANIGRAMME : Assure que prenom et nom existent toujours
   const allIfsiMembers = useMemo(() => [
-    ...orgAccounts.map(u => ({ id: u.id, prenom: u.email?u.email.split('@')[0]:"User", nom: "", name: u.email?u.email.split('@')[0]:"User", roles: u.orgRoles || [], type: 'account', email: u.email })),
-    ...manualUsers.map(u => ({ id: u.id, prenom: u.name?.split(' ')[0] || "Membre", nom: u.name?.split(' ').slice(1).join(' ') || "", name: u.name||"Membre", roles: u.roles || [], type: 'manual' }))
-  ].sort((a,b) => a.name.localeCompare(b.name)), [orgAccounts, manualUsers]);
+    ...orgAccounts.map(u => ({ id: u.id, prenom: u.email ? u.email.split('@')[0] : "Utilisateur", nom: "", name: u.email ? u.email.split('@')[0] : "Utilisateur", roles: u.orgRoles || [], type: 'account', email: u.email })),
+    ...manualUsers.map(u => {
+      const parts = (u.name || "Membre Inconnu").trim().split(' ');
+      return { id: u.id, prenom: parts[0] || "Membre", nom: parts.slice(1).join(' ') || "", name: u.name || "Membre", roles: u.roles || [], type: 'manual' };
+    })
+  ].sort((a,b) => (a.name||"").localeCompare(b.name||"")), [orgAccounts, manualUsers]);
 
   const { stats, urgents, filtered, axes } = useMemo(() => {
     const filt = criteres.filter(c => {
@@ -217,7 +221,7 @@ function MainApp() {
     const total = criteres.filter(c => c.statut !== "non-concerne").length || 1;
     return {
       stats: { total, conforme: criteres.filter(c => c.statut === "conforme").length, enCours: criteres.filter(c => c.statut === "en-cours").length, nonConforme: criteres.filter(c => c.statut === "non-conforme").length, nonEvalue: criteres.filter(c => c.statut === "non-evalue").length, nonConcerne: criteres.filter(c => c.statut === "non-concerne").length },
-      urgents: criteres.filter(c => days(c.delai) <= 30 && c.statut !== "conforme" && c.statut !== "non-concerne"),
+      urgents: criteres.filter(c => days(c.delai) <= 30 && c.statut !== "conforme" && c.statut !== "non-concerne").sort((a,b) => days(a.delai) - days(b.delai)),
       filtered: filt,
       axes: criteres.filter(c => ["non-conforme", "en-cours"].includes(c.statut)).sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]))
     };
@@ -247,15 +251,15 @@ function MainApp() {
   }, [allQualiopiData]);
 
   const tourData = useMemo(() => {
-    const active = ifsiList.filter(i => !i.archived).map(i => ({ ...i, ...getIfsiGlobalStats(i.id) }));
+    const active = ifsiList.filter(i => !i.archived).map(i => ({ ...i, ...getIfsiGlobalStats(i.id), users: teamUsers.filter(u => u.etablissementId === i.id).length }));
     const score = active.length ? Math.round(active.reduce((acc, curr) => acc + curr.pct, 0) / active.length) : 0;
     let alerts = [];
     active.forEach(s => (s.liste || []).forEach(c => {
-      if (c.statut === "non-conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "non-conforme" });
-      else if (days(c.delai) < 0 && c.statut !== "non-concerne" && c.statut !== "conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "depasse", days: Math.abs(days(c.delai)) });
+      if (c.statut === "non-conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "non-conforme", id: s.id+c.num });
+      else if (days(c.delai) < 0 && c.statut !== "non-concerne" && c.statut !== "conforme") alerts.push({ ifsiId: s.id, ifsiName: s.name, critere: c, type: "depasse", days: Math.abs(days(c.delai)), id: s.id+c.num });
     }));
     return { active, archived: ifsiList.filter(i => i.archived), score, alerts };
-  }, [ifsiList, getIfsiGlobalStats]);
+  }, [ifsiList, getIfsiGlobalStats, teamUsers]);
 
   const sortedTourIfsis = useMemo(() => [...tourData.active].sort((a,b) => {
     if (tourSort === "urgence") return new Date(a.auditDate) - new Date(b.auditDate);
@@ -280,7 +284,7 @@ function MainApp() {
     if (action === "close" || !action) setModalCritere(null); 
     else if (action === "next") {
        const idx = filtered.findIndex(c => c.id === updated.id);
-       if (idx < filtered.length - 1) setModalCritere(filtered[idx + 1]);
+       if (idx !== -1 && idx < filtered.length - 1) setModalCritere(filtered[idx + 1]);
     }
     else if (action === "prev") {
        const idx = filtered.findIndex(c => c.id === updated.id);
@@ -296,19 +300,27 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
+  // Design de l'encadré actif
   const menuBtn = (id, label) => {
     const act = activeTab === id;
     return (
       <button 
         onClick={() => { setActiveTab(id); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} 
-        style={{ width: "100%", display: "block", padding: "10px 16px", background: act ? "rgba(255,255,255,0.12)" : "transparent", color: act ? t.textNav : t.textNavSub, border: "none", borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px" }}
+        style={{ 
+          width: "100%", display: "block", padding: "10px 16px", 
+          background: act ? "rgba(212,160,48,0.05)" : "transparent", 
+          color: act ? t.textNav : t.textNavSub, 
+          border: act ? `1px solid rgba(212,160,48,0.4)` : "1px solid transparent", 
+          boxShadow: act ? `0 0 10px rgba(212,160,48,0.1)` : "none",
+          borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", 
+          cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px" 
+        }}
       >
         {label}
       </button>
     );
   };
 
-  // Calcul du currentIndex pour la modal
   const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
@@ -317,7 +329,6 @@ function MainApp() {
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
       <link href={GFONT} rel="stylesheet" />
       <style>{`
-        /* CORRECTION DU CADRE BLANC */
         html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: ${t.bg}; }
         @media print { .no-print { display: none !important; } body { background: white !important; } }
         .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
@@ -333,7 +344,7 @@ function MainApp() {
           onClose={() => setModalCritere(null)} 
           onSave={saveModal} 
           onAutoSave={handleAutoSave} 
-          saveData={saveData} // Répare le bug "saveData is not defined"
+          saveData={saveData} 
           isReadOnly={isArchive} 
           isAuditMode={isAuditMode} 
           allMembers={allIfsiMembers} 
@@ -344,11 +355,11 @@ function MainApp() {
         />
       )}
 
-      {/* 🧭 SIDEBAR GAUCHE (Bleu Nuit) */}
+      {/* 🧭 SIDEBAR GAUCHE */}
       <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50 }}>
         
-        {/* Logo & Date */}
-        <div style={{ padding:"24px 20px 16px", display:"flex", alignItems:"center", gap:"14px" }}>
+        {/* Logo Cliquable */}
+        <div onClick={() => setActiveTab('dashboard')} style={{ padding:"24px 20px 16px", display:"flex", alignItems:"center", gap:"14px", cursor:"pointer" }}>
           <div style={{ width:"38px", height:"38px", border:`2px solid ${t.gold}`, borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 0 10px ${t.goldBd}`, background:t.goldBg }}>
             <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:t.gold, fontStyle:"italic", lineHeight:1 }}>Q</span>
           </div>
@@ -362,7 +373,6 @@ function MainApp() {
           {dateJourFormat}
         </div>
 
-        {/* Sélecteur IFSI */}
         <div style={{ padding:"20px", borderBottom:`1px solid ${t.borderNav}` }}>
           <div style={{ fontSize:"10px", fontWeight:"700", color:t.textNavSub, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"10px" }}>Établissement</div>
           {userProfile?.role === "superadmin" ? (
@@ -377,7 +387,6 @@ function MainApp() {
           )}
         </div>
 
-        {/* Menu Principal */}
         <div style={{ flex: 1, overflowY: "auto", padding: "20px 12px" }}>
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
           {menuBtn("dashboard", "Tableau de bord")}
@@ -393,7 +402,7 @@ function MainApp() {
           {userProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
         </div>
 
-        {/* ✦ Prochain audit ✦ */}
+        {/* Prochain audit */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -401,7 +410,7 @@ function MainApp() {
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
-          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.textNav, letterSpacing:"-0.2px", marginBottom:"12px" }}>
             {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
           </div>
           <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
@@ -412,7 +421,7 @@ function MainApp() {
           </div>
         </div>
 
-        {/* Profil & Logout */}
+        {/* Profil cliquable */}
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
           <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px" }}>
             <div style={{ width: "36px", height: "36px", borderRadius: "10px", background: t.accentBg, border: `1px solid ${t.accentBd}`, display: "flex", alignItems: "center", justifyContent: "center", color: t.accent, fontSize: "14px", fontWeight: "800", flexShrink: 0 }}>
@@ -423,16 +432,12 @@ function MainApp() {
               <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>Mon compte ⚙️</div>
             </div>
           </div>
-          <button onClick={handleLogout} style={{ width:"100%", background: "transparent", border: `1px solid ${t.borderNav}`, borderRadius:"8px", padding:"8px", color: t.textNavSub, cursor: "pointer", fontSize: "12px", fontWeight:"600", transition: "all 0.2s" }} onMouseOver={e=>{e.currentTarget.style.color=t.red; e.currentTarget.style.borderColor=t.redBd;}} onMouseOut={e=>{e.currentTarget.style.color=t.textNavSub; e.currentTarget.style.borderColor=t.borderNav;}}>
-            Déconnexion
-          </button>
         </div>
       </aside>
 
       {/* 🖥️ MAIN CONTENT */}
       <main style={{ flex: 1, height: "100vh", overflowY: "auto", overflowX: "hidden", background: t.bg, position: "relative", display: "flex", flexDirection: "column" }}>
         
-        {/* Sub-header global */}
         <div className="no-print" style={{ height:"60px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
             <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>{activeTab === 'dashboard' ? 'Tableau de bord' : activeTab.replace('_', ' ')}</span>
@@ -452,7 +457,7 @@ function MainApp() {
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "axes" && <AxesTab axes={axes} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
-          {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} t={t} />}
+          {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} t={t} />}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
         </div>
       </main>
