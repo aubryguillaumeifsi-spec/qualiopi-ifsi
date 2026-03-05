@@ -1,136 +1,162 @@
-import React from "react";
-import { CRITERES_LABELS } from "../data";
+import React, { useMemo } from "react";
 
-export function GaugeChart({ pct, score, color }) {
-  const val = pct !== undefined ? pct : (score !== undefined ? score : 0);
-  const c = color || "#1d4ed8";
-  const r = 32;
-  const circ = 2 * Math.PI * r;
-  const offset = circ - (val / 100) * circ;
-  return (
-    <div style={{ position: "relative", width: "80px", height: "80px" }}>
-      <svg width="80" height="80" viewBox="0 0 80 80" style={{ transform: "rotate(-90deg)" }}>
-        <circle cx="40" cy="40" r={r} fill="transparent" stroke="rgba(148, 163, 184, 0.2)" strokeWidth="8" />
-        <circle cx="40" cy="40" r={r} fill="transparent" stroke={c} strokeWidth="8" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition: "stroke-dashoffset 1s ease-out" }} />
-      </svg>
-      <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "16px", fontWeight: "900" }}>
-        {val}%
-      </div>
-    </div>
-  );
-}
-
-export function ProgressBar({ pct, color }) {
-  return (
-    <div style={{ background: "rgba(148, 163, 184, 0.2)", borderRadius: "8px", height: "8px", width: "100%", overflow: "hidden" }}>
-      <div style={{ width: `${Math.max(0, Math.min(100, pct || 0))}%`, background: color || "#1d4ed8", height: "100%", borderRadius: "8px", transition: "width 0.5s ease-out" }} />
-    </div>
-  );
-}
-
-export default function DashboardTab({ bannerConfig, currentAuditDate, isArchive, handleEditAuditDate, stats, urgents, criteres, userProfile, isDarkMode, isColorblindMode }) {
+export default function DashboardTab({ campaigns, activeCampaignId, t }) {
   
-  const hist = [...criteres].flatMap(c => (c.historique||[]).map(h => ({...h, num: c.num, titre: c.titre}))).sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 15);
+  // 1. Récupération intelligente des données (Le travail que faisait App.jsx avant)
+  const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
+  const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
+  const auditDate = currentCampaign?.auditDate || "2026-10-15";
 
-  // COULEURS NATIVES (Dark Mode + Daltonien)
-  const bgCard = isDarkMode ? "#1e1f20" : "white";
-  const bgMain = isDarkMode ? "#131314" : "#f8fafc";
-  const textMain = isDarkMode ? "#e3e3e3" : "#1e3a5f";
-  const textMuted = isDarkMode ? "#9aa0a6" : "#64748b";
-  const borderCol = isDarkMode ? "#333537" : "#e2e8f0";
+  // 2. Calcul des KPI
+  const stats = useMemo(() => {
+    const total = criteres.filter(c => c.statut !== "non-concerne").length || 1;
+    return {
+      total,
+      conforme: criteres.filter(c => c.statut === "conforme").length,
+      enCours: criteres.filter(c => c.statut === "en-cours").length,
+      nonConforme: criteres.filter(c => c.statut === "non-conforme").length
+    };
+  }, [criteres]);
 
-  const cConf = isColorblindMode ? "#2563eb" : "#10b981";
-  const bgConf = isDarkMode ? "#13231a" : (isColorblindMode ? "#eff6ff" : "#f0fdf4");
-  const bdConf = isDarkMode ? "#064e3b" : (isColorblindMode ? "#bfdbfe" : "#86efac");
+  const pct = Math.round((stats.conforme / stats.total) * 100);
 
-  const cNConf = isColorblindMode ? "#ea580c" : "#ef4444";
-  const bgNConf = isDarkMode ? "#450a0a" : (isColorblindMode ? "#fff7ed" : "#fef2f2");
-  const bdNConf = isDarkMode ? "#7f1d1d" : (isColorblindMode ? "#ffedd5" : "#fca5a5");
+  // 3. Calcul des Urgences & Jours restants
+  const today = new Date();
+  const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
+  const urgents = useMemo(() => criteres.filter(c => days(c.delai) <= 30 && c.statut !== "conforme" && c.statut !== "non-concerne").sort((a,b) => days(a.delai) - days(b.delai)), [criteres]);
+  
+  // 4. Historique et Preuves
+  const hist = useMemo(() => [...criteres].flatMap(c => c.historique?.map(h => ({ ...h, num: c.num })) || []).sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5), [criteres]);
+  const preuvesCount = useMemo(() => criteres.filter(c => c.preuves || c.preuves_encours || (c.fichiers && c.fichiers.length > 0)).length, [criteres]);
+
+  // Mathématiques pour la Jauge SVG
+  const r = 38; 
+  const circ = 2 * Math.PI * r; 
+  const offset = circ - (pct / 100) * circ;
+
+  // Formateur de temps (ex: "il y a 4 min")
+  const timeAgo = (dateString) => {
+    const diff = Math.floor((new Date() - new Date(dateString)) / 60000);
+    if (diff < 60) return `${diff} min`;
+    if (diff < 1440) return `${Math.floor(diff/60)} h`;
+    return `${Math.floor(diff/1440)} j`;
+  };
 
   return (
-    <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "24px" }}>
+    <div className="animate-fade-in" style={{ maxWidth:"1200px", margin:"0 auto" }}>
       
-      {/* 🟢 BANNIÈRE SUPÉRIEURE */}
-      <div style={{ background: bannerConfig.bg, border: `1px solid ${bannerConfig.border}`, padding: "20px 30px", borderRadius: "16px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "20px" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-          <div style={{ fontSize: "40px" }}>{bannerConfig.icon}</div>
+      {/* 🟢 EN-TÊTE DU DASHBOARD */}
+      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-end", marginBottom:"24px" }}>
+        <div>
+          <div style={{ fontSize:"11px", fontWeight:"700", color:t.accent, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"6px" }}>
+            {currentCampaign?.name || "Audit Qualiopi"}
+          </div>
+          <h1 style={{ fontFamily:"'Instrument Serif', serif", fontSize:"38px", color:t.text, margin:0, fontWeight:"normal" }}>
+            Vue Globale
+          </h1>
+        </div>
+        <div style={{ display:"flex", gap:"10px", alignItems:"center", background:t.surface2, padding:"8px 16px", borderRadius:"10px", border:`1px solid ${t.border}` }}>
+          <span style={{ fontSize:"20px" }}>🗓️</span>
           <div>
-            <div style={{ fontSize: "13px", fontWeight: "800", color: bannerConfig.color, textTransform: "uppercase", letterSpacing: "1px" }}>{bannerConfig.text}</div>
-            <div style={{ fontSize: "28px", fontWeight: "900", color: textMain, display: "flex", alignItems: "center", gap: "12px", marginTop: "4px" }}>
-              {currentAuditDate ? new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'}) : "Non définie"}
-              {!isArchive && <button onClick={handleEditAuditDate} style={{ fontSize: "12px", background: bgCard, border: `1px solid ${borderCol}`, padding: "6px 12px", borderRadius: "8px", cursor: "pointer", color: textMuted, fontWeight: "bold" }}>✏️ Modifier</button>}
-            </div>
+            <div style={{ fontSize:"10px", color:t.text3, textTransform:"uppercase", fontWeight:"700" }}>Date d'audit</div>
+            <div style={{ fontSize:"14px", fontWeight:"600", color:t.text }}>{new Date(auditDate).toLocaleDateString("fr-FR")}</div>
           </div>
         </div>
-        <div style={{ textAlign: "right", background: bgCard, padding: "15px 25px", borderRadius: "12px", border: `1px solid ${borderCol}` }}>
-          <div style={{ fontSize: "32px", fontWeight: "900", color: textMain }}>{Math.round((stats.conforme / stats.total) * 100)}%</div>
-          <div style={{ fontSize: "12px", fontWeight: "800", color: textMuted, textTransform: "uppercase" }}>Conformité totale</div>
-        </div>
       </div>
 
-      {/* 📊 CHIFFRES CLÉS */}
-      <div className="responsive-grid-5">
-         <StatCard val={stats.conforme} label="Indicateurs Conformes" color={cConf} bg={bgConf} border={bdConf} />
-         <StatCard val={stats.enCours} label="Chantiers en cours" color="#d97706" bg={isDarkMode ? "#451a03" : "#fffbeb"} border={isDarkMode ? "#78350f" : "#fde68a"} />
-         <StatCard val={stats.nonConforme} label="Non conformités" color={cNConf} bg={bgNConf} border={bdNConf} />
-         <StatCard val={criteres.reduce((acc,c)=>acc+(c.fichiers?.filter(f=>f.validated).length||0)+(c.chemins_reseau?.filter(r=>r.validated).length||0),0)} label="Preuves déposées" color={isDarkMode ? "#8ab4f8" : "#1d4ed8"} bg={isDarkMode ? "rgba(138,180,248,0.1)" : "#eff6ff"} border={isDarkMode ? "#8ab4f8" : "#bfdbfe"} />
-         <StatCard val={stats.nonConcerne} label="Non concernés" color={textMuted} bg={bgMain} border={borderCol} />
-      </div>
+      <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"24px" }}>
+        
+        {/* 🔵 COLONNE GAUCHE (KPI PRINCIPAUX) */}
+        <div style={{ display:"flex", flexDirection:"column", gap:"24px" }}>
+          
+          {/* GRANDE CARTE DE CONFORMITÉ */}
+          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"14px", padding:"28px", display:"flex", alignItems:"center", gap:"32px", boxShadow:t.shadow }}>
+            
+            {/* Jauge Circulaire */}
+            <div style={{ position:"relative", width:"100px", height:"100px", flexShrink:0 }}>
+              <svg width="100" height="100" viewBox="0 0 100 100" style={{ transform:"rotate(-90deg)" }}>
+                <circle cx="50" cy="50" r={r} fill="transparent" stroke={t.border2} strokeWidth="8"/>
+                <circle cx="50" cy="50" r={r} fill="transparent" stroke={pct === 100 ? t.green : pct >= 50 ? t.gold : t.red} strokeWidth="8" strokeDasharray={circ} strokeDashoffset={offset} strokeLinecap="round" style={{ transition:"stroke-dashoffset 1s ease-out" }}/>
+              </svg>
+              <div style={{ position:"absolute", inset:0, display:"flex", flexDirection:"column", alignItems:"center", justifyContent:"center" }}>
+                <span style={{ fontFamily:"'Instrument Serif', serif", fontSize:"32px", color:t.text, lineHeight:1 }}>{pct}%</span>
+              </div>
+            </div>
 
-      {/* ⚡ COLONNES URGENCES ET HISTORIQUE */}
-      <div className="responsive-grid-2">
-        <div style={{ background: bgCard, borderRadius: "16px", border: `1px solid ${borderCol}`, padding: "24px" }}>
-           <h3 style={{ margin: "0 0 20px", display: "flex", alignItems: "center", gap: "10px", color: textMain, fontSize: "18px", fontWeight: "800" }}>
-             <span>🚨</span> Échéances proches
-             <span style={{ background: cNConf, color: "white", padding: "2px 8px", borderRadius: "12px", fontSize: "12px" }}>{urgents.length}</span>
-           </h3>
-           <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-             {urgents.length === 0 ? <div style={{ color: textMuted, fontStyle: "italic", fontSize: "14px" }}>Aucune urgence à traiter.</div> : null}
-             
-             {/* 👉 NOUVEAUTÉ : Bordure gauche dynamique basée sur le critère */}
-             {urgents.map(c => {
-               const catColor = CRITERES_LABELS[c.critere]?.color || textMuted;
-               return (
-                 <div key={c.id} className="td-dash" style={{ background: bgMain, border: `1px solid ${borderCol}`, borderLeft: `6px solid ${catColor}`, borderRadius: "8px", padding: "16px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                    <div>
-                      <div style={{ fontWeight: "800", color: textMain, fontSize: "14px", marginBottom: "4px" }}>{c.num} - {c.titre}</div>
-                      <div style={{ fontSize: "12px", color: textMuted, fontWeight: "600" }}>{CRITERES_LABELS[c.critere]?.label}</div>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div style={{ fontWeight: "900", color: cNConf, fontSize: "14px" }}>{new Date(c.delai).toLocaleDateString("fr-FR")}</div>
-                      <div style={{ fontSize: "10px", color: textMuted, textTransform: "uppercase", fontWeight: "800", marginTop: "2px" }}>Date limite</div>
-                    </div>
-                 </div>
-               )
-             })}
-           </div>
+            {/* Blocs de stats */}
+            <div style={{ display:"flex", gap:"16px", flex:1 }}>
+              <div style={{ flex:1, background:t.greenBg, border:`1px solid ${t.greenBd}`, borderRadius:"10px", padding:"16px" }}>
+                <div style={{ fontSize:"10px", fontWeight:"700", color:t.green, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>Conformes</div>
+                <div style={{ fontFamily:"'Instrument Serif', serif", fontSize:"36px", color:t.text, lineHeight:1 }}>{stats.conforme}</div>
+              </div>
+              <div style={{ flex:1, background:t.amberBg, border:`1px solid ${t.amberBd}`, borderRadius:"10px", padding:"16px" }}>
+                <div style={{ fontSize:"10px", fontWeight:"700", color:t.amber, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>En cours</div>
+                <div style={{ fontFamily:"'Instrument Serif', serif", fontSize:"36px", color:t.text, lineHeight:1 }}>{stats.enCours}</div>
+              </div>
+              <div style={{ flex:1, background:t.redBg, border:`1px solid ${t.redBd}`, borderRadius:"10px", padding:"16px" }}>
+                <div style={{ fontSize:"10px", fontWeight:"700", color:t.red, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>Écarts</div>
+                <div style={{ fontFamily:"'Instrument Serif', serif", fontSize:"36px", color:t.text, lineHeight:1 }}>{stats.nonConforme}</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Ici, on pourra rajouter plus tard un beau tableau des indicateurs urgents ou des graphiques ! */}
+
         </div>
 
-        <div style={{ background: bgCard, borderRadius: "16px", border: `1px solid ${borderCol}`, padding: "24px" }}>
-           <h3 style={{ margin: "0 0 20px", display: "flex", alignItems: "center", gap: "10px", color: textMain, fontSize: "18px", fontWeight: "800" }}><span>⚡</span> Activité de l'équipe</h3>
-           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-             {hist.length === 0 ? <div style={{ color: textMuted, fontStyle: "italic", fontSize: "14px" }}>Aucune modification récente enregistrée.</div> : null}
-             {hist.map((h, i) => (
-               <div key={i} style={{ display: "flex", gap: "12px" }}>
-                 <div style={{ width: "10px", height: "10px", borderRadius: "50%", background: isDarkMode ? "#8ab4f8" : "#1d4ed8", marginTop: "4px", flexShrink: 0 }}></div>
-                 <div>
-                   <div style={{ fontSize: "13px", color: textMain, fontWeight: "600", lineHeight: "1.4" }}><strong style={{ color: isDarkMode ? "#8ab4f8" : "#1d4ed8" }}>{h.user.split('@')[0]}</strong> {h.msg}</div>
-                   <div style={{ fontSize: "10px", color: textMuted, marginTop: "4px", textTransform: "uppercase", fontWeight: "800" }}>{h.num} • {new Date(h.date).toLocaleString("fr-FR")}</div>
-                 </div>
-               </div>
-             ))}
-           </div>
+        {/* 🟠 COLONNE DROITE (WIDGETS) */}
+        <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
+          
+          {/* URGENCES */}
+          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"16px", boxShadow:t.shadowSm }}>
+            <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>⚠️ Urgences & Délais</div>
+            {urgents.length === 0 ? (
+              <div style={{ fontSize:"12px", color:t.text2, fontStyle:"italic" }}>Aucune échéance proche.</div>
+            ) : (
+              <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                {urgents.slice(0, 4).map(u => (
+                  <div key={u.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"8px 10px", background:t.redBg, border:`1px solid ${t.redBd}`, borderRadius:"6px" }}>
+                    <span style={{ fontSize:"12px", fontWeight:"600", color:t.text }}>{u.num}</span>
+                    <span style={{ fontSize:"10px", color:t.red, fontWeight:"700" }}>{days(u.delai) < 0 ? "DÉPASSÉ" : `J-${days(u.delai)}`}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* ACTIVITÉ RÉCENTE */}
+          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"16px", boxShadow:t.shadowSm, flex:1 }}>
+            <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"16px" }}>⚡ Activité récente</div>
+            {hist.length === 0 ? (
+              <div style={{ fontSize:"12px", color:t.text2, fontStyle:"italic" }}>Aucune activité enregistrée.</div>
+            ) : (
+              hist.map((h, i) => (
+                <div key={i} style={{ display:"flex", gap:"10px", marginBottom:"14px", alignItems:"flex-start" }}>
+                  <div style={{ width:"6px", height:"6px", borderRadius:"50%", background:t.gold, marginTop:"5px", flexShrink:0, opacity:0.8 }}/>
+                  <div>
+                    <div style={{ fontSize:"11px", color:t.text2, lineHeight:"1.45" }}>
+                      <strong style={{ color:t.text }}>{h.user.split('@')[0]}</strong> sur <strong style={{ color:t.accent }}>{h.num}</strong>
+                    </div>
+                    <div style={{ fontFamily:"'DM Mono', monospace", fontSize:"9px", color:t.text3, marginTop:"2px" }}>{h.msg} ({timeAgo(h.date)})</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+
+          {/* PREUVES GLOBALES */}
+          <div style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, borderRadius:"12px", padding:"16px" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <div>
+                <div style={{ fontSize:"9px", fontWeight:"700", color:t.accent, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>Preuves déposées</div>
+                <div style={{ fontFamily:"'Instrument Serif', serif", fontSize:"28px", color:t.text, lineHeight:1 }}>{preuvesCount}</div>
+              </div>
+              <div style={{ width:"40px", height:"40px", borderRadius:"10px", background:t.accentBg, border:`1px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"18px" }}>📎</div>
+            </div>
+          </div>
+
         </div>
       </div>
     </div>
-  )
-}
-
-function StatCard({ val, label, color, bg, border }) {
-  return (
-    <div className="td-dash" style={{ background: bg, border: `1px solid ${border}`, borderRadius: "12px", padding: "20px", textAlign: "center", boxShadow: "0 2px 4px rgba(0,0,0,0.02)" }}>
-      <div style={{ fontSize: "36px", fontWeight: "900", color: color }}>{val}</div>
-      <div style={{ fontSize: "12px", fontWeight: "800", color: color, textTransform: "uppercase", marginTop: "8px" }}>{label}</div>
-    </div>
-  )
+  );
 }
