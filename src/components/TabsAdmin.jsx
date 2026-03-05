@@ -5,11 +5,10 @@ import React from "react";
 // ----------------------------------------------------------------------
 export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser, selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm, sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t }) {
   
-  // Protection anti-crash pour la recherche/tri
   const safeUsers = Array.isArray(sortedTeamUsers) ? sortedTeamUsers : [];
 
   return (
-    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"24px", maxWidth:"1000px", margin:"0 auto" }}>
+    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"20px", maxWidth:"1000px", margin:"0 auto" }}>
       
       {/* HEADER ADMINISTRATION */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"24px 32px", boxShadow:t.shadowSm, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -103,13 +102,13 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
 }
 
 // ----------------------------------------------------------------------
-// 👤 ONGLET : COMPTE PERSONNEL (Design Claude "midnight-profil")
+// 👤 ONGLET : COMPTE PERSONNEL (Design Parfait Claude)
 // ----------------------------------------------------------------------
 export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleChangePassword, isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode, t }) {
   return (
-    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"24px", maxWidth:"800px", margin:"0 auto", paddingBottom:"40px" }}>
+    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"20px", maxWidth:"800px", margin:"0 auto", paddingBottom:"40px" }}>
       
-      {/* 1. Header Profil */}
+      {/* Header Profil */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"32px", display:"flex", alignItems:"center", gap:"24px", boxShadow:t.shadowSm }}>
         <div style={{ width:"80px", height:"80px", borderRadius:"20px", background:t.accentBg, border:`2px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"32px", fontWeight:"800", color:t.accent, flexShrink:0 }}>
           {auth.currentUser?.email?.charAt(0).toUpperCase()}
@@ -125,12 +124,13 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
         </div>
       </div>
 
-      {/* 2. Paramètres d'interface */}
+      {/* Paramètres d'interface */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
         <div style={{ padding:"16px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
           <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>🎨 Apparence & Accessibilité</span>
         </div>
         <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:"16px" }}>
+          
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:"16px", borderBottom:`1px solid ${t.border2}` }}>
             <div>
               <div style={{ fontSize:"14px", fontWeight:"600", color:t.text, marginBottom:"4px" }}>Thème sombre (Midnight)</div>
@@ -140,19 +140,44 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
               {isDarkMode ? "Activé" : "Désactivé"}
             </button>
           </div>
+          
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
               <div style={{ fontSize:"14px", fontWeight:"600", color:t.text, marginBottom:"4px" }}>Mode Daltonien</div>
-              <div style={{ fontSize:"12px", color:t.text2 }}>Remplace le rouge/vert par des couleurs plus contrastées.</div>
+              <div style={{ fontSize:"12px", color:t.text2 }}>Remplace le rouge/vert par des couleurs à fort contraste.</div>
             </div>
             <button onClick={() => setIsColorblindMode(!isColorblindMode)} style={{ background:isColorblindMode?t.accent:t.surface2, color:isColorblindMode?"white":t.text, border:`1px solid ${isColorblindMode?t.accentBd:t.border}`, padding:"8px 16px", borderRadius:"8px", fontSize:"12px", fontWeight:"700", cursor:"pointer", transition:"all 0.2s" }}>
               {isColorblindMode ? "Activé" : "Désactivé"}
             </button>
           </div>
+
         </div>
       </div>
 
-      {/* 3. Sécurité (Mot de passe) */}
+      {/* Notifications (Factice pour UI) */}
+      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
+        <div style={{ padding:"16px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+          <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>🔔 Notifications</span>
+        </div>
+        <div style={{ padding:"24px", display:"flex", flexDirection:"column", gap:"16px" }}>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", paddingBottom:"16px", borderBottom:`1px solid ${t.border2}` }}>
+            <div>
+              <div style={{ fontSize:"14px", fontWeight:"600", color:t.text, marginBottom:"4px" }}>Alerte d'échéance proche (J-30)</div>
+              <div style={{ fontSize:"12px", color:t.text2 }}>Recevoir un email quand un indicateur approche de sa date butoir.</div>
+            </div>
+            <input type="checkbox" defaultChecked style={{ width:"20px", height:"20px", accentColor:t.accent }} />
+          </div>
+          <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+            <div>
+              <div style={{ fontSize:"14px", fontWeight:"600", color:t.text, marginBottom:"4px" }}>Rapport mensuel</div>
+              <div style={{ fontSize:"12px", color:t.text2 }}>Résumé de la conformité du réseau le 1er du mois.</div>
+            </div>
+            <input type="checkbox" defaultChecked style={{ width:"20px", height:"20px", accentColor:t.accent }} />
+          </div>
+        </div>
+      </div>
+
+      {/* Sécurité (Mot de passe) */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
         <div style={{ padding:"16px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
           <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>🔒 Sécurité du compte</span>
@@ -172,7 +197,7 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
         </div>
       </div>
 
-      {/* 4. Zone Danger (Copie parfaite de Claude) */}
+      {/* Zone Danger */}
       <div style={{ background:t.surface, border:`1px solid ${t.dangerBd}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
         <div style={{ padding:"20px 24px" }}>
           <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.danger, marginBottom:"6px" }}>⚠️ Zone dangereuse</div>
@@ -184,7 +209,7 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
                 <div style={{ fontSize:"13px", fontWeight:"700", color:t.text, marginBottom:"4px" }}>Exporter mes données</div>
                 <div style={{ fontSize:"11px", color:t.text3 }}>Télécharger toutes mes données au format JSON</div>
               </div>
-              <button onClick={()=>alert("Export en cours (simulation)")} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"8px 16px", borderRadius:"6px", fontSize:"12px", fontWeight:"700", cursor:"pointer" }}>Exporter</button>
+              <button onClick={()=>alert("Export en cours...")} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"8px 16px", borderRadius:"6px", fontSize:"12px", fontWeight:"700", cursor:"pointer" }}>Exporter</button>
             </div>
             
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"14px 16px", background:t.dangerBg, border:`1px solid ${t.dangerBd}`, borderRadius:"8px" }}>
