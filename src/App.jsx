@@ -105,7 +105,7 @@ function MainApp() {
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
 
-  // NOUVEAU : État pour la modale d'Audit (Remplace le prompt bloquant)
+  // Modale pour la création de nouvel audit
   const [auditModal, setAuditModal] = useState({ show: false, name: "", date: "" });
 
   useEffect(() => {
@@ -295,12 +295,12 @@ function MainApp() {
     }
   };
 
-  // NOUVEAU : Édition Date / Création Campagne (Sans INP blocking)
+  // NOUVEAU : Édition Date / Création Campagne avec vraie fenêtre Modale !
   const submitAuditModal = () => {
     if(!auditModal.name || !auditModal.date) return alert("Veuillez remplir tous les champs.");
     const newId = Date.now().toString();
     const newCamp = { id: newId, name: auditModal.name, auditDate: auditModal.date, liste: DEFAULT_CRITERES, locked: false };
-    saveData([...campaigns, newCamp]);
+    saveData([...(campaigns||[]), newCamp]);
     setActiveCampaignId(newId);
     setAuditModal({ show: false, name: "", date: "" });
   };
@@ -310,7 +310,7 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  // NOUVEAU : Fonctions Organigramme (Passées en props)
+  // Fonctions Organigramme passées en props
   const handleAddOrgRole = (newRole) => {
     if (newRole && !orgRoles.includes(newRole)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, newRole] }, { merge: true });
   };
@@ -328,7 +328,6 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
-  // Onglets Sidebar : L'onglet actif a le fond rgba(255,255,255,0.06)
   const menuBtn = (id, label) => {
     const act = activeTab === id;
     return (
@@ -336,9 +335,10 @@ function MainApp() {
         onClick={() => { setActiveTab(id); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} 
         style={{ 
           width: "100%", display: "block", padding: "10px 16px", 
-          background: act ? "rgba(255,255,255,0.06)" : "transparent", 
+          background: act ? "rgba(212,160,48,0.08)" : "transparent", 
           color: act ? t.textNav : t.textNavSub, 
-          border: "none",
+          border: act ? `1px solid rgba(212,160,48,0.5)` : "1px solid transparent", 
+          boxShadow: act ? `0 0 10px rgba(212,160,48,0.1)` : "none",
           borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", 
           cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px" 
         }}
@@ -365,22 +365,25 @@ function MainApp() {
         main::-webkit-scrollbar-thumb { background: ${t.border}; border-radius: 4px; }
       `}</style>
 
-      {/* Modale Nouvel Audit (Remplace le Prompt bloquant) */}
+      {/* 🟢 Modale Propre pour un Nouvel Audit */}
       {auditModal.show && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.7)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
-          <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"32px", width:"400px", boxShadow:t.shadowLg }}>
-            <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"26px", color:t.text, margin:"0 0 16px 0" }}>Nouveau Cycle d'Audit</h3>
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
+          <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", width:"420px", boxShadow:t.shadowLg }}>
+            <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", color:t.text, margin:"0 0 8px 0" }}>Nouvel Audit</h3>
+            <p style={{ fontSize:"13px", color:t.text2, marginBottom:"24px", lineHeight:"1.5" }}>Préparez un nouveau cycle d'évaluation. Tous les indicateurs seront réinitialisés pour cette campagne.</p>
+            
             <div style={{ marginBottom:"16px" }}>
-              <label style={{ display:"block", fontSize:"12px", color:t.text2, marginBottom:"6px" }}>Nom de l'audit</label>
-              <input type="text" value={auditModal.name} onChange={e=>setAuditModal({...auditModal, name:e.target.value})} placeholder="ex: Renouvellement 2028" style={{ width:"100%", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px" }} />
+              <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Nom de l'audit</label>
+              <input type="text" value={auditModal.name} onChange={e=>setAuditModal({...auditModal, name:e.target.value})} placeholder="Ex: Audit de renouvellement 2028" style={{ width:"100%", padding:"12px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontFamily:"inherit" }} />
             </div>
-            <div style={{ marginBottom:"24px" }}>
-              <label style={{ display:"block", fontSize:"12px", color:t.text2, marginBottom:"6px" }}>Date prévue de l'audit</label>
-              <input type="date" value={auditModal.date} onChange={e=>setAuditModal({...auditModal, date:e.target.value})} style={{ width:"100%", padding:"10px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", colorScheme:"dark" }} />
+            <div style={{ marginBottom:"32px" }}>
+              <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Date d'évaluation prévue</label>
+              <input type="date" value={auditModal.date} onChange={e=>setAuditModal({...auditModal, date:e.target.value})} style={{ width:"100%", padding:"12px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontFamily:"inherit", colorScheme:isDarkMode?"dark":"light" }} />
             </div>
+            
             <div style={{ display:"flex", justifyContent:"flex-end", gap:"12px" }}>
-              <button onClick={()=>setAuditModal({show:false, name:"", date:""})} style={{ padding:"10px 16px", borderRadius:"8px", border:"none", background:"transparent", color:t.text2, fontWeight:"600", cursor:"pointer" }}>Annuler</button>
-              <button onClick={submitAuditModal} style={{ padding:"10px 24px", borderRadius:"8px", border:"none", background:t.accent, color:"white", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}` }}>Créer l'audit vierge</button>
+              <button onClick={()=>setAuditModal({show:false, name:"", date:""})} style={{ padding:"12px 20px", borderRadius:"8px", border:"none", background:"transparent", color:t.text2, fontWeight:"600", cursor:"pointer", fontSize:"13px" }}>Annuler</button>
+              <button onClick={submitAuditModal} style={{ padding:"12px 24px", borderRadius:"8px", border:"none", background:t.accent, color:"white", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}`, fontSize:"13px" }}>Créer l'audit vierge</button>
             </div>
           </div>
         </div>
@@ -421,7 +424,7 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit placé SOUS le sélecteur d'établissement */}
+        {/* Prochain audit SOUS le sélecteur */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -429,7 +432,6 @@ function MainApp() {
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
-          {/* Couleur de la date corrigée pour être lisible (t.text -> blanc cassé/noir selon thème) */}
           <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
             {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
           </div>
@@ -485,7 +487,8 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {activeTab === "dashboard" && campaigns && <DashboardTab currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} t={t} />}
+          {/* Historique : On passe "campaigns" et "activeCampaignId" au DashboardTab */}
+          {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
