@@ -41,7 +41,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
           <div>
             <div style={{ fontSize:"11px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"6px" }}>Campagne d'audit active</div>
             <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-              {/* Menu déroulant pour changer d'audit */}
               <select value={activeCampaignId || ""} onChange={(e) => setActiveCampaignId(e.target.value)} style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.text, background:"transparent", border:"none", outline:"none", cursor:"pointer", padding:"0", appearance:"none" }}>
                 {campaigns?.map(c => <option key={c.id} value={c.id} style={{fontFamily:"sans-serif", fontSize:"14px", color:"black"}}>{c.name}</option>)}
               </select>
@@ -59,15 +58,16 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               )}
             </div>
             
+            {/* BOUTON NOUVEL AUDIT (Design corrigé) */}
             {userProfile?.role !== "lecteur" && (
-              <button onClick={handleCreateCampaign} style={{ background:t.accent, color:"white", border:"none", padding:"10px 16px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 10px ${t.accentBd}` }}>
+              <button onClick={handleCreateCampaign} style={{ background:t.surface2, color:t.text, border:`1px solid ${t.border}`, padding:"10px 16px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=t.surface3} onMouseOut={e=>e.currentTarget.style.background=t.surface2}>
                 + Nouvel Audit
               </button>
             )}
           </div>
         </div>
 
-        {/* ── ROW 1 : HERO CONFORMITÉ + KPIs (Tassés) ── */}
+        {/* ── ROW 1 : HERO CONFORMITÉ + KPIs ── */}
         <div style={{ display:"grid", gridTemplateColumns:"2fr 1fr 1fr 1fr", gap:"12px" }}>
           
           <div className="ca" style={{ background:t.surface, border:`1px solid ${t.goldBd}`, borderRadius:"10px", padding:"16px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowGold }}>
@@ -110,15 +110,16 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px", flex:1 }}>
           
-          {/* 📊 Table Aperçu : SCROLL HORIZONTAL pour empêcher la superposition */}
+          {/* 📊 Table Aperçu (FIN DES SUPERPOSITIONS) */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
             </div>
             
             <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
-              <div style={{ minWidth: "600px" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+              <div style={{ minWidth: "650px" }}>
+                {/* Colonnes élargies (110px pour le numéro) pour éviter l'écrasement */}
+                <div style={{ display:"grid", gridTemplateColumns:"110px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                   {["N°","Libellé","Statut","Responsable","Date"].map(h => (
                     <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                   ))}
@@ -132,10 +133,11 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                     
                     return (
-                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"60px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"110px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                         
-                        <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:cConf.color, whiteSpace:"nowrap" }}>
-                          Ind. {r.num.replace('C', '')}
+                        {/* Affichage direct du numéro brut, coupé proprement s'il est trop long */}
+                        <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:cConf.color, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }} title={r.num}>
+                          {r.num}
                         </div>
                         
                         <div style={{ minWidth: 0 }}>
@@ -161,8 +163,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
 
           {/* ⚡ Panel de droite */}
           <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
-            
-            {/* Échéances proches (Bulles séparées autour de l'indicateur Image 2) */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>🚨 Échéances proches</div>
               {safeUrgents.length === 0 ? (
@@ -175,16 +175,14 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     
                     return (
                       <div key={i} className="ug" style={{ background: t.surface2, border:`1px solid ${t.border2}`, borderRadius:"8px", padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowSm }}>
-                        {/* Bulle spécifique autour du Numéro Indicator */}
                         <div style={{ display:"flex", alignItems:"center", gap:"8px", flex:1, overflow:"hidden" }}>
-                          <span style={{ background: cConf.bg, color: cConf.color, border: `1px solid ${cConf.bd}`, padding: "2px 6px", borderRadius: "6px", fontSize: "11px", fontWeight: "800", flexShrink: 0 }}>
-                            {u.num}
+                          <span style={{ background: cConf.bg, color: cConf.color, border: `1px solid ${cConf.bd}`, padding: "2px 6px", borderRadius: "6px", fontSize:"11px", fontWeight: "800", flexShrink: 0 }}>
+                            {u.num.substring(0, 4)} {/* Raccourcit juste pour l'affichage bulle */}
                           </span>
                           <span style={{ fontSize:"12px", fontWeight:"500", color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                             {u.titre}
                           </span>
                         </div>
-                        
                         {d < 0 ? (
                           <span style={{ background:t.redBg, color:t.red, border:`1px solid ${t.redBd}`, padding:"2px 6px", borderRadius:"4px", fontSize:"9px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>DÉPASSÉ</span>
                         ) : (
@@ -197,7 +195,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               )}
             </div>
 
-            {/* Widget: Activité récente */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow, flex:1 }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"14px" }}>⚡ Activité récente</div>
               {hist.length === 0 ? (
