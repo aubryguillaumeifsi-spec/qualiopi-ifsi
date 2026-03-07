@@ -1,5 +1,4 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { CRITERES_LABELS } from "../data";
 
 export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, orgConnections, handleUpdateConnections, setModalCritere, days, t }) {
   
@@ -26,7 +25,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
   const isSuperAdmin = userProfile?.role === "superadmin";
 
-  // ALGORITHME DE RÉCUPÉRATION DES INDICATEURS (Extrêmement Robuste)
+  // ALGORITHME DE RÉCUPÉRATION DES INDICATEURS
   const getUserCriteres = (person) => {
     if (!person) return []; 
     const p_prenom = (person.prenom || "").toLowerCase().trim();
@@ -37,15 +36,12 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       c.responsables && c.responsables.some(resp => {
         const r = resp.toLowerCase().trim();
         if (!r) return false;
-        
         if (p_email && r.includes(p_email)) return true;
-        
         const fn1 = `${p_prenom} ${p_nom}`.trim();
         const fn2 = `${p_nom} ${p_prenom}`.trim();
         if (fn1 && fn1.length > 2 && r.includes(fn1)) return true;
         if (fn2 && fn2.length > 2 && r.includes(fn2)) return true;
         if (p_prenom && p_nom && r.includes(p_prenom) && r.includes(p_nom)) return true;
-        
         const words = r.split(/[\s,;-]+/);
         if (p_nom && p_nom.length > 1 && words.includes(p_nom)) return true;
         if (p_prenom && p_prenom.length > 1 && words.includes(p_prenom)) return true;
@@ -83,7 +79,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   }));
 
   const displayMembers = safeMembers.filter(m => showArchived ? m.archived : !m.archived);
-  
   const selectedPerson = editForm?.id ? safeMembers.find(m => m.id === editForm.id) : null;
   const selectedPersonCriteres = selectedPerson ? getUserCriteres(selectedPerson) : [];
 
@@ -97,13 +92,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       if (el) {
         const rect = el.getBoundingClientRect();
         newPos[m.id] = {
-          // Point bas centre (pour départ)
           bottomX: rect.left - containerRect.left + containerRef.current.scrollLeft + rect.width / 2,
           bottomY: rect.top - containerRect.top + containerRef.current.scrollTop + rect.height,
-          // Point haut centre (pour arrivée)
           topX: rect.left - containerRect.left + containerRef.current.scrollLeft + rect.width / 2,
           topY: rect.top - containerRect.top + containerRef.current.scrollTop,
-          // Point milieu centre (pour liens même niveau)
           midX: rect.left - containerRect.left + containerRef.current.scrollLeft + rect.width / 2,
           midY: rect.top - containerRect.top + containerRef.current.scrollTop + rect.height / 2,
         };
@@ -113,12 +105,12 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   }, [displayMembers]);
 
   useEffect(() => {
-    const timer = setTimeout(updatePositions, 300); // Laisse le temps au DOM de se placer
+    const timer = setTimeout(updatePositions, 300);
     window.addEventListener('resize', updatePositions);
     return () => { clearTimeout(timer); window.removeEventListener('resize', updatePositions); };
   }, [updatePositions, showArchived, editForm, isLinkingMode]);
 
-  // --- ACTIONS PANNEAU ---
+  // --- ACTIONS ---
   const handleArchiveUser = async () => {
     if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ?`)) {
       await handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, { archived: true });
@@ -137,9 +129,8 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       if (!linkSourceId) {
         setLinkSourceId(m.id);
       } else if (linkSourceId === m.id) {
-        setLinkSourceId(null); // On se désélectionne
+        setLinkSourceId(null);
       } else {
-        // Toggle de connexion : s'il existe, on l'enlève, sinon on le crée
         const existing = orgConnections.find(c => c.source === linkSourceId && c.target === m.id);
         if (existing) {
           handleUpdateConnections(orgConnections.filter(c => c.id !== existing.id));
@@ -148,7 +139,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           handleUpdateConnections(newConns);
         }
       }
-      return; // Empêche l'ouverture du panneau latéral
+      return; 
     }
     setEditForm({ ...m, isEditing: false });
     setPanelMode('profile');
@@ -179,7 +170,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     setEditForm(editForm.isNew ? null : { ...editForm, isEditing: false });
   };
 
-  // --- DRAG AND DROP ---
   const handleDragStart = (e, member) => {
     if (isLinkingMode) { e.preventDefault(); return; }
     e.dataTransfer.setData("memberId", member.id);
@@ -197,14 +187,14 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
   const handleDragOver = (e) => e.preventDefault();
 
+  const removeConnection = (connId) => {
+    handleUpdateConnections(orgConnections.filter(c => c.id !== connId));
+  };
+
   const formatInd = (critere, num) => {
     const match = String(num).match(/(\d+)$/);
     const n = match ? match[1] : String(num).replace(/\D/g, '');
     return `${critere}.${n}`;
-  };
-
-  const removeConnection = (connId) => {
-    handleUpdateConnections(orgConnections.filter(c => c.id !== connId));
   };
 
   // --- SEPARATION PAR NIVEAU ---
@@ -212,11 +202,23 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const level2 = displayMembers.filter(m => m.orgLevel === 2);
   const level3 = displayMembers.filter(m => m.orgLevel === 3);
 
-  // --- SOUS-COMPOSANT : CARTE CARRÉE COMPACTE (110x110px) ---
-  const SquareCard = ({ m }) => {
+  // --- FONCTION DE REGROUPEMENT PAR FONCTION (Titre) ---
+  const groupMembersByJob = (membersArray) => {
+    const groups = {};
+    membersArray.forEach(m => {
+      const job = m.jobTitles[0] || "Sans fonction spécifique";
+      if (!groups[job]) groups[job] = [];
+      groups[job].push(m);
+    });
+    return groups;
+  };
+
+  // --- SOUS-COMPOSANT : L'ÉTIQUETTE D'IDENTITÉ (MINI-TAG) ---
+  const MiniIdentityTag = ({ m }) => {
     const rc = getRoleColor(m.roles[0]);
     const isSelected = editForm?.id === m.id;
     const isLinkingSource = isLinkingMode && linkSourceId === m.id;
+    const isActif = m.status === "ACTIF";
 
     return (
       <div 
@@ -225,41 +227,69 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         onDragStart={(e) => handleDragStart(e, m)}
         onClick={() => openViewPanel(m)}
         style={{
-          width: "110px", height: "110px", // Taille hyper compacte
-          background: t.surface, border: `2px solid ${isLinkingSource ? activeLinkColor : isSelected ? rc.text : t.border}`, borderRadius: "12px",
-          padding: "10px 8px", display: "flex", flexDirection: "column", alignItems: "center",
+          width: "180px", 
+          background: t.surface, 
+          border: `1px solid ${isLinkingSource ? activeLinkColor : isSelected ? rc.text : t.border}`, 
+          borderRadius: "8px",
+          padding: "8px", 
+          display: "flex", 
+          flexDirection: "column", 
+          gap: "6px",
           cursor: isLinkingMode ? "crosshair" : isAdminOrSuper ? "grab" : "pointer", 
           boxShadow: isLinkingSource ? `0 0 12px ${activeLinkColor}60` : isSelected ? `0 4px 12px ${rc.bg}` : t.shadowSm, 
-          transition: "all 0.2s", position: "relative", zIndex: 10,
-          backgroundClip: "padding-box"
+          transition: "all 0.15s", 
+          position: "relative", 
+          zIndex: 10,
+          opacity: isActif ? 1 : 0.6
         }}
-        onMouseOver={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=isLinkingSource ? `0 0 16px ${activeLinkColor}80` : `0 6px 16px ${rc.bg}`; }}
+        onMouseOver={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=isLinkingSource ? `0 0 12px ${activeLinkColor}80` : `0 4px 12px ${rc.bg}`; }}
         onMouseOut={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow=isLinkingSource ? `0 0 12px ${activeLinkColor}60` : isSelected ? `0 4px 12px ${rc.bg}` : t.shadowSm; }}
       >
-         <div style={{ width:"34px", height:"34px", borderRadius:"10px", background: rc.bg, border:`1px solid ${rc.bd}`, color: rc.text, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"800", fontSize:"12px", flexShrink:0 }}>
-           {m.prenom?.charAt(0).toUpperCase()}{m.nom ? m.nom.charAt(0).toUpperCase() : ""}
+         <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
+           <div style={{ width:"32px", height:"32px", borderRadius:"8px", background: rc.bg, border:`1px solid ${rc.bd}`, color: rc.text, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"800", fontSize:"12px", flexShrink:0 }}>
+             {m.prenom?.charAt(0).toUpperCase()}{m.nom ? m.nom.charAt(0).toUpperCase() : ""}
+           </div>
+           <div style={{ flex:1, overflow:"hidden" }}>
+             <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, whiteSpace:"nowrap", textOverflow:"ellipsis", overflow:"hidden" }}>
+               {m.prenom} {m.nom}
+             </div>
+             {/* Mini stat rapide */}
+             <div style={{ display:"flex", alignItems:"center", gap:"6px", marginTop:"2px" }}>
+               <div style={{ width:"6px", height:"6px", borderRadius:"50%", background: m.stats.pct >= 90 ? t.green : m.stats.pct >= 50 ? t.amber : m.stats.total === 0 ? t.text3 : t.red }} />
+               <span style={{ fontSize:"10px", color:t.text2, fontWeight:"600" }}>{m.stats.total > 0 ? `${m.stats.pct}% conf.` : "0 ind."}</span>
+             </div>
+           </div>
          </div>
-         
-         <div style={{ fontSize:"11px", fontWeight:"800", color:t.text, marginTop:"8px", textAlign:"center", lineHeight:"1.2", width:"100%", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow:"hidden" }}>
-           {m.prenom} {m.nom}
-         </div>
-         
-         <div style={{ fontSize:"8px", color:t.text2, marginTop:"3px", textAlign:"center", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", width:"100%", fontWeight:"700", textTransform:"uppercase" }}>
-           {m.jobTitles[0] || "—"}
-         </div>
-         
-         {/* Mini Barre d'indicateurs en bas */}
-         <div style={{ marginTop:"auto", width:"100%" }}>
-            <div style={{ display:"flex", justifyContent:"space-between", fontSize:"8px", fontWeight:"800", color:t.text3, marginBottom:"4px" }}>
-              <span>{m.stats.total} ind.</span>
-              <span style={{ color: m.stats.pct >= 90 ? t.green : m.stats.pct >= 50 ? t.amber : t.text3 }}>{m.stats.pct}%</span>
-            </div>
-            <div style={{ height:"4px", background:t.surface2, borderRadius:"2px", display:"flex", gap:"1px", overflow:"hidden", border:`1px solid ${t.border}` }}>
-                {m.stats.conf > 0 && <div style={{ width:`${(m.stats.conf/m.stats.total)*100}%`, background:t.green, height:"100%" }}/>}
-                {m.stats.ec > 0 && <div style={{ width:`${(m.stats.ec/m.stats.total)*100}%`, background:t.amber, height:"100%" }}/>}
-                {m.stats.nc > 0 && <div style={{ width:`${(m.stats.nc/m.stats.total)*100}%`, background:t.red, height:"100%" }}/>}
-            </div>
-         </div>
+      </div>
+    );
+  };
+
+  // --- SOUS-COMPOSANT : LA BOÎTE DE GROUPE DE FONCTION ---
+  const JobGroupBox = ({ jobTitle, members }) => {
+    // On prend la couleur du pôle de la première personne du groupe pour teinter légèrement la boîte
+    const groupColor = members.length > 0 ? getRoleColor(members[0].roles[0]) : { bg: t.surface2, bd: t.border, text: t.text };
+    
+    return (
+      <div style={{ 
+        background: t.surface2, 
+        border: `1px solid ${t.border}`, 
+        borderTop: `3px solid ${groupColor.text}`,
+        borderRadius: "12px", 
+        padding: "16px", 
+        display: "flex", 
+        flexDirection: "column", 
+        gap: "12px",
+        minWidth: "200px",
+        maxWidth: "600px", // Permet d'avoir jusqu'à 3 étiquettes par ligne avant de wrap
+        boxShadow: t.shadowSm,
+        zIndex: 2
+      }}>
+        <div style={{ fontSize:"11px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px", textAlign:"center" }}>
+          {jobTitle} <span style={{ color:t.text3, fontWeight:"600" }}>({members.length})</span>
+        </div>
+        <div style={{ display:"flex", flexWrap:"wrap", gap:"10px", justifyContent:"center" }}>
+          {members.map(m => <MiniIdentityTag key={m.id} m={m} />)}
+        </div>
       </div>
     );
   };
@@ -329,7 +359,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       )}
 
-      {/* ── ZONE GAUCHE : La Grille des collaborateurs ── */}
+      {/* ── ZONE GAUCHE : L'Arbre Organigramme ── */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", gap:"20px", overflow:"hidden" }}>
         
         {/* LÉGENDES ET BOUTONS */}
@@ -357,7 +387,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
             {isAdminOrSuper && (
               <>
-                {/* BOUTON CONNEXION */}
                 <button 
                   onClick={() => { setIsLinkingMode(!isLinkingMode); setLinkSourceId(null); setPanelMode('profile'); setEditForm(null); updatePositions(); }} 
                   style={{ background:isLinkingMode?t.accentBg:t.surface, border:`1px solid ${isLinkingMode?t.accentBd:t.border}`, color:isLinkingMode?t.accent:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}
@@ -381,40 +410,27 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </div>
         </div>
 
-        {/* OUTIL DE LIAISON (Lignes) */}
-        {isAdminOrSuper && !showArchived && (
-          <div style={{ background:isLinkingMode ? t.accentBg : t.surface, border:`1px solid ${isLinkingMode ? t.accentBd : t.border}`, padding:"12px 16px", borderRadius:"12px", display:"flex", alignItems:"center", gap:"16px", boxShadow:t.shadowSm }}>
-            <button 
-              onClick={() => { setIsLinkingMode(!isLinkingMode); setLinkSourceId(null); setPanelMode('profile'); setEditForm(null); updatePositions(); }} 
-              style={{ background:isLinkingMode?t.accent:t.surface2, color:isLinkingMode?"white":t.text, border:`1px solid ${isLinkingMode?t.accent:t.border}`, padding:"8px 16px", borderRadius:"8px", fontSize:"13px", fontWeight:"800", cursor:"pointer", boxShadow:t.shadowSm }}
-            >
-              🔗 {isLinkingMode ? "Fermer l'outil" : "Tirer des liens"}
-            </button>
-
-            {isLinkingMode && (
-              <>
-                <div style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>
-                  {!linkSourceId ? "1. Sélectionnez un Parent ➔" : "2. Cliquez sur les Enfants pour relier (ou retirer) ➔"}
-                </div>
-                <div style={{ display:"flex", gap:"8px", marginLeft:"auto" }}>
-                   {LINE_COLORS.map(c => (
-                     <div 
-                       key={c.color} 
-                       onClick={() => setActiveLinkColor(c.color)}
-                       title={c.label}
-                       style={{ width:"24px", height:"24px", borderRadius:"50%", background:c.color, border: activeLinkColor === c.color ? `3px solid ${t.text}` : `2px solid transparent`, cursor:"pointer", transition:"all 0.2s", transform: activeLinkColor === c.color ? "scale(1.2)" : "scale(1)" }}
-                     />
-                   ))}
-                </div>
-              </>
-            )}
+        {isLinkingMode && !showArchived && (
+          <div style={{ background: t.accentBg, border:`1px solid ${t.accentBd}`, padding:"12px 16px", borderRadius:"12px", display:"flex", alignItems:"center", gap:"16px", boxShadow:t.shadowSm }}>
+             <div style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>
+               {!linkSourceId ? "1. Cliquez sur l'étiquette Parent ➔" : "2. Cliquez sur les Enfants pour relier (ou retirer) ➔"}
+             </div>
+             <div style={{ display:"flex", gap:"8px", marginLeft:"auto" }}>
+                {LINE_COLORS.map(c => (
+                  <div 
+                    key={c.color} 
+                    onClick={() => setActiveLinkColor(c.color)}
+                    title={c.label}
+                    style={{ width:"24px", height:"24px", borderRadius:"50%", background:c.color, border: activeLinkColor === c.color ? `3px solid ${t.text}` : `2px solid transparent`, cursor:"pointer", transition:"all 0.2s", transform: activeLinkColor === c.color ? "scale(1.2)" : "scale(1)" }}
+                  />
+                ))}
+             </div>
           </div>
         )}
 
-        {/* L'ARBORESCENCE (Scrollable avec Lignes SVG) */}
+        {/* L'ARBORESCENCE AVEC GROUPES (Scrollable) */}
         <div ref={containerRef} className="scroll-container" style={{ flex:1, overflow:"auto", padding:"40px 20px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", alignItems:"center", boxShadow:t.shadowSm, position:"relative" }}>
           
-          {/* CALQUE DES LIGNES SVG */}
           {!showArchived && (
             <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
               {orgConnections.map(conn => {
@@ -423,12 +439,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 if(!posA || !posB) return null;
 
                 let path = "";
-                // Si la cible est plus basse (Parent -> Enfant normal) : Tracé orthogonal "Râteau"
                 if (posB.topY > posA.bottomY + 20) {
                    const midY = (posA.bottomY + posB.topY) / 2;
                    path = `M ${posA.bottomX},${posA.bottomY} L ${posA.bottomX},${midY} L ${posB.topX},${midY} L ${posB.topX},${posB.topY}`;
                 } else {
-                   // Si même niveau ou inversé : Courbe
                    path = `M ${posA.midX},${posA.midY} C ${posA.midX},${(posA.midY+posB.midY)/2} ${posB.midX},${(posA.midY+posB.midY)/2} ${posB.midX},${posB.midY}`;
                 }
 
@@ -439,7 +453,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             </svg>
           )}
 
-          {/* BOUTONS SUPPRESSION DES LIGNES (Si mode lien actif) */}
           {isLinkingMode && !showArchived && orgConnections.map(conn => {
             const posA = cardPositions[conn.source];
             const posB = cardPositions[conn.target];
@@ -456,7 +469,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
           {showArchived ? (
             <div style={{ display:"flex", flexWrap:"wrap", gap:"20px", justifyContent:"center", zIndex:10 }}>
-              {displayMembers.length === 0 ? <div style={{ color:t.text3, fontStyle:"italic" }}>Aucun archivé.</div> : displayMembers.map(m => <SquareCard key={m.id} m={m} />)}
+              {displayMembers.length === 0 ? <div style={{ color:t.text3, fontStyle:"italic" }}>Aucun archivé.</div> : displayMembers.map(m => <MiniIdentityTag key={m.id} m={m} />)}
             </div>
           ) : (
             <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:"100%", minWidth:"max-content", zIndex:10 }}>
@@ -464,59 +477,36 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               {/* === NIVEAU 1 : DIRECTION === */}
               <div 
                 onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 1)}
-                style={{ display:"flex", justifyContent:"center", gap:"20px", position:"relative", paddingBottom:"60px", minWidth:"200px", minHeight:"110px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
+                style={{ display:"flex", justifyContent:"center", gap:"30px", position:"relative", paddingBottom:"60px", minWidth:"200px", minHeight:"120px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
               >
                 {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 1</div>}
                 
-                {/* Ligne Horizontale d'alignement interne N1 */}
-                {level1.length > 1 && <div style={{ position:"absolute", top:"55px", left:"55px", right:"55px", height:"2px", background:t.border, zIndex:1 }}/>}
-                
-                {level1.map(m => (
-                  <div key={m.id} style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center" }}>
-                    {/* Trait descendant N1 -> N2 */}
-                    {level2.length > 0 && <div style={{ position:"absolute", top:"110px", width:"2px", height:"30px", background:t.border, zIndex:1 }}/>}
-                    <SquareCard m={m} />
-                  </div>
+                {Object.entries(groupMembersByJob(level1)).map(([job, members]) => (
+                   <JobGroupBox key={job} jobTitle={job} members={members} />
                 ))}
               </div>
 
               {/* === NIVEAU 2 : RESPONSABLES === */}
               <div 
                 onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 2)}
-                style={{ display:"flex", justifyContent:"center", gap:"20px", position:"relative", paddingBottom:"60px", minWidth:"400px", minHeight:"110px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
+                style={{ display:"flex", justifyContent:"center", gap:"40px", position:"relative", paddingBottom:"60px", minWidth:"400px", minHeight:"120px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
               >
                 {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 2</div>}
                 
-                {/* Ligne Horizontale Supérieure N2 (reliée à N1) */}
-                {level2.length > 1 && level1.length > 0 && <div style={{ position:"absolute", top:"-30px", left:"55px", right:"55px", height:"2px", background:t.border, zIndex:1 }}/>}
-                
-                {level2.map(m => (
-                  <div key={m.id} style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center" }}>
-                    {/* Trait ascendant N2 -> N1 */}
-                    {level1.length > 0 && <div style={{ position:"absolute", top:"-30px", width:"2px", height:"30px", background:t.border, zIndex:1 }}/>}
-                    {/* Trait descendant N2 -> N3 */}
-                    {level3.length > 0 && <div style={{ position:"absolute", top:"110px", width:"2px", height:"30px", background:t.border, zIndex:1 }}/>}
-                    <SquareCard m={m} />
-                  </div>
+                {Object.entries(groupMembersByJob(level2)).map(([job, members]) => (
+                   <JobGroupBox key={job} jobTitle={job} members={members} />
                 ))}
               </div>
 
               {/* === NIVEAU 3 : ÉQUIPES === */}
               <div 
                 onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 3)}
-                style={{ display:"flex", justifyContent:"center", gap:"20px", position:"relative", minWidth:"600px", minHeight:"110px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s", padding:"0 40px" }}
+                style={{ display:"flex", justifyContent:"center", gap:"30px", position:"relative", minWidth:"600px", minHeight:"120px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s", padding:"0 40px" }}
               >
                 {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 3</div>}
                 
-                {/* Ligne Horizontale Supérieure N3 (reliée à N2) */}
-                {level3.length > 1 && level2.length > 0 && <div style={{ position:"absolute", top:"-30px", left:"95px", right:"95px", height:"2px", background:t.border, zIndex:1 }}/>}
-                
-                {level3.map(m => (
-                  <div key={m.id} style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center" }}>
-                    {/* Trait ascendant N3 -> N2 */}
-                    {level2.length > 0 && <div style={{ position:"absolute", top:"-30px", width:"2px", height:"30px", background:t.border, zIndex:1 }}/>}
-                    <SquareCard m={m} />
-                  </div>
+                {Object.entries(groupMembersByJob(level3)).map(([job, members]) => (
+                   <JobGroupBox key={job} jobTitle={job} members={members} />
                 ))}
               </div>
 
@@ -525,11 +515,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       </div>
 
-      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Vue Profil ou Liste Indicateurs) ── */}
+      {/* ── ZONE DROITE : PANNEAU LATÉRAL ── */}
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
-          {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             
             {panelMode === 'indicators' && selectedPerson ? (
@@ -582,7 +571,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
           <div className="scroll-container" style={{ padding:"24px 20px", overflowY:"auto", display:"flex", flexDirection:"column", gap:"24px" }}>
             
-            {/* 🔴 VUE : LISTE DES INDICATEURS */}
+            {/* 🔴 VUE : LISTE DES INDICATEURS CLIQUABLES */}
             {panelMode === 'indicators' && selectedPerson && (
                <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
                   {selectedPersonCriteres.length === 0 ? (
@@ -727,7 +716,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                         ✉️ Contacter
                       </button>
                       <button 
-                        onClick={() => setPanelMode('indicators')}
+                        onClick={() => { setPanelMode('indicators'); updatePositions(); }}
                         style={{ flex:1, background:t.goldBg, border:`1px solid ${t.goldBd}`, color:t.gold, padding:"12px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
                       >
                         📋 Indicateurs
