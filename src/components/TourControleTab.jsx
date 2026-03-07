@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 
-// --- Fausses données pour l'UI de l'onglet Utilisateurs (Maquette Image 5) ---
+// --- Fausses données pour l'UI de l'onglet Utilisateurs ---
 const MOCK_USERS = [
   { id:1, init:"ML", nom:"Marie Leclerc", mail:"m.leclerc@ifsi-lyon.fr", etab:"Tous", role:"Super Admin", active:"Il y a 2 min", status:"Actif" },
   { id:2, init:"SR", nom:"Sophie Renard", mail:"s.renard@ifsi-lyon.fr", etab:"IFSI de Lyon", role:"Admin", active:"Il y a 18 min", status:"Actif" },
@@ -11,7 +11,7 @@ const MOCK_USERS = [
   { id:7, init:"MF", nom:"Marc Fontaine", mail:"m.fontaine@ifsi-annecy.fr", etab:"IFSI d'Annecy", role:"Lecteur", active:"Il y a 2j", status:"Actif" },
 ];
 
-export default function TourControleTab({ globalScore, activeIfsis, topAlerts, sortedTourIfsis, setSelectedIfsi, archivedIfsis, handleArchiveIfsi, handleHardDeleteIfsi, setActiveTab, tourSort, setTourSort, t }) {
+export default function TourControleTab({ globalScore, activeIfsis, topAlerts, sortedTourIfsis, setSelectedIfsi, archivedIfsis, handleArchiveIfsi, handleHardDeleteIfsi, handleRenameIfsi, setActiveTab, tourSort, setTourSort, t }) {
   
   const [onglet, setOnglet] = useState("vue");
 
@@ -22,7 +22,7 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
     audit: e.auditDate ? new Date(e.auditDate).toLocaleDateString("fr-FR") : "-",
     jours: e.auditDate ? Math.round((new Date(e.auditDate) - new Date()) / 86400000) : 0,
     statut: (e.pct < 65 || (e.liste?.filter(c => c.statut === "non-conforme").length || 0) > 10) ? "critique" : (e.pct < 80) ? "alerte" : "actif",
-    users: e.users || Math.floor(Math.random() * 8) + 2 // Simulation si prop manquante
+    users: e.users || Math.floor(Math.random() * 8) + 2 
   }));
 
   const critiques = etablissements.filter(e => e.statut === "critique").length;
@@ -56,15 +56,13 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
         .tab-btn:hover { color:${t.text}!important; background:${t.surface2}!important; }
         .ro { transition:background 0.15s; }
         .ro:hover { background:${t.surface2}!important; cursor:pointer; }
-        
-        /* Toggle Switch CSS */
-        .toggle-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: ${t.border}; cursor: pointer; transition: background 0.3s; display:flex; alignItems:center; padding: 2px; }
+        .toggle-switch { position: relative; width: 36px; height: 20px; border-radius: 10px; background: ${t.border}; cursor: pointer; transition: background 0.3s; display:flex; align-items:center; padding: 2px; }
         .toggle-switch.on { background: ${t.accent}; }
         .toggle-knob { width: 16px; height: 16px; border-radius: 50%; background: white; transition: transform 0.3s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
         .toggle-switch.on .toggle-knob { transform: translateX(16px); }
       `}</style>
 
-      {/* ── KPIs HAUT DE PAGE (Image 159aab) ── */}
+      {/* ── KPIs HAUT DE PAGE ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"16px" }}>
         {[
           { v:etablissements.length, l:"Établissements", c:t.text, icon:"🏥", bg:t.surface3 },
@@ -145,7 +143,7 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
                         <span style={{ fontSize:"13px", fontWeight:"600", color:t.text2 }}>{statCfg.label}</span>
                       </div>
 
-                      <div style={{ display:"flex", alignItems:"center", gap:"8px", color:t.text2, fontSize:"14px", fontWeight:"600" }}>
+                      <div style={{ display:"flex", alignItems:"center", gap:"6px", color:t.text2, fontSize:"14px", fontWeight:"600" }}>
                         <span style={{ fontSize:"16px" }}>👥</span> {e.users}
                       </div>
 
@@ -166,7 +164,7 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
         </div>
       )}
 
-      {/* ── ONGLET : ALERTES (Affinées et Élégantes) ── */}
+      {/* ── ONGLET : ALERTES ── */}
       {onglet === "alertes" && (
         <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
           
@@ -215,7 +213,7 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
         </div>
       )}
 
-      {/* ── ONGLET : UTILISATEURS (Image 15f0a5) ── */}
+      {/* ── ONGLET : UTILISATEURS ── */}
       {onglet === "users" && (
         <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
           <div style={{ padding:"16px 24px", borderBottom:`1px solid ${t.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
@@ -301,11 +299,10 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
         </div>
       )}
 
-      {/* ── ONGLET : CONFIGURATION (Image 6) ── */}
+      {/* ── ONGLET : CONFIGURATION ── */}
       {onglet === "config" && (
         <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"24px" }}>
           
-          {/* Colonne Gauche */}
           <div style={{ display:"flex", flexDirection:"column", gap:"24px" }}>
             
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
@@ -350,10 +347,8 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
                 </button>
               </div>
             </div>
-            
           </div>
 
-          {/* Colonne Droite */}
           <div style={{ display:"flex", flexDirection:"column", gap:"24px" }}>
             
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
@@ -400,10 +395,8 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
                 </div>
               </div>
             </div>
-            
           </div>
 
-          {/* Section Archives en pleine largeur en bas */}
           {archivedIfsis && archivedIfsis.length > 0 && (
             <div style={{ gridColumn:"1/-1", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
               <div style={{ padding:"20px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}`, color:t.text, fontSize:"16px", fontWeight:"800" }}>📦 Établissements Archivés</div>
@@ -414,8 +407,8 @@ export default function TourControleTab({ globalScore, activeIfsis, topAlerts, s
                 <div key={a.id} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", padding:"16px 24px", borderBottom:`1px solid ${t.border2}` }}>
                   <div style={{ color:t.text, fontSize:"15px", fontWeight:"700" }}>{a.name}</div>
                   <div style={{ display:"flex", gap:"12px" }}>
-                     <button onClick={() => handleArchiveIfsi(a.id, a.name, false)} style={{ background:t.greenBg, color:t.green, border:`1px solid ${t.greenBd}`, padding:"8px 16px", borderRadius:"6px", cursor:"pointer", fontWeight:"700", fontSize:"12px" }}>Restaurer l'accès</button>
-                     <button onClick={() => handleHardDeleteIfsi(a.id, a.name)} style={{ background:t.redBg, color:t.red, border:`1px solid ${t.redBd}`, padding:"8px 16px", borderRadius:"6px", cursor:"pointer", fontWeight:"700", fontSize:"12px" }}>Supprimer définitivement</button>
+                     <button onClick={() => handleArchiveIfsi(a.id, a.name, false)} style={{ background:t.greenBg, color:t.green, border:`1px solid ${t.greenBd}`, padding:"10px 20px", borderRadius:"8px", cursor:"pointer", fontWeight:"700", fontSize:"12px" }}>Restaurer l'accès</button>
+                     <button onClick={() => handleHardDeleteIfsi(a.id, a.name)} style={{ background:t.redBg, color:t.red, border:`1px solid ${t.redBd}`, padding:"10px 20px", borderRadius:"8px", cursor:"pointer", fontWeight:"700", fontSize:"12px" }}>Supprimer définitivement</button>
                   </div>
                 </div>
               ))}
