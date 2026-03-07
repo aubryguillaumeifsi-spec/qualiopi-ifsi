@@ -89,7 +89,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
 
       {/* ── VUE TABLEAU ── */}
       {vue === "table" && (
-        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, display:"flex", flexDirection:"column" }}>
+        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           
           <div className="scroll-container" style={{ overflowX: "auto" }}>
             <div style={{ minWidth: "750px" }}>
@@ -99,7 +99,6 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                 ))}
               </div>
               
-              {/* Hauteur max fixée pour permettre de scroller dedans sans couper */}
               <div className="scroll-container" style={{ maxHeight:"600px", overflowY:"auto", paddingBottom:"10px" }}>
                 {filtered.length === 0 ? (
                   <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontStyle:"italic", fontSize:"13px" }}>Aucun indicateur.</div>
@@ -180,10 +179,10 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                       const isComplete = preuvesCount > 0 && isConforme;
 
                       return (
-                         <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"14px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:t.shadowSm }}>
+                         <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${themeStatut.bd}`, borderRadius:"8px", padding:"14px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:`0 4px 12px ${themeStatut.bg}` }}>
                             <div>
                               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px" }}>
-                                 <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "800" }}>
+                                 <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "2px 8px", borderRadius:"6px", fontSize:"11px", fontWeight:"800" }}>
                                    {formatInd(c.critere, c.num)}
                                  </span>
                                  <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>{labelStatut}</span>
@@ -208,59 +207,6 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                 </div>
               </div>
             )
-          })}
-        </div>
-      )}
-    </div>
-  );
-}
-
-// ----------------------------------------------------------------------
-// 🔥 ONGLET : PRIORITÉS 
-// ----------------------------------------------------------------------
-export function AxesTab({ axes, days, dayColor, setModalCritere, t }) {
-  const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
-
-  return (
-    <div className="animate-fade-in" style={{ maxWidth:"1000px", margin:"0 auto" }}>
-      <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"20px 24px", marginBottom:"20px", boxShadow:t.shadowSm, display:"flex", alignItems:"center", gap:"16px" }}>
-        <div>
-          <h2 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"24px", color:t.text, margin:"0 0 4px 0" }}>Plan d'action & Priorités</h2>
-          <p style={{ color:t.text2, fontSize:"13px", margin:0 }}>Liste des indicateurs nécessitant une attention particulière (Non conformes ou en cours).</p>
-        </div>
-      </div>
-      {axes.length === 0 ? (
-        <div style={{ background:t.greenBg, border:`1px solid ${t.greenBd}`, padding:"40px", textAlign:"center", borderRadius:"10px", color:t.green }}>
-          <div style={{ fontSize:"30px", marginBottom:"10px" }}>✅</div>
-          <h3 style={{ margin:"0 0 6px 0", fontSize:"18px" }}>Félicitations !</h3>
-          <p style={{ fontSize:"13px" }}>Aucun indicateur n'est en statut "Écart" ou "En cours".</p>
-        </div>
-      ) : (
-        <div style={{ display:"flex", flexDirection:"column", gap:"10px" }}>
-          {axes.map(c => {
-            const d = days(c.delai);
-            const isNC = c.statut === "non-conforme";
-            const labelStatut = isNC ? "Non conforme" : "En cours";
-            const themeStatut = isNC ? { c:t.red, bg:t.redBg, bd:t.redBd } : { c:t.amber, bg:t.amberBg, bd:t.amberBd };
-            const cConf = CRITERES_LABELS[c.critere] || { color: t.text2 };
-            
-            return (
-              <div key={c.id} onClick={() => setModalCritere(c)} style={{ background:t.surface, border:`1px solid ${isNC ? t.redBd : t.border}`, borderLeft:`4px solid ${isNC ? t.red : t.amber}`, borderRadius:"8px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", cursor:"pointer", transition:"all 0.2s", boxShadow:t.shadowSm }} onMouseOver={e => e.currentTarget.style.transform = "translateY(-2px)"} onMouseOut={e => e.currentTarget.style.transform = "translateY(0)"}>
-                <div style={{ flex:1, paddingRight:"20px" }}>
-                  <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"6px" }}>
-                    <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "2px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800" }}>
-                      {formatInd(c.critere, c.num)}
-                    </span>
-                    <span style={{ background:themeStatut.bg, color:themeStatut.c, border:`1px solid ${themeStatut.bd}`, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"4px", textTransform:"uppercase" }}>{labelStatut}</span>
-                  </div>
-                  <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", lineHeight:"1.4" }}>{c.titre}</div>
-                </div>
-                <div style={{ textAlign:"right", minWidth:"100px" }}>
-                  <div style={{ fontSize:"9px", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px", fontWeight:"700" }}>Échéance</div>
-                  <div style={{ fontSize:"16px", fontWeight:"800", color: d < 0 ? t.red : t.amber }}>{d < 0 ? "DÉPASSÉ" : `J-${d}`}</div>
-                </div>
-              </div>
-            );
           })}
         </div>
       )}
