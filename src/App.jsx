@@ -210,7 +210,10 @@ function MainApp() {
 
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
-  const isArchive = currentCampaign?.locked || false;
+  
+  // L'archivage verrouille également l'audit en lecture seule
+  const isArchive = currentCampaign?.locked || currentCampaign?.archived || false;
+  
   const currentAuditDate = currentCampaign?.auditDate || "2026-10-15";
   const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
@@ -293,6 +296,27 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
+  // NOUVEAU : Fonction d'archivage d'un audit
+  const handleArchiveCampaign = (campaignId, status) => {
+    const camp = campaigns.find(c => c.id === campaignId);
+    if (window.confirm(`Voulez-vous vraiment ${status ? 'archiver' : 'désarchiver'} l'audit "${camp.name}" ?`)) {
+      const newCampaigns = campaigns.map(c => c.id === campaignId ? { ...c, archived: status } : c);
+      saveData(newCampaigns);
+    }
+  };
+
+  // NOUVEAU : Fonction de suppression définitive (Super Admin uniquement)
+  const handleDeleteCampaign = (campaignId) => {
+    const camp = campaigns.find(c => c.id === campaignId);
+    if (prompt(`⚠️ ATTENTION ACTION IRRÉVERSIBLE !\nTapez "SUPPRIMER" pour détruire définitivement l'audit "${camp.name}".`) === "SUPPRIMER") {
+      const newCampaigns = campaigns.filter(c => c.id !== campaignId);
+      saveData(newCampaigns);
+      if (activeCampaignId === campaignId) {
+        setActiveCampaignId(newCampaigns[newCampaigns.length - 1]?.id || null);
+      }
+    }
+  };
+
   const saveModal = (updated, action) => { 
     handleAutoSave(updated); 
     if (action === "close" || !action) setModalCritere(null); 
@@ -309,7 +333,7 @@ function MainApp() {
   const submitAuditModal = () => {
     if(!auditModal.name || !auditModal.date) return alert("Veuillez remplir tous les champs.");
     const newId = Date.now().toString();
-    const newCamp = { id: newId, name: auditModal.name, auditDate: auditModal.date, liste: DEFAULT_CRITERES, locked: false };
+    const newCamp = { id: newId, name: auditModal.name, auditDate: auditModal.date, liste: DEFAULT_CRITERES, locked: false, archived: false };
     saveData([...(campaigns||[]), newCamp]);
     setActiveCampaignId(newId);
     setAuditModal({ show: false, name: "", date: "" });
@@ -445,7 +469,7 @@ function MainApp() {
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
-            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#0c1118" }}>
+            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#ffffff" }}>
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
@@ -503,8 +527,7 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {/* Note: handleAutoSave est bien passé ! */}
-          {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} t={t} />}
+          {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} handleUpdateUserRoles={handleUpdateUserRoles} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
