@@ -49,8 +49,8 @@ const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Fo
 const ROLE_PALETTE = [ 
   { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, 
   { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, 
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, 
   { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, 
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, 
   { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, 
   { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, 
   { bg: "#ecfeff", border: "#7dd3fc", text: "#0369a1" }, 
@@ -197,7 +197,7 @@ function MainApp() {
     try {
       const cred = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
-      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], jobTitles: [], mustChangePassword: true, status: "ACTIF" });
+      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], jobTitles: [], mustChangePassword: true, status: "ACTIF", orgLevel: 3 });
       alert("✅ Compte créé !");
       setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
       secondaryAuth.signOut();
@@ -218,8 +218,6 @@ function MainApp() {
   
   const orgRoles = useMemo(() => ifsiData?.roles || DEFAULT_ROLES, [ifsiData]);
   const orgJobTitles = useMemo(() => ifsiData?.jobTitles || DEFAULT_JOB_TITLES, [ifsiData]); 
-  
-  // NOUVEAU : Récupération des connexions SVG de l'établissement
   const orgConnections = useMemo(() => ifsiData?.orgConnections || [], [ifsiData]);
   
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
@@ -394,7 +392,7 @@ function MainApp() {
       jobTitles: userData.jobTitles || [],
       email: userData.email || "",
       phone: userData.phone || "",
-      orgLevel: 3 // Par défaut tout le monde va au niveau 3
+      orgLevel: 3 // On les place par défaut en équipe
     };
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
@@ -443,7 +441,6 @@ function MainApp() {
     await setDoc(docRef, updates, { merge: true });
   };
 
-  // NOUVEAU : Fonction de mise à jour des liens (lignes) dans la DB
   const handleUpdateConnections = async (newConns) => {
     await setDoc(doc(db, "etablissements", selectedIfsi), { orgConnections: newConns }, { merge: true });
   };
@@ -477,7 +474,7 @@ function MainApp() {
     );
   };
 
-  // SÉCURITÉ ICI : Définition des boutons Précédent/Suivant pour la modale
+  // CORRECTIF ICI : hasPrev et hasNext sont bien définis pour la modale
   const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
