@@ -26,7 +26,8 @@ function buildTokens(dark) {
     gold:"#d4a030", goldBg:"rgba(212,160,48,0.12)", goldBd:"rgba(212,160,48,0.3)",
     green:"#2cc880", greenBg:"rgba(44,200,128,0.1)", greenBd:"rgba(44,200,128,0.25)",
     red:"#f07070", redBg:"rgba(240,112,112,0.1)", redBd:"rgba(240,112,112,0.25)",
-    amber:"#f0a030", amberBg:"rgba(240,160,48,0.1)", amberBd:"rgba(240,160,48,0.25)",
+    // Nouvel orange plus vif et clair pour le Dark Mode
+    amber:"#fbad14", amberBg:"rgba(251,173,20,0.12)", amberBd:"rgba(251,173,20,0.3)",
     shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)", shadowGold:"0 4px 16px rgba(212,160,48,0.18)",
   } : {
     bg:"#eef2f6", surface:"#ffffff", surface2:"#f8fafc", surface3:"#e2e8f0",
@@ -38,7 +39,8 @@ function buildTokens(dark) {
     gold:"#b07010", goldBg:"#fef4de", goldBd:"#f0cc70",
     green:"#0e7a50", greenBg:"#e8f9f3", greenBd:"#9dddc5",
     red:"#c42828", redBg:"#fdecea", redBd:"#f4a6a6",
-    amber:"#a85c07", amberBg:"#fef5e7", amberBd:"#f5ce84",
+    // Nouvel orange plus vif et clair pour le Light Mode (pour bien trancher avec le rouge)
+    amber:"#e08500", amberBg:"#fef6eb", amberBd:"#f8d799",
     shadow:"0 4px 6px -1px rgba(0,0,0,0.05)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)", shadowGold:"0 4px 16px rgba(176,112,16,0.18)",
   };
 }
@@ -46,7 +48,6 @@ function buildTokens(dark) {
 const DEFAULT_ROLES = ["Direction", "Formation", "Secrétariat", "Documentaliste", "Qualité"];
 const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Formateur IFSI", "Formateur IFAS", "Secrétaire", "TICE", "Documentaliste", "Référent ABS (handicap)", "Référent laïcité", "Ingénieur pédagogique"];
 
-// 🎨 PALETTE DE COULEURS ÉLARGIE ET TRÈS CONTRASTÉE
 const ROLE_PALETTE = [ 
   { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, // 0. Or (Direction)
   { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, // 1. Bleu (Qualité)
@@ -394,6 +395,7 @@ function MainApp() {
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
 
+  // 🎯 GESTION DE LA STRUCTURE (Pôles et Fonctions)
   const handleManageStructure = async (type, action, oldVal, newVal) => {
     const docRef = doc(db, "etablissements", selectedIfsi);
     const snap = await getDoc(docRef);
@@ -438,10 +440,6 @@ function MainApp() {
     await setDoc(docRef, updates, { merge: true });
   };
 
-  // NOUVEAU : Récupération correcte de hasPrev / hasNext pour Modal
-  const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
-  const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
@@ -542,7 +540,7 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit */}
+        {/* Prochain audit avec date bien lisible dans tous les modes */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -607,6 +605,7 @@ function MainApp() {
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
+          {/* L'Organigramme reçoit la nouvelle fonction de management structurel */}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
