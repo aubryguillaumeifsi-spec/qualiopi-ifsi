@@ -219,6 +219,9 @@ function MainApp() {
   const orgRoles = useMemo(() => ifsiData?.roles || DEFAULT_ROLES, [ifsiData]);
   const orgJobTitles = useMemo(() => ifsiData?.jobTitles || DEFAULT_JOB_TITLES, [ifsiData]); 
   
+  // NOUVEAU : Récupération des connexions SVG de l'établissement
+  const orgConnections = useMemo(() => ifsiData?.orgConnections || [], [ifsiData]);
+  
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
@@ -390,7 +393,8 @@ function MainApp() {
       status: "ACTIF", 
       jobTitles: userData.jobTitles || [],
       email: userData.email || "",
-      phone: userData.phone || ""
+      phone: userData.phone || "",
+      orgLevel: 3 // Par défaut tout le monde va au niveau 3
     };
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
@@ -439,6 +443,11 @@ function MainApp() {
     await setDoc(docRef, updates, { merge: true });
   };
 
+  // NOUVEAU : Fonction de mise à jour des liens (lignes) dans la DB
+  const handleUpdateConnections = async (newConns) => {
+    await setDoc(doc(db, "etablissements", selectedIfsi), { orgConnections: newConns }, { merge: true });
+  };
+
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
@@ -468,7 +477,7 @@ function MainApp() {
     );
   };
 
-  // LA CORRECTION EST ICI ! Ces lignes assurent le bon fonctionnement du bouton Précédent/Suivant dans la modal
+  // SÉCURITÉ ICI : Définition des boutons Précédent/Suivant pour la modale
   const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
@@ -609,7 +618,7 @@ function MainApp() {
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} setModalCritere={setModalCritere} days={days} t={t} />}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
