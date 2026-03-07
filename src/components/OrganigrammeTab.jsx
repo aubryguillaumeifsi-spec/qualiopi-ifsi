@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 
-export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMembers, criteres, userProfile, getRoleColor, handleAddManualUser, handleUpdateUserDetail, t }) {
+export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleAddJobTitle, handleAddManualUser, handleUpdateUserDetail, t }) {
   const [selectedPersonId, setSelectedPersonId] = useState(null);
+  const [newUserForm, setNewUserForm] = useState(null); // Gère l'affichage du formulaire de création
 
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
+  const isSuperAdmin = userProfile?.role === "superadmin";
 
-  // Fonction de calcul des statistiques pour une personne donnée
   const getUserStats = (person) => {
     const userCriteres = criteres.filter(c => 
       c.responsables && c.responsables.some(resp => 
@@ -23,7 +24,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
     return { total, conf, ec, nc, pct };
   };
 
-  // On injecte les stats dans CHAQUE membre pour que l'affichage et le panneau latéral ne plantent plus
   const safeMembers = allIfsiMembers.map(m => ({
     ...m, 
     prenom: m.prenom || "Membre", 
@@ -32,15 +32,30 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
     stats: getUserStats(m)
   })).filter(m => !m.archived);
 
-  // Le membre sélectionné est tiré de safeMembers (qui contient les stats calculées)
   const selectedPerson = safeMembers.find(m => m.id === selectedPersonId);
 
-  // Actions Panneau Latéral
   const handleArchiveUser = async () => {
     if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ? Cette personne n'apparaîtra plus dans la liste.`)) {
       await handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, { archived: true });
       setSelectedPersonId(null);
     }
+  };
+
+  const openCreationPanel = () => {
+    setSelectedPersonId(null);
+    setNewUserForm({
+      prenom: "",
+      nom: "",
+      email: "",
+      phone: "",
+      jobTitle: orgJobTitles[0] || "",
+    });
+  };
+
+  const submitNewUser = () => {
+    if (!newUserForm.prenom || !newUserForm.nom) return alert("Le Prénom et le Nom sont requis.");
+    handleAddManualUser(newUserForm);
+    setNewUserForm(null); // On referme le panneau après création
   };
 
   return (
@@ -81,7 +96,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
             </div>
 
             {isAdminOrSuper && (
-              <button onClick={() => { const p = prompt("Prénom :"); const n = prompt("Nom :"); if(p&&n) handleAddManualUser(p,n); }} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}>
+              <button onClick={openCreationPanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                 👤 Nouveau collaborateur
               </button>
             )}
@@ -101,12 +116,11 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
               return (
                 <div 
                   key={m.id}
-                  onClick={() => setSelectedPersonId(m.id)}
+                  onClick={() => { setNewUserForm(null); setSelectedPersonId(m.id); }}
                   style={{ background:t.surface, border:`1px solid ${selectedPersonId === m.id ? rc.text : t.border}`, borderRadius:"12px", padding:"16px", cursor:"pointer", transition:"all 0.2s", boxShadow: selectedPersonId === m.id ? `0 4px 12px ${rc.bg}` : t.shadowSm, display:"flex", flexDirection:"column" }}
                   onMouseOver={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=`0 6px 16px ${rc.bg}`; }}
                   onMouseOut={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow=selectedPersonId === m.id ? `0 4px 12px ${rc.bg}` : t.shadowSm; }}
                 >
-                  {/* Titre du rôle en haut à gauche */}
                   <div style={{ fontSize:"10px", fontWeight:"800", color:rc.text, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>
                     {primaryRole || "Non assigné"}
                   </div>
@@ -124,7 +138,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
                     </div>
                   </div>
 
-                  {/* Barre d'indicateurs de la personne (en bas de carte) */}
                   <div style={{ marginTop:"auto" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:"11px", fontWeight:"700", color:t.text3, marginBottom:"6px" }}>
                       <span>{m.stats.total > 0 ? `${m.stats.conf}/${m.stats.total} ind.` : "Aucun ind."}</span>
@@ -143,11 +156,61 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
         </div>
       </div>
 
-      {/* ── ZONE DROITE : Détail de la Personne (Façon Outlook) ── */}
-      {selectedPerson && (
+      {/* ── ZONE DROITE : CRÉATION D'UN NOUVEAU COLLABORATEUR ── */}
+      {newUserForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden" }}>
           
-          {/* Header */}
+          <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            <div style={{ fontSize:"18px", fontWeight:"800", color:t.text }}>👤 Nouveau collaborateur</div>
+            <button onClick={() => setNewUserForm(null)} style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", color:t.text3, fontSize:"16px", cursor:"pointer", width:"32px", height:"32px", display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
+          </div>
+
+          <div style={{ padding:"24px 20px", flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:"20px" }}>
+            
+            <div>
+              <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Prénom *</label>
+              <input type="text" value={newUserForm.prenom} onChange={e=>setNewUserForm({...newUserForm, prenom: e.target.value})} placeholder="Ex: Jean" style={{ width:"100%", padding:"12px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, marginTop:"6px", outline:"none", fontSize:"13px" }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Nom *</label>
+              <input type="text" value={newUserForm.nom} onChange={e=>setNewUserForm({...newUserForm, nom: e.target.value})} placeholder="Ex: Dupont" style={{ width:"100%", padding:"12px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, marginTop:"6px", outline:"none", fontSize:"13px" }} />
+            </div>
+
+            {/* SELECTION PERSONNALISABLE DE LA FONCTION */}
+            <div>
+              <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+                <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Fonction</label>
+                {isSuperAdmin && (
+                  <button onClick={() => { const f = prompt("Nouvelle fonction ?"); if(f) handleAddJobTitle(f); }} style={{ background:"transparent", border:"none", color:t.accent, fontSize:"11px", fontWeight:"700", cursor:"pointer" }}>+ Ajouter</button>
+                )}
+              </div>
+              <select value={newUserForm.jobTitle} onChange={e=>setNewUserForm({...newUserForm, jobTitle: e.target.value})} style={{ width:"100%", padding:"12px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, marginTop:"6px", outline:"none", cursor:"pointer", fontSize:"13px" }}>
+                {orgJobTitles.map(jt => <option key={jt} value={jt} style={{color:"black"}}>{jt}</option>)}
+              </select>
+            </div>
+
+            <div>
+              <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Email professionnel</label>
+              <input type="email" value={newUserForm.email} onChange={e=>setNewUserForm({...newUserForm, email: e.target.value})} placeholder="jean.dupont@ifsi.fr" style={{ width:"100%", padding:"12px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, marginTop:"6px", outline:"none", fontSize:"13px" }} />
+            </div>
+
+            <div>
+              <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Téléphone</label>
+              <input type="text" value={newUserForm.phone} onChange={e=>setNewUserForm({...newUserForm, phone: e.target.value})} placeholder="06 12 34 56 78" style={{ width:"100%", padding:"12px 14px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, marginTop:"6px", outline:"none", fontSize:"13px" }} />
+            </div>
+
+            <button onClick={submitNewUser} style={{ width:"100%", background:t.accent, color:"white", border:"none", padding:"14px", borderRadius:"8px", fontSize:"14px", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}`, marginTop:"auto" }}>
+              💾 Enregistrer
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── ZONE DROITE : Détail d'un collaborateur existant (Outlook Style) ── */}
+      {selectedPerson && !newUserForm && (
+        <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden" }}>
+          
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             <div style={{ display:"flex", gap:"16px", alignItems:"center" }}>
               <div style={{ width:"64px", height:"64px", borderRadius:"16px", background:getRoleColor(selectedPerson.roles[0]).bg, border:`1px solid ${getRoleColor(selectedPerson.roles[0]).bd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", fontWeight:"800", color:getRoleColor(selectedPerson.roles[0]).text }}>
@@ -155,8 +218,17 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
               </div>
               <div>
                 <div style={{ fontSize:"20px", fontWeight:"800", color:t.text }}>{selectedPerson.prenom} {selectedPerson.nom}</div>
+                
+                {/* MENU DÉROULANT POUR MODIFIER LA FONCTION D'UN EXISTANT */}
                 {isAdminOrSuper ? (
-                   <input type="text" value={selectedPerson.jobTitle} onChange={e => handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, {jobTitle: e.target.value})} style={{ background:"transparent", border:"none", borderBottom:`1px dashed ${t.border}`, color:t.text2, fontSize:"13px", outline:"none", width:"100%", marginTop:"4px" }} placeholder="Fonction..." />
+                  <div style={{ display:"flex", alignItems:"center", gap:"6px", marginTop:"4px" }}>
+                    <select value={selectedPerson.jobTitle || ""} onChange={e => handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, {jobTitle: e.target.value})} style={{ background:"transparent", border:"none", borderBottom:`1px dashed ${t.border}`, color:t.text2, fontSize:"13px", outline:"none", cursor:"pointer", width:"100%" }}>
+                      {orgJobTitles.map(jt => <option key={jt} value={jt} style={{color:"black"}}>{jt}</option>)}
+                    </select>
+                    {isSuperAdmin && (
+                      <button onClick={() => { const f = prompt("Nouvelle fonction ?"); if(f) handleAddJobTitle(f); }} style={{ background:"transparent", border:"none", color:t.accent, fontSize:"14px", fontWeight:"800", cursor:"pointer" }}>+</button>
+                    )}
+                  </div>
                 ) : (
                    <div style={{ fontSize:"13px", color:t.text2, marginTop:"4px" }}>{selectedPerson.jobTitle}</div>
                 )}
@@ -173,13 +245,16 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
 
           <div style={{ padding:"24px 20px", flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:"24px" }}>
             
-            {/* Contact Pro uniquement */}
             <div>
               <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Contact</div>
               <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
                 <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
                   <span>✉️</span>
-                  {selectedPerson.email ? <span style={{ fontFamily:"'DM Mono',monospace", color:t.text }}>{selectedPerson.email}</span> : <span style={{ fontStyle:"italic", opacity:0.5 }}>Non renseigné</span>}
+                  {isAdminOrSuper ? (
+                    <input type="email" value={selectedPerson.email || ""} onChange={e => handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, {email: e.target.value})} placeholder="Ajouter un email..." style={{ background:"transparent", border:"none", borderBottom:`1px dashed ${t.border}`, color:t.text, fontFamily:"'DM Mono',monospace", outline:"none", width:"100%" }} />
+                  ) : (
+                    selectedPerson.email ? <span style={{ fontFamily:"'DM Mono',monospace", color:t.text }}>{selectedPerson.email}</span> : <span style={{ fontStyle:"italic", opacity:0.5 }}>Non renseigné</span>
+                  )}
                 </div>
                 <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
                   <span>📞</span>
@@ -198,7 +273,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
 
             <hr style={{ border:0, borderTop:`1px solid ${t.border}` }}/>
 
-            {/* Indicateurs Qualiopi Personnels (Les 3 gros carrés) */}
             <div>
               <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Indicateurs Qualiopi</div>
               
@@ -230,7 +304,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
               </div>
             </div>
 
-            {/* Boutons Actions (Le bouton mailto est fonctionnel !) */}
             <div style={{ display:"flex", gap:"12px", marginTop:"auto" }}>
               <button 
                 onClick={() => selectedPerson.email ? (window.location.href = `mailto:${selectedPerson.email}`) : alert("Aucune adresse mail renseignée.")}
@@ -247,7 +320,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, allIfsiMemb
               </button>
             </div>
 
-            {/* Actions SuperAdmin Critiques */}
             {isAdminOrSuper && (
                <div style={{ marginTop:"10px", textAlign:"center" }}>
                  <button onClick={handleArchiveUser} style={{ background:"transparent", border:"none", color:t.red, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
