@@ -18,14 +18,14 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
   const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
 
   return (
-    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", height:"100%" }}>
+    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", paddingBottom:"40px" }}>
       <style>{`
         .ro { transition:background 0.15s; cursor:pointer; }
         .ro:hover { background:${t.surface2}!important; }
         .stat-card { transition:all 0.2s; cursor:pointer; border:1px solid ${t.border}; }
         .stat-card:hover { transform:translateY(-2px); box-shadow:${t.shadowMd}!important; }
         .fil:hover { border-color:${t.accent}!important; background:${t.accentBg}!important; color:${t.accent}!important; }
-        .scroll-container::-webkit-scrollbar { height: 6px; }
+        .scroll-container::-webkit-scrollbar { height: 6px; width: 6px; }
         .scroll-container::-webkit-scrollbar-track { background: transparent; }
         .scroll-container::-webkit-scrollbar-thumb { background: ${t.border2}; border-radius: 4px; }
       `}</style>
@@ -87,19 +87,20 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"11px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── VUE TABLEAU (Bulles Indicateurs) ── */}
+      {/* ── VUE TABLEAU ── */}
       {vue === "table" && (
-        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
+        <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, display:"flex", flexDirection:"column" }}>
           
-          <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
-            <div style={{ minWidth: "700px" }}>
-              <div style={{ display:"grid", gridTemplateColumns:"90px minmax(200px, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+          <div className="scroll-container" style={{ overflowX: "auto" }}>
+            <div style={{ minWidth: "750px" }}>
+              <div style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 110px 110px 60px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                 {["N°", "Libellé", "Statut", "Responsable", "Échéance"].map(h => (
                   <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                 ))}
               </div>
               
-              <div style={{ paddingBottom:"10px" }}>
+              {/* Hauteur max fixée pour permettre de scroller dedans sans couper */}
+              <div className="scroll-container" style={{ maxHeight:"600px", overflowY:"auto", paddingBottom:"10px" }}>
                 {filtered.length === 0 ? (
                   <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontStyle:"italic", fontSize:"13px" }}>Aucun indicateur.</div>
                 ) : (
@@ -112,11 +113,10 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                      const d = days(c.delai);
 
                      return (
-                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"90px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
                           
-                          {/* Numéro sous forme de Bulle stylisée */}
                           <div>
-                            <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                            <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif" }}>
                               {formatInd(c.critere, c.num)}
                             </span>
                           </div>
@@ -183,7 +183,6 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                          <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"14px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:t.shadowSm }}>
                             <div>
                               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px" }}>
-                                 {/* Bulle indicateur pour la carte aussi */}
                                  <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "800" }}>
                                    {formatInd(c.critere, c.num)}
                                  </span>
