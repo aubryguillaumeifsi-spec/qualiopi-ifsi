@@ -1,9 +1,6 @@
 import React, { useState } from "react";
 import { CRITERES_LABELS, STATUT_CONFIG } from "../data";
 
-// ----------------------------------------------------------------------
-// 🎯 ONGLET : INDICATEURS
-// ----------------------------------------------------------------------
 export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilterStatut, filterCritere, setFilterCritere, filtered, days, setModalCritere, t }) {
   
   const [vue, setVue] = useState("table"); 
@@ -15,7 +12,12 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
     "non-concerne": filtered.filter(c => c.statut === "non-concerne").length
   };
 
-  const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
+  // FONCTION INTELLIGENTE : Transforme "Indicateur 1" en "1.1"
+  const formatInd = (critere, num) => {
+    const match = String(num).match(/(\d+)$/);
+    const n = match ? match[1] : String(num).replace(/\D/g, '');
+    return `${critere}.${n}`;
+  };
 
   return (
     <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", paddingBottom:"40px" }}>
@@ -87,7 +89,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"11px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── VUE TABLEAU ── */}
+      {/* ── VUE TABLEAU (Anti-superposition et bulles) ── */}
       {vue === "table" && (
         <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           
@@ -115,7 +117,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                        <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 110px 110px 60px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
                           
                           <div>
-                            <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif" }}>
+                            <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
                               {formatInd(c.critere, c.num)}
                             </span>
                           </div>
@@ -182,7 +184,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                          <div key={c.id} onClick={()=>setModalCritere(c)} className="stat-card" style={{ background:t.surface, border:`1px solid ${themeStatut.bd}`, borderRadius:"8px", padding:"14px", display:"flex", flexDirection:"column", justifyContent:"space-between", boxShadow:`0 4px 12px ${themeStatut.bg}` }}>
                             <div>
                               <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"10px" }}>
-                                 <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "2px 8px", borderRadius:"6px", fontSize:"11px", fontWeight:"800" }}>
+                                 <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "2px 8px", borderRadius:"6px", fontSize: "11px", fontWeight: "800" }}>
                                    {formatInd(c.critere, c.num)}
                                  </span>
                                  <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>{labelStatut}</span>
