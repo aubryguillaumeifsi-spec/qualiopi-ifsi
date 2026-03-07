@@ -1,51 +1,53 @@
 import React, { useState } from "react";
+import { CRITERES_LABELS } from "../data";
 
-export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, t }) {
+export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, setModalCritere, days, t }) {
   
   const [editForm, setEditForm] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false); 
+  const [panelMode, setPanelMode] = useState('profile'); // 'profile' ou 'indicators'
 
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
   const isSuperAdmin = userProfile?.role === "superadmin";
 
-  // ALGORITHME DE STATS RENFORCÉ ET EN TEMPS RÉEL
-  const getUserStats = (person) => {
+  // ALGORITHME DE RÉCUPÉRATION DES INDICATEURS (Robuste pour anciens et nouveaux comptes)
+  const getUserCriteres = (person) => {
+    if (!person) return [];
+    const p_name = (person.name || "").toLowerCase().trim();
     const p_prenom = (person.prenom || "").toLowerCase().trim();
     const p_nom = (person.nom || "").toLowerCase().trim();
     const p_email = (person.email || "").toLowerCase().trim();
-
-    const userCriteres = criteres.filter(c => 
+    
+    return criteres.filter(c => 
       c.responsables && c.responsables.some(resp => {
         const r = resp.toLowerCase().trim();
         if (!r) return false;
-
-        // Correspondance Email
+        
+        // Match email exact
         if (p_email && r.includes(p_email)) return true;
-
-        // Correspondance Nom Complet
-        const fn1 = `${p_prenom} ${p_nom}`.trim();
-        const fn2 = `${p_nom} ${p_prenom}`.trim();
-        if (fn1 && fn1.length > 2 && r.includes(fn1)) return true;
-        if (fn2 && fn2.length > 2 && r.includes(fn2)) return true;
-
-        // Si le prénom et le nom sont distinctement dans la chaine
+        // Match nom complet exact
+        if (p_name && r.includes(p_name)) return true;
+        // Match prenom + nom combinés
         if (p_prenom && p_nom && r.includes(p_prenom) && r.includes(p_nom)) return true;
-
-        // Correspondance partielle (au cas où seul le nom ou le prénom est saisi)
-        if (p_nom && p_nom.length > 2 && r.includes(p_nom)) return true;
-        if (p_prenom && p_prenom.length > 2 && !p_nom && r.includes(p_prenom)) return true;
-
+        
+        // Mots stricts (ex: si r="Jean Dupont", words=["jean", "dupont"])
+        const words = r.split(/[\s,;-]+/);
+        if (p_nom && p_nom.length > 1 && words.includes(p_nom)) return true;
+        if (p_prenom && p_prenom.length > 1 && words.includes(p_prenom)) return true;
+        
         return false;
       })
     );
-    
+  };
+
+  const getUserStats = (person) => {
+    const userCriteres = getUserCriteres(person);
     const total = userCriteres.length;
     const conf = userCriteres.filter(c => c.statut === "conforme").length;
     const ec = userCriteres.filter(c => c.statut === "en-cours").length;
     const nc = userCriteres.filter(c => c.statut === "non-conforme").length;
     const pct = total > 0 ? Math.round((conf / total) * 100) : 0;
-    
     return { total, conf, ec, nc, pct };
   };
 
@@ -60,6 +62,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
   const displayMembers = safeMembers.filter(m => showArchived ? m.archived : !m.archived);
   const selectedPerson = editForm?.id ? safeMembers.find(m => m.id === editForm.id) : null;
+  const selectedPersonCriteres = getUserCriteres(selectedPerson);
 
   const handleArchiveUser = async () => {
     if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ?`)) {
@@ -76,17 +79,18 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
   const openViewPanel = (m) => {
     setEditForm({ ...m, isEditing: false });
+    setPanelMode('profile');
   };
 
   const openCreatePanel = () => {
     setEditForm({ isNew: true, isEditing: true, prenom: "", nom: "", email: "", phone: "", jobTitles: [], roles: [], status: "ACTIF" });
+    setPanelMode('profile');
   };
 
   const toggleArrayItem = (array, item) => array.includes(item) ? array.filter(i => i !== item) : [...array, item];
 
   const submitForm = async () => {
     if (!editForm.prenom || !editForm.nom) return alert("Le Prénom et le Nom sont requis.");
-    
     if (editForm.isNew) {
       handleAddManualUser(editForm);
     } else {
@@ -101,6 +105,12 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       });
     }
     setEditForm(editForm.isNew ? null : { ...editForm, isEditing: false });
+  };
+
+  const formatInd = (critere, num) => {
+    const match = String(num).match(/(\d+)$/);
+    const n = match ? match[1] : String(num).replace(/\D/g, '');
+    return `${critere}.${n}`;
   };
 
   return (
@@ -119,8 +129,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             </div>
             
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"32px", overflowY:"auto", paddingBottom:"10px" }} className="scroll-container">
-              
-              {/* Colonne Pôles */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Pôles (Équipes)</div>
@@ -145,7 +153,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 </div>
               </div>
 
-              {/* Colonne Fonctions */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titres)</div>
@@ -213,7 +220,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                   👤 Nouveau collaborateur
                 </button>
-                {/* BOUTON CONFIGURATION BIEN VISIBLE */}
                 {isSuperAdmin && (
                   <button onClick={() => setIsSettingsOpen(true)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                     ⚙️ Configurer
@@ -224,7 +230,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </div>
         </div>
 
-        {/* LA GRILLE DES CARTES (Avec padding top réparé pour l'ombre) */}
+        {/* LA GRILLE DES CARTES */}
         <div className="scroll-container" style={{ flex:1, overflowY:"auto", padding:"4px 8px 20px 4px" }}>
           
           {showArchived && <div style={{ fontSize:"14px", fontWeight:"800", color:t.text3, marginBottom:"16px", textTransform:"uppercase", letterSpacing:"1px" }}>📦 Membres Archivés</div>}
@@ -287,38 +293,51 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
-          {/* HEADER DU PANNEAU */}
+          {/* HEADER DU PANNEAU (Commun Vue/Edition/Liste Indicateurs) */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-            <div style={{ display:"flex", gap:"16px", alignItems:"center", width:"100%" }}>
-              <div style={{ width:"64px", height:"64px", borderRadius:"16px", background:getRoleColor(editForm.roles[0]).bg, border:`1px solid ${getRoleColor(editForm.roles[0]).bd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", fontWeight:"800", color:getRoleColor(editForm.roles[0]).text, flexShrink:0 }}>
-                {editForm.prenom ? editForm.prenom.charAt(0).toUpperCase() : ""}{editForm.nom ? editForm.nom.charAt(0).toUpperCase() : ""}
-              </div>
-              <div style={{ flex:1 }}>
-                {editForm.isEditing ? (
-                   <div style={{ display:"flex", gap:"8px", marginBottom:"4px" }}>
-                     <input type="text" value={editForm.prenom} onChange={e=>setEditForm({...editForm, prenom: e.target.value.charAt(0).toUpperCase() + e.target.value.slice(1)})} placeholder="Prénom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
-                     <input type="text" value={editForm.nom} onChange={e=>setEditForm({...editForm, nom: e.target.value.toUpperCase()})} placeholder="Nom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
+            
+            {panelMode === 'indicators' ? (
+               <div style={{ display:"flex", alignItems:"center", gap:"12px", width:"100%" }}>
+                 <button onClick={() => setPanelMode('profile')} style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", width:"36px", height:"36px", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:t.text, flexShrink:0, boxShadow:t.shadowSm }}>
+                   ⬅️
+                 </button>
+                 <div>
+                   <div style={{ fontSize:"16px", fontWeight:"800", color:t.text, lineHeight:1.2 }}>Indicateurs assignés</div>
+                   <div style={{ fontSize:"12px", color:t.text2, marginTop:"4px" }}>{selectedPerson.prenom} {selectedPerson.nom} • {selectedPerson.stats.total} résultats</div>
+                 </div>
+               </div>
+            ) : (
+               <div style={{ display:"flex", gap:"16px", alignItems:"center", width:"100%" }}>
+                 <div style={{ width:"64px", height:"64px", borderRadius:"16px", background:getRoleColor(editForm.roles[0]).bg, border:`1px solid ${getRoleColor(editForm.roles[0]).bd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", fontWeight:"800", color:getRoleColor(editForm.roles[0]).text, flexShrink:0 }}>
+                   {editForm.prenom ? editForm.prenom.charAt(0).toUpperCase() : ""}{editForm.nom ? editForm.nom.charAt(0).toUpperCase() : ""}
+                 </div>
+                 <div style={{ flex:1 }}>
+                   {editForm.isEditing ? (
+                      <div style={{ display:"flex", gap:"8px", marginBottom:"4px" }}>
+                        <input type="text" value={editForm.prenom} onChange={e=>setEditForm({...editForm, prenom: e.target.value.charAt(0).toUpperCase() + e.target.value.slice(1)})} placeholder="Prénom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
+                        <input type="text" value={editForm.nom} onChange={e=>setEditForm({...editForm, nom: e.target.value.toUpperCase()})} placeholder="Nom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
+                      </div>
+                   ) : (
+                      <div style={{ fontSize:"20px", fontWeight:"800", color:t.text }}>{editForm.prenom} {editForm.nom}</div>
+                   )}
+                   
+                   <div style={{ fontSize:"13px", color:t.text2, marginTop:"4px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                     {editForm.jobTitles.join(', ') || "Aucune fonction"}
                    </div>
-                ) : (
-                   <div style={{ fontSize:"20px", fontWeight:"800", color:t.text }}>{editForm.prenom} {editForm.nom}</div>
-                )}
-                
-                <div style={{ fontSize:"13px", color:t.text2, marginTop:"4px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                  {editForm.jobTitles.join(', ') || "Aucune fonction"}
-                </div>
-                
-                {!editForm.isNew && (
-                  <div style={{ marginTop:"8px" }}>
-                    <span onClick={() => editForm.isEditing && setEditForm({...editForm, status: editForm.status === "ACTIF" ? "CONGÉ" : "ACTIF"})} style={{ background:editForm.status==="ACTIF"?t.greenBg:t.amberBg, color:editForm.status==="ACTIF"?t.green:t.amber, border:`1px solid ${editForm.status==="ACTIF"?t.greenBd:t.amberBd}`, fontSize:"10px", fontWeight:"800", padding:"3px 10px", borderRadius:"12px", cursor:editForm.isEditing?"pointer":"default" }}>
-                      {editForm.status}
-                    </span>
-                  </div>
-                )}
-              </div>
-            </div>
+                   
+                   {!editForm.isNew && (
+                     <div style={{ marginTop:"8px" }}>
+                       <span onClick={() => editForm.isEditing && setEditForm({...editForm, status: editForm.status === "ACTIF" ? "CONGÉ" : "ACTIF"})} style={{ background:editForm.status==="ACTIF"?t.greenBg:t.amberBg, color:editForm.status==="ACTIF"?t.green:t.amber, border:`1px solid ${editForm.status==="ACTIF"?t.greenBd:t.amberBd}`, fontSize:"10px", fontWeight:"800", padding:"3px 10px", borderRadius:"12px", cursor:editForm.isEditing?"pointer":"default" }}>
+                         {editForm.status}
+                       </span>
+                     </div>
+                   )}
+                 </div>
+               </div>
+            )}
             
             <div style={{ display:"flex", gap:"8px", flexShrink:0 }}>
-              {isAdminOrSuper && !editForm.isEditing && (
+              {isAdminOrSuper && !editForm.isEditing && panelMode === 'profile' && (
                  <button onClick={() => setEditForm({...editForm, isEditing: true})} style={{ background:"transparent", border:"none", color:t.text3, fontSize:"16px", cursor:"pointer", width:"32px", height:"32px", display:"flex", alignItems:"center", justifyContent:"center" }} title="Éditer">✏️</button>
               )}
               <button onClick={() => setEditForm(null)} style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", color:t.text3, fontSize:"16px", cursor:"pointer", width:"32px", height:"32px", display:"flex", alignItems:"center", justifyContent:"center" }}>✕</button>
@@ -327,141 +346,178 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
           <div className="scroll-container" style={{ padding:"24px 20px", overflowY:"auto", display:"flex", flexDirection:"column", gap:"24px" }}>
             
-            {/* CONTACT */}
-            <div>
-              <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Contact</div>
-              <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
-                <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
-                  <span>✉️</span>
-                  {editForm.isEditing ? (
-                    <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} placeholder="Email pro..." style={{ background:"transparent", border:"none", borderBottom:`1px dashed ${t.border}`, color:t.text, fontFamily:"'DM Mono',monospace", outline:"none", width:"100%" }} />
+            {/* 🔴 VUE : LISTE DES INDICATEURS */}
+            {panelMode === 'indicators' && (
+               <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                  {selectedPersonCriteres.length === 0 ? (
+                    <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontStyle:"italic", fontSize:"13px" }}>Aucun indicateur assigné.</div>
                   ) : (
-                    editForm.email ? <span style={{ fontFamily:"'DM Mono',monospace", color:t.text }}>{editForm.email}</span> : <span style={{ fontStyle:"italic", opacity:0.5 }}>Non renseigné</span>
+                    selectedPersonCriteres.map(c => {
+                       const isConforme = c.statut === "conforme";
+                       const isNC = c.statut === "non-conforme";
+                       const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : c.statut === "en-cours" ? "En cours" : "Non évalué";
+                       const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd }, "non-concerne": { c:t.text3, bg:t.surface3, bd:t.border } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
+                       const cConf = CRITERES_LABELS[c.critere] || { bg:t.surface2, bd:t.border, color:t.text };
+                       const d = days(c.delai);
+
+                       return (
+                         <div key={c.id} onClick={() => setModalCritere(c)} style={{ background:t.surface2, border:`1px solid ${themeStatut.bd}`, borderRadius:"10px", padding:"16px", cursor:"pointer", transition:"all 0.2s", boxShadow:t.shadowSm }} onMouseOver={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseOut={e=>e.currentTarget.style.transform="translateY(0)"}>
+                           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
+                             <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "2px 8px", borderRadius: "6px", fontSize: "11px", fontWeight: "800" }}>
+                               {formatInd(c.critere, c.num)}
+                             </span>
+                             <span style={{ background:themeStatut.bg, border:`1px solid ${themeStatut.bd}`, color:themeStatut.c, fontSize:"9px", fontWeight:"800", padding:"3px 8px", borderRadius:"5px" }}>{labelStatut}</span>
+                           </div>
+                           <div style={{ fontSize:"13px", fontWeight:"600", color:t.text, lineHeight:"1.4", marginBottom:"12px" }}>{c.titre}</div>
+                           <div style={{ display:"flex", justifyContent:"flex-end" }}>
+                             <span style={{ fontSize:"11px", fontWeight:"800", color: d < 0 ? t.red : t.text3 }}>{d < 0 ? "DÉPASSÉ" : `Échéance J-${d}`}</span>
+                           </div>
+                         </div>
+                       )
+                    })
                   )}
-                </div>
-                <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
-                  <span>📞</span>
-                  {editForm.isEditing ? (
-                    <input type="text" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} placeholder="Numéro..." style={{ background:"transparent", border:"none", borderBottom:`1px dashed ${t.border}`, color:t.text, fontFamily:"'DM Mono',monospace", outline:"none", width:"100%" }} />
-                  ) : (
-                    <span style={{ fontFamily:"'DM Mono',monospace", color:t.text }}>{editForm.phone || "Non renseigné"}</span>
-                  )}
-                </div>
-                {!editForm.isEditing && (
-                  <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
-                    <span>🏢</span>
-                    <span style={{ fontWeight:"600", color:t.text }}>{editForm.roles.join(', ') || "Aucun pôle"}</span>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* FORMULAIRE PÔLES & FONCTIONS (En mode Édition) */}
-            {editForm.isEditing && (
-              <>
-                <hr style={{ border:0, borderTop:`1px solid ${t.border}` }}/>
-                
-                <div>
-                  <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Pôles (Équipes)</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
-                     {orgRoles.map(r => (
-                       <label key={r} style={{ display:"flex", alignItems:"center", gap:"8px", background:editForm.roles.includes(r)?getRoleColor(r).bg:t.surface2, border:`1px solid ${editForm.roles.includes(r)?getRoleColor(r).bd:t.border}`, padding:"6px 12px", borderRadius:"20px", cursor:"pointer", fontSize:"12px", color:editForm.roles.includes(r)?getRoleColor(r).text:t.text }}>
-                         <input type="checkbox" checked={editForm.roles.includes(r)} onChange={()=>setEditForm({...editForm, roles: toggleArrayItem(editForm.roles, r)})} style={{ display:"none" }} />
-                         {r}
-                       </label>
-                     ))}
-                  </div>
-                </div>
-
-                <div>
-                  <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
-                    <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titre)</div>
-                  </div>
-                  
-                  <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-                     {[...new Set([...orgJobTitles, ...editForm.jobTitles])].map(jt => (
-                       <label key={jt} style={{ display:"flex", alignItems:"center", gap:"10px", background:editForm.jobTitles.includes(jt)?t.accentBg:t.surface2, border:`1px solid ${editForm.jobTitles.includes(jt)?t.accentBd:t.border}`, padding:"8px 12px", borderRadius:"8px", cursor:"pointer" }}>
-                         <input type="checkbox" checked={editForm.jobTitles.includes(jt)} onChange={()=>setEditForm({...editForm, jobTitles: toggleArrayItem(editForm.jobTitles, jt)})} style={{ width:"16px", height:"16px", accentColor:t.accent }} />
-                         <span style={{ fontSize:"13px", color:editForm.jobTitles.includes(jt)?t.accent:t.text, fontWeight:editForm.jobTitles.includes(jt)?"700":"500" }}>{jt}</span>
-                       </label>
-                     ))}
-                  </div>
-                </div>
-
-                <button onClick={submitForm} style={{ width:"100%", background:t.accent, color:"white", border:"none", padding:"14px", borderRadius:"8px", fontSize:"14px", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}` }}>
-                  💾 Enregistrer le profil
-                </button>
-              </>
+               </div>
             )}
 
-            {/* INDICATEURS & BOUTONS (En mode Vue) */}
-            {!editForm.isEditing && selectedPerson && (
+            {/* 🔵 VUE : PROFIL COMPLET OU EDITION */}
+            {panelMode === 'profile' && (
               <>
-                <hr style={{ border:0, borderTop:`1px solid ${t.border}` }}/>
-
+                {/* CONTACT */}
                 <div>
-                  <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Indicateurs Qualiopi</div>
-                  
-                  <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px", marginBottom:"16px" }}>
-                    <div style={{ border:`1px solid ${t.greenBd}`, background:t.surface, borderRadius:"8px", padding:"12px", textAlign:"center", color:t.green, boxShadow:t.shadowSm }}>
-                      <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", lineHeight:1 }}>{selectedPerson.stats.conf}</div>
-                      <div style={{ fontSize:"11px", fontWeight:"700", marginTop:"6px", color:t.text2 }}>Conformes</div>
+                  <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Contact</div>
+                  <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
+                    <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
+                      <span>✉️</span>
+                      {editForm.isEditing ? (
+                        <input type="email" value={editForm.email} onChange={e => setEditForm({...editForm, email: e.target.value})} placeholder="Email pro..." style={{ background:"transparent", border:"none", borderBottom:`1px dashed ${t.border}`, color:t.text, fontFamily:"'DM Mono',monospace", outline:"none", width:"100%" }} />
+                      ) : (
+                        editForm.email ? <span style={{ fontFamily:"'DM Mono',monospace", color:t.text }}>{editForm.email}</span> : <span style={{ fontStyle:"italic", opacity:0.5 }}>Non renseigné</span>
+                      )}
                     </div>
-                    <div style={{ border:`1px solid ${t.amberBd}`, background:t.surface, borderRadius:"8px", padding:"12px", textAlign:"center", color:t.amber, boxShadow:t.shadowSm }}>
-                      <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", lineHeight:1 }}>{selectedPerson.stats.ec}</div>
-                      <div style={{ fontSize:"11px", fontWeight:"700", marginTop:"6px", color:t.text2 }}>En cours</div>
+                    <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
+                      <span>📞</span>
+                      {editForm.isEditing ? (
+                        <input type="text" value={editForm.phone} onChange={e => setEditForm({...editForm, phone: e.target.value})} placeholder="Numéro..." style={{ background:"transparent", border:"none", borderBottom:`1px dashed ${t.border}`, color:t.text, fontFamily:"'DM Mono',monospace", outline:"none", width:"100%" }} />
+                      ) : (
+                        <span style={{ fontFamily:"'DM Mono',monospace", color:t.text }}>{editForm.phone || "Non renseigné"}</span>
+                      )}
                     </div>
-                    <div style={{ border:`1px solid ${t.redBd}`, background:t.surface, borderRadius:"8px", padding:"12px", textAlign:"center", color:t.red, boxShadow:t.shadowSm }}>
-                      <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", lineHeight:1 }}>{selectedPerson.stats.nc}</div>
-                      <div style={{ fontSize:"11px", fontWeight:"700", marginTop:"6px", color:t.text2 }}>Non conf.</div>
-                    </div>
-                  </div>
-
-                  <div style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"16px" }}>
-                    <div style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", fontWeight:"700", color:t.text2, marginBottom:"12px" }}>
-                      <span>Taux de conformité</span>
-                      <span style={{ color:t.text, fontSize:"14px" }}>{selectedPerson.stats.pct}%</span>
-                    </div>
-                    <div style={{ height:"8px", background:t.border, borderRadius:"4px", display:"flex", gap:"2px", overflow:"hidden" }}>
-                      {selectedPerson.stats.conf > 0 && <div style={{ width:`${(selectedPerson.stats.conf/selectedPerson.stats.total)*100}%`, background:t.green, height:"100%" }}/>}
-                      {selectedPerson.stats.ec > 0 && <div style={{ width:`${(selectedPerson.stats.ec/selectedPerson.stats.total)*100}%`, background:t.amber, height:"100%" }}/>}
-                      {selectedPerson.stats.nc > 0 && <div style={{ width:`${(selectedPerson.stats.nc/selectedPerson.stats.total)*100}%`, background:t.red, height:"100%" }}/>}
-                    </div>
+                    {!editForm.isEditing && (
+                      <div style={{ display:"flex", alignItems:"center", gap:"12px", color:t.text2, fontSize:"14px" }}>
+                        <span>🏢</span>
+                        <span style={{ fontWeight:"600", color:t.text }}>{editForm.roles.join(', ') || "Aucun pôle"}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div style={{ display:"flex", gap:"12px", marginTop:"16px" }}>
-                  <button 
-                    onClick={() => selectedPerson.email ? (window.location.href = `mailto:${selectedPerson.email}`) : alert("Aucune adresse mail renseignée.")}
-                    style={{ flex:1, background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"12px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
-                    onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
-                  >
-                    ✉️ Contacter
-                  </button>
-                  <button 
-                    onClick={() => alert(`Bientôt : Ouvre le tableau filtré avec les ${selectedPerson.stats.total} indicateurs de ${selectedPerson.prenom}.`)}
-                    style={{ flex:1, background:t.goldBg, border:`1px solid ${t.goldBd}`, color:t.gold, padding:"12px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
-                  >
-                    📋 Indicateurs
-                  </button>
-                </div>
+                {/* FORMULAIRE PÔLES & FONCTIONS (En mode Édition) */}
+                {editForm.isEditing && (
+                  <>
+                    <hr style={{ border:0, borderTop:`1px solid ${t.border}` }}/>
+                    
+                    <div>
+                      <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Pôles (Équipes)</div>
+                      <div style={{ display:"flex", flexWrap:"wrap", gap:"8px" }}>
+                         {orgRoles.map(r => (
+                           <label key={r} style={{ display:"flex", alignItems:"center", gap:"8px", background:editForm.roles.includes(r)?getRoleColor(r).bg:t.surface2, border:`1px solid ${editForm.roles.includes(r)?getRoleColor(r).bd:t.border}`, padding:"6px 12px", borderRadius:"20px", cursor:"pointer", fontSize:"12px", color:editForm.roles.includes(r)?getRoleColor(r).text:t.text }}>
+                             <input type="checkbox" checked={editForm.roles.includes(r)} onChange={()=>setEditForm({...editForm, roles: toggleArrayItem(editForm.roles, r)})} style={{ display:"none" }} />
+                             {r}
+                           </label>
+                         ))}
+                      </div>
+                    </div>
 
-                {isAdminOrSuper && (
-                   <div style={{ marginTop:"16px", textAlign:"center", paddingBottom:"8px" }}>
-                     {selectedPerson.archived ? (
-                        <button onClick={handleRestoreUser} style={{ background:"transparent", border:"none", color:t.green, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
-                          Restaurer ce collaborateur
-                        </button>
-                     ) : (
-                        <button onClick={handleArchiveUser} style={{ background:"transparent", border:"none", color:t.red, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
-                          Archiver ce collaborateur
-                        </button>
-                     )}
-                   </div>
+                    <div>
+                      <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
+                        <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titre)</div>
+                      </div>
+                      
+                      <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                         {[...new Set([...orgJobTitles, ...editForm.jobTitles])].map(jt => (
+                           <label key={jt} style={{ display:"flex", alignItems:"center", gap:"10px", background:editForm.jobTitles.includes(jt)?t.accentBg:t.surface2, border:`1px solid ${editForm.jobTitles.includes(jt)?t.accentBd:t.border}`, padding:"8px 12px", borderRadius:"8px", cursor:"pointer" }}>
+                             <input type="checkbox" checked={editForm.jobTitles.includes(jt)} onChange={()=>setEditForm({...editForm, jobTitles: toggleArrayItem(editForm.jobTitles, jt)})} style={{ width:"16px", height:"16px", accentColor:t.accent }} />
+                             <span style={{ fontSize:"13px", color:editForm.jobTitles.includes(jt)?t.accent:t.text, fontWeight:editForm.jobTitles.includes(jt)?"700":"500" }}>{jt}</span>
+                           </label>
+                         ))}
+                      </div>
+                    </div>
+
+                    <button onClick={submitForm} style={{ width:"100%", background:t.accent, color:"white", border:"none", padding:"14px", borderRadius:"8px", fontSize:"14px", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}` }}>
+                      💾 Enregistrer le profil
+                    </button>
+                  </>
+                )}
+
+                {/* INDICATEURS & BOUTONS (En mode Vue) */}
+                {!editForm.isEditing && selectedPerson && (
+                  <>
+                    <hr style={{ border:0, borderTop:`1px solid ${t.border}` }}/>
+
+                    <div>
+                      <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Indicateurs Qualiopi</div>
+                      
+                      <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"8px", marginBottom:"16px" }}>
+                        <div style={{ border:`1px solid ${t.greenBd}`, background:t.surface, borderRadius:"8px", padding:"12px", textAlign:"center", color:t.green, boxShadow:t.shadowSm }}>
+                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", lineHeight:1 }}>{selectedPerson.stats.conf}</div>
+                          <div style={{ fontSize:"11px", fontWeight:"700", marginTop:"6px", color:t.text2 }}>Conformes</div>
+                        </div>
+                        <div style={{ border:`1px solid ${t.amberBd}`, background:t.surface, borderRadius:"8px", padding:"12px", textAlign:"center", color:t.amber, boxShadow:t.shadowSm }}>
+                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", lineHeight:1 }}>{selectedPerson.stats.ec}</div>
+                          <div style={{ fontSize:"11px", fontWeight:"700", marginTop:"6px", color:t.text2 }}>En cours</div>
+                        </div>
+                        <div style={{ border:`1px solid ${t.redBd}`, background:t.surface, borderRadius:"8px", padding:"12px", textAlign:"center", color:t.red, boxShadow:t.shadowSm }}>
+                          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", lineHeight:1 }}>{selectedPerson.stats.nc}</div>
+                          <div style={{ fontSize:"11px", fontWeight:"700", marginTop:"6px", color:t.text2 }}>Non conf.</div>
+                        </div>
+                      </div>
+
+                      <div style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"16px" }}>
+                        <div style={{ display:"flex", justifyContent:"space-between", fontSize:"12px", fontWeight:"700", color:t.text2, marginBottom:"12px" }}>
+                          <span>Taux de conformité</span>
+                          <span style={{ color:t.text, fontSize:"14px" }}>{selectedPerson.stats.pct}%</span>
+                        </div>
+                        <div style={{ height:"8px", background:t.border, borderRadius:"4px", display:"flex", gap:"2px", overflow:"hidden" }}>
+                          {selectedPerson.stats.conf > 0 && <div style={{ width:`${(selectedPerson.stats.conf/selectedPerson.stats.total)*100}%`, background:t.green, height:"100%" }}/>}
+                          {selectedPerson.stats.ec > 0 && <div style={{ width:`${(selectedPerson.stats.ec/selectedPerson.stats.total)*100}%`, background:t.amber, height:"100%" }}/>}
+                          {selectedPerson.stats.nc > 0 && <div style={{ width:`${(selectedPerson.stats.nc/selectedPerson.stats.total)*100}%`, background:t.red, height:"100%" }}/>}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div style={{ display:"flex", gap:"12px", marginTop:"16px" }}>
+                      <button 
+                        onClick={() => selectedPerson.email ? (window.location.href = `mailto:${selectedPerson.email}`) : alert("Aucune adresse mail renseignée.")}
+                        style={{ flex:1, background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"12px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
+                        onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
+                      >
+                        ✉️ Contacter
+                      </button>
+                      <button 
+                        onClick={() => setPanelMode('indicators')}
+                        style={{ flex:1, background:t.goldBg, border:`1px solid ${t.goldBd}`, color:t.gold, padding:"12px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
+                      >
+                        📋 Indicateurs
+                      </button>
+                    </div>
+
+                    {isAdminOrSuper && (
+                       <div style={{ marginTop:"16px", textAlign:"center", paddingBottom:"8px" }}>
+                         {selectedPerson.archived ? (
+                            <button onClick={handleRestoreUser} style={{ background:"transparent", border:"none", color:t.green, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
+                              Restaurer ce collaborateur
+                            </button>
+                         ) : (
+                            <button onClick={handleArchiveUser} style={{ background:"transparent", border:"none", color:t.red, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
+                              Archiver ce collaborateur
+                            </button>
+                         )}
+                       </div>
+                    )}
+                  </>
                 )}
               </>
             )}
-
           </div>
         </div>
       )}
