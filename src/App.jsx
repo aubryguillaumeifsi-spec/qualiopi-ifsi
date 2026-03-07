@@ -5,11 +5,11 @@ import DetailModal from "./components/DetailModal";
 import DashboardTab from "./components/DashboardTab";
 import TourControleTab from "./components/TourControleTab";
 import OrganigrammeTab from "./components/OrganigrammeTab";
-import { CriteresTab, AxesTab, LivreBlancTab } from "./components/TabsQualiopi";
+import { CriteresTab, LivreBlancTab } from "./components/TabsQualiopi";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -43,20 +43,20 @@ function buildTokens(dark) {
   };
 }
 
-const DEFAULT_ROLES = ["Direction", "Qualité", "Secrétariat", "Pôle Stages", "Formateurs IFSI", "Formateurs IFAS"];
+const DEFAULT_ROLES = ["Direction", "Qualité & Conformité", "Formation", "Administration", "Pôle Stages", "Secrétariat"];
 const ROLE_PALETTE = [ 
-  { bg: "#e0e7ff", border: "#bfdbfe", text: "#1e40af" }, 
-  { bg: "#dcfce7", border: "#86efac", text: "#166534" }, 
-  { bg: "#fef3c7", border: "#fde68a", text: "#92400e" }, 
-  { bg: "#f3e8ff", border: "#d8b4fe", text: "#6b21a8" }, 
-  { bg: "#fee2e2", border: "#fca5a5", text: "#991b1b" }, 
-  { bg: "#ccfbf1", border: "#67e8f9", text: "#155e75" }, 
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#9d174d" }, 
-  { bg: "#e0f2fe", border: "#bae6fd", text: "#075985" }, 
-  { bg: "#fef08a", border: "#fcd34d", text: "#854d0e" }, 
-  { bg: "#ffedd5", border: "#fdba74", text: "#9a3412" }, 
-  { bg: "#d1fae5", border: "#6ee7b7", text: "#065f46" }, 
-  { bg: "#cffafe", border: "#7dd3fc", text: "#0369a1" }  
+  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, // Or/Direction
+  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, // Bleu/Qualité
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, // Violet/Formation
+  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, // Vert/Admin
+  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, // Orange
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, // Rose
+  { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" }, // Ciel
+  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, // Rouge
+  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, // Cyan
+  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, // Jaune
+  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }, // Fuchsia
+  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }  // Indigo
 ];
 
 const today = new Date();
@@ -195,37 +195,60 @@ function MainApp() {
     try {
       const cred = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
-      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true });
+      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true, status: "ACTIF" });
       alert("✅ Compte créé !");
       setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
       secondaryAuth.signOut();
     } catch (error) { alert(error.message); }
     setIsCreatingUser(false);
   };
+
   const getRoleColor = useCallback((roleName) => { 
-    if (roleName === "Direction") return { bg: t.surface3, border: t.border, text: t.text }; 
+    if (!roleName) return ROLE_PALETTE[0];
     const idx = (ifsiData?.roles || []).indexOf(roleName); 
     return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[5]; 
   }, [ifsiData, t]);
 
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
-  
-  // L'archivage verrouille également l'audit en lecture seule
   const isArchive = currentCampaign?.locked || currentCampaign?.archived || false;
-  
   const currentAuditDate = currentCampaign?.auditDate || "2026-10-15";
-  const orgRoles = useMemo(() => ifsiData?.roles || [], [ifsiData]);
+  const orgRoles = useMemo(() => ifsiData?.roles || DEFAULT_ROLES, [ifsiData]);
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
+  // Rassemblement de tous les membres avec leurs infos étendues
   const allIfsiMembers = useMemo(() => [
-    ...orgAccounts.map(u => ({ id: u.id, prenom: u.email ? u.email.split('@')[0] : "Utilisateur", nom: "", name: u.email ? u.email.split('@')[0] : "Utilisateur", roles: u.orgRoles || [], type: 'account', email: u.email })),
+    ...orgAccounts.map(u => ({ 
+      id: u.id, 
+      prenom: u.prenom || (u.email ? u.email.split('@')[0].split('.')[0] : "Utilisateur"), 
+      nom: u.nom || (u.email && u.email.includes('.') ? u.email.split('@')[0].split('.')[1] : ""), 
+      name: u.name || (u.email ? u.email.split('@')[0] : "Utilisateur"), 
+      roles: u.orgRoles || [], 
+      type: 'account', 
+      email: u.email,
+      phone: u.phone || "",
+      jobTitle: u.jobTitle || "Membre",
+      status: u.status || "ACTIF",
+      archived: u.archived || false
+    })),
     ...manualUsers.map(u => {
       const parts = (u.name || "Membre Inconnu").trim().split(' ');
-      return { id: u.id, prenom: parts[0] || "Membre", nom: parts.slice(1).join(' ') || "", name: u.name || "Membre", roles: u.roles || [], type: 'manual' };
+      return { 
+        id: u.id, 
+        prenom: u.prenom || parts[0] || "Membre", 
+        nom: u.nom || parts.slice(1).join(' ') || "", 
+        name: u.name || "Membre", 
+        roles: u.roles || [], 
+        type: 'manual',
+        email: u.email || "",
+        phone: u.phone || "",
+        jobTitle: u.jobTitle || "Membre",
+        status: u.status || "ACTIF",
+        archived: u.archived || false
+      };
     })
-  ].sort((a,b) => (a.name||"").localeCompare(b.name||"")), [orgAccounts, manualUsers]);
+  ].sort((a,b) => (a.prenom||"").localeCompare(b.prenom||"")), [orgAccounts, manualUsers]);
 
   const { stats, urgents, filtered, axes } = useMemo(() => {
     const filt = criteres.filter(c => {
@@ -296,7 +319,6 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  // NOUVEAU : Fonction d'archivage d'un audit
   const handleArchiveCampaign = (campaignId, status) => {
     const camp = campaigns.find(c => c.id === campaignId);
     if (window.confirm(`Voulez-vous vraiment ${status ? 'archiver' : 'désarchiver'} l'audit "${camp.name}" ?`)) {
@@ -305,7 +327,6 @@ function MainApp() {
     }
   };
 
-  // NOUVEAU : Fonction de suppression définitive (Super Admin uniquement)
   const handleDeleteCampaign = (campaignId) => {
     const camp = campaigns.find(c => c.id === campaignId);
     if (prompt(`⚠️ ATTENTION ACTION IRRÉVERSIBLE !\nTapez "SUPPRIMER" pour détruire définitivement l'audit "${camp.name}".`) === "SUPPRIMER") {
@@ -344,11 +365,12 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  const handleUpdateUserRoles = async (memberId, type, newRoles) => {
+  // FONCTION UNIFIÉE DE MISE À JOUR D'UN UTILISATEUR DEPUIS L'ORGANIGRAMME
+  const handleUpdateUserDetail = async (memberId, type, updates) => {
     if (type === 'account') {
-      await setDoc(doc(db, "users", memberId), { orgRoles: newRoles }, { merge: true });
+      await setDoc(doc(db, "users", memberId), updates, { merge: true });
     } else if (type === 'manual') {
-      const updatedManuals = manualUsers.map(u => u.id === memberId ? { ...u, roles: newRoles } : u);
+      const updatedManuals = manualUsers.map(u => u.id === memberId ? { ...u, ...updates } : u);
       await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true });
     }
   };
@@ -357,8 +379,7 @@ function MainApp() {
     if (newRole && !orgRoles.includes(newRole)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, newRole] }, { merge: true });
   };
   const handleAddManualUser = (prenom, nom) => {
-    const fullName = `${prenom} ${nom.toUpperCase()}`;
-    const newUser = { id: 'm_' + Date.now(), name: fullName, roles: [] };
+    const newUser = { id: 'm_' + Date.now(), prenom: prenom.trim(), nom: nom.toUpperCase().trim(), name: `${prenom} ${nom.toUpperCase()}`, roles: [], status: "ACTIF", jobTitle: "Membre de l'équipe" };
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
 
@@ -529,7 +550,8 @@ function MainApp() {
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} handleUpdateUserRoles={handleUpdateUserRoles} t={t} />}
+          {/* L'Organigramme reçoit désormais criteres pour calculer les barres de progression et handleUpdateUserDetail */}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
           {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} t={t} />}
