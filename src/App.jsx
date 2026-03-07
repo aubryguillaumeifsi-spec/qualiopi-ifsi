@@ -9,7 +9,7 @@ import { CriteresTab, LivreBlancTab } from "./components/TabsQualiopi";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, sendPasswordResetEmail } from "firebase/auth";
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
 import { db, auth, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -44,19 +44,22 @@ function buildTokens(dark) {
 }
 
 const DEFAULT_ROLES = ["Direction", "Qualité & Conformité", "Formation", "Administration", "Pôle Stages", "Secrétariat"];
+// NOUVEAU : Fonctions de base
+const DEFAULT_JOB_TITLES = ["Directrice", "Directeur", "Formateur", "Formatrice", "Secrétaire", "Responsable Qualité"];
+
 const ROLE_PALETTE = [ 
-  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, // Or/Direction
-  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, // Bleu/Qualité
-  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, // Violet/Formation
-  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, // Vert/Admin
-  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, // Orange
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, // Rose
-  { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" }, // Ciel
-  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, // Rouge
-  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, // Cyan
-  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, // Jaune
-  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }, // Fuchsia
-  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }  // Indigo
+  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, 
+  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, 
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, 
+  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, 
+  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, 
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, 
+  { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" }, 
+  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, 
+  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, 
+  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, 
+  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }, 
+  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }  
 ];
 
 const today = new Date();
@@ -213,11 +216,13 @@ function MainApp() {
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
   const isArchive = currentCampaign?.locked || currentCampaign?.archived || false;
   const currentAuditDate = currentCampaign?.auditDate || "2026-10-15";
+  
   const orgRoles = useMemo(() => ifsiData?.roles || DEFAULT_ROLES, [ifsiData]);
+  const orgJobTitles = useMemo(() => ifsiData?.jobTitles || DEFAULT_JOB_TITLES, [ifsiData]); // NOUVEAU
+  
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
-  // Rassemblement de tous les membres avec leurs infos étendues
   const allIfsiMembers = useMemo(() => [
     ...orgAccounts.map(u => ({ 
       id: u.id, 
@@ -275,7 +280,7 @@ function MainApp() {
       const nom = prompt("Nom de l'établissement :"); 
       if (nom?.trim()) { 
         const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); 
-        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, archived: false }); 
+        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, jobTitles: DEFAULT_JOB_TITLES, archived: false }); 
         setSelectedIfsi(id); 
       } else {
         setSelectedIfsi(null); setTimeout(() => setSelectedIfsi(selectedIfsi), 0);
@@ -365,7 +370,6 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  // FONCTION UNIFIÉE DE MISE À JOUR D'UN UTILISATEUR DEPUIS L'ORGANIGRAMME
   const handleUpdateUserDetail = async (memberId, type, updates) => {
     if (type === 'account') {
       await setDoc(doc(db, "users", memberId), updates, { merge: true });
@@ -375,11 +379,26 @@ function MainApp() {
     }
   };
 
-  const handleAddOrgRole = (newRole) => {
-    if (newRole && !orgRoles.includes(newRole)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, newRole] }, { merge: true });
+  // NOUVEAU : Ajouter un titre de fonction personnalisé
+  const handleAddJobTitle = (newTitle) => {
+    if (newTitle && !orgJobTitles.includes(newTitle)) {
+      setDoc(doc(db, "etablissements", selectedIfsi), { jobTitles: [...orgJobTitles, newTitle] }, { merge: true });
+    }
   };
-  const handleAddManualUser = (prenom, nom) => {
-    const newUser = { id: 'm_' + Date.now(), prenom: prenom.trim(), nom: nom.toUpperCase().trim(), name: `${prenom} ${nom.toUpperCase()}`, roles: [], status: "ACTIF", jobTitle: "Membre de l'équipe" };
+
+  // NOUVEAU : Ajout de collaborateur refait pour prendre le formulaire complet
+  const handleAddManualUser = (userData) => {
+    const newUser = { 
+      id: 'm_' + Date.now(), 
+      prenom: userData.prenom.trim(), 
+      nom: userData.nom.toUpperCase().trim(), 
+      name: `${userData.prenom.trim()} ${userData.nom.toUpperCase().trim()}`, 
+      roles: [], 
+      status: "ACTIF", 
+      jobTitle: userData.jobTitle || orgJobTitles[0] || "Membre",
+      email: userData.email || "",
+      phone: userData.phone || ""
+    };
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
 
@@ -486,7 +505,7 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit */}
+        {/* Prochain audit avec date bien lisible dans tous les modes */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -550,8 +569,10 @@ function MainApp() {
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
-          {/* L'Organigramme reçoit désormais criteres pour calculer les barres de progression et handleUpdateUserDetail */}
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} t={t} />}
+          
+          {/* L'Organigramme reçoit les nouvelles fonctions personnalisables */}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleAddJobTitle={handleAddJobTitle} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} t={t} />}
+          
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
           {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} t={t} />}
