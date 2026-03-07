@@ -1,11 +1,12 @@
 import React, { useState } from "react";
 
-export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleAddJobTitle, handleRemoveJobTitle, handleAddManualUser, handleUpdateUserDetail, t }) {
+export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, t }) {
   
   const [editForm, setEditForm] = useState(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Modal d'édition des rôles
 
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
-  const isSuperAdmin = userProfile?.role === "superadmin";
 
   const getUserStats = (person) => {
     const userCriteres = criteres.filter(c => 
@@ -31,16 +32,25 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     roles: m.roles || [],
     jobTitles: Array.isArray(m.jobTitles) ? m.jobTitles : [],
     stats: getUserStats(m)
-  })).filter(m => !m.archived);
+  }));
 
-  // Le membre actuellement visualisé ou édité
+  // Filtrage selon le mode Archives
+  const displayMembers = safeMembers.filter(m => showArchived ? m.archived : !m.archived);
+
+  // Le membre actuellement visualisé ou édité (tiré de safeMembers pour avoir ses vraies stats à jour)
   const selectedPerson = editForm?.id ? safeMembers.find(m => m.id === editForm.id) : null;
 
   const handleArchiveUser = async () => {
-    if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ? Cette personne n'apparaîtra plus dans la liste.`)) {
+    if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ?`)) {
       await handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, { archived: true });
       setEditForm(null);
     }
+  };
+
+  const handleRestoreUser = async () => {
+    await handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, { archived: false });
+    setEditForm(null);
+    setShowArchived(false);
   };
 
   const openViewPanel = (m) => {
@@ -69,13 +79,67 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         status: editForm.status
       });
     }
-    // On repasse en mode Vue
     setEditForm(editForm.isNew ? null : { ...editForm, isEditing: false });
   };
 
   return (
     <div className="animate-fade-in" style={{ display:"flex", gap:"24px", height:"100%" }}>
       
+      {/* ── MODAL : CONFIGURATION DES PÔLES ET FONCTIONS ── */}
+      {isSettingsOpen && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
+          <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", width:"700px", boxShadow:t.shadowLg, display:"flex", flexDirection:"column", maxHeight:"80vh" }}>
+            <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"24px" }}>
+              <div>
+                <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.text, margin:0 }}>Configuration de l'équipe</h3>
+                <div style={{ fontSize:"13px", color:t.text2 }}>Modifiez ou supprimez les pôles et les fonctions (titres) de l'établissement.</div>
+              </div>
+              <button onClick={()=>setIsSettingsOpen(false)} style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"8px", cursor:"pointer", color:t.text }}>✕</button>
+            </div>
+            
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"32px", overflowY:"auto", paddingBottom:"10px" }} className="scroll-container">
+              {/* Colonne Pôles */}
+              <div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
+                  <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Pôles (Équipes)</div>
+                  <button onClick={() => { const v = prompt("Nouveau Pôle ?"); if(v) handleManageStructure('role', 'add', null, v); }} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {orgRoles.map(r => (
+                    <div key={r} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px" }}>
+                      <span style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>{r}</span>
+                      <div style={{ display:"flex", gap:"8px" }}>
+                        <button onClick={() => { const v = prompt("Renommer le pôle (Met à jour tous les membres) :", r); if(v && v!==r) handleManageStructure('role', 'edit', r, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
+                        <button onClick={() => { if(window.confirm(`Supprimer le pôle "${r}" pour tout le monde ?`)) handleManageStructure('role', 'delete', r); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Colonne Fonctions */}
+              <div>
+                <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
+                  <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titres)</div>
+                  <button onClick={() => { const v = prompt("Nouvelle Fonction ?"); if(v) handleManageStructure('jobTitle', 'add', null, v); }} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
+                </div>
+                <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
+                  {orgJobTitles.map(j => (
+                    <div key={j} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px" }}>
+                      <span style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>{j}</span>
+                      <div style={{ display:"flex", gap:"8px" }}>
+                        <button onClick={() => { const v = prompt("Renommer la fonction (Met à jour tous les membres) :", j); if(v && v!==j) handleManageStructure('jobTitle', 'edit', j, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
+                        <button onClick={() => { if(window.confirm(`Supprimer la fonction "${j}" pour tout le monde ?`)) handleManageStructure('jobTitle', 'delete', j); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── ZONE GAUCHE : La Grille des collaborateurs ── */}
       <div style={{ flex:1, display:"flex", flexDirection:"column", gap:"20px", overflow:"hidden" }}>
         
@@ -94,6 +158,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 )
               })}
+              {isAdminOrSuper && (
+                <button onClick={() => setIsSettingsOpen(true)} title="Gérer l'organisation" style={{ background:"transparent", border:"none", cursor:"pointer", marginLeft:"auto", color:t.text2 }}>⚙️</button>
+              )}
             </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:"16px", background:t.surface, padding:"10px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, boxShadow:t.shadowSm, alignSelf:"flex-start" }}>
@@ -111,18 +178,29 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             </div>
 
             {isAdminOrSuper && (
-              <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}>
-                👤 Nouveau collaborateur
-              </button>
+              <>
+                <button onClick={() => setShowArchived(!showArchived)} style={{ background:showArchived?t.surface3:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}>
+                  📦 {showArchived ? "Retour" : "Archives"}
+                </button>
+                <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
+                  👤 Nouveau collaborateur
+                </button>
+              </>
             )}
           </div>
         </div>
 
-        {/* LA GRILLE DES CARTES */}
-        <div className="scroll-container" style={{ flex:1, overflowY:"auto", paddingRight:"8px", paddingBottom:"20px" }}>
+        {/* LA GRILLE DES CARTES (Avec padding pour éviter de couper la bordure au hover) */}
+        <div className="scroll-container" style={{ flex:1, overflowY:"auto", padding:"4px 8px 20px 4px" }}>
+          
+          {showArchived && <div style={{ fontSize:"14px", fontWeight:"800", color:t.text3, marginBottom:"16px", textTransform:"uppercase", letterSpacing:"1px" }}>📦 Membres Archivés</div>}
+          
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(260px, 1fr))", gap:"20px" }}>
-            
-            {safeMembers.map(m => {
+            {displayMembers.length === 0 && (
+              <div style={{ padding:"40px", color:t.text3, fontStyle:"italic", fontSize:"13px" }}>Aucun collaborateur à afficher.</div>
+            )}
+
+            {displayMembers.map(m => {
               const primaryRole = m.roles[0];
               const rc = getRoleColor(primaryRole);
               const stColor = m.status === "ACTIF" ? t.green : t.amber;
@@ -142,7 +220,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
                   <div style={{ display:"flex", alignItems:"flex-start", gap:"16px", marginBottom:"24px" }}>
                     <div style={{ width:"48px", height:"48px", borderRadius:"12px", background:rc.bg, border:`1px solid ${rc.bd}`, color:rc.text, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"16px", fontWeight:"800", flexShrink:0 }}>
-                      {m.prenom.charAt(0)}{m.nom ? m.nom.charAt(0) : ""}
+                      {m.prenom?.charAt(0).toUpperCase()}{m.nom ? m.nom.charAt(0).toUpperCase() : ""}
                     </div>
                     <div style={{ overflow:"hidden" }}>
                       <div style={{ fontSize:"15px", fontWeight:"800", color:t.text, lineHeight:"1.2" }}>{m.prenom} <br/>{m.nom}</div>
@@ -153,7 +231,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     </div>
                   </div>
 
-                  {/* Barre d'indicateurs de la personne (en bas de carte) */}
                   <div style={{ marginTop:"auto" }}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:"11px", fontWeight:"700", color:t.text3, marginBottom:"6px" }}>
                       <span>{m.stats.total > 0 ? `${m.stats.conf}/${m.stats.total} ind.` : "Aucun ind."}</span>
@@ -180,7 +257,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             <div style={{ display:"flex", gap:"16px", alignItems:"center", width:"100%" }}>
               <div style={{ width:"64px", height:"64px", borderRadius:"16px", background:getRoleColor(editForm.roles[0]).bg, border:`1px solid ${getRoleColor(editForm.roles[0]).bd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px", fontWeight:"800", color:getRoleColor(editForm.roles[0]).text, flexShrink:0 }}>
-                {editForm.prenom ? editForm.prenom.charAt(0) : ""}{editForm.nom ? editForm.nom.charAt(0) : ""}
+                {editForm.prenom ? editForm.prenom.charAt(0).toUpperCase() : ""}{editForm.nom ? editForm.nom.charAt(0).toUpperCase() : ""}
               </div>
               <div style={{ flex:1 }}>
                 {editForm.isEditing ? (
@@ -192,7 +269,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                    <div style={{ fontSize:"20px", fontWeight:"800", color:t.text }}>{editForm.prenom} {editForm.nom}</div>
                 )}
                 
-                <div style={{ fontSize:"13px", color:t.text2, marginTop:"4px" }}>{editForm.jobTitles.join(', ') || "Aucune fonction"}</div>
+                <div style={{ fontSize:"13px", color:t.text2, marginTop:"4px", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+                  {editForm.jobTitles.join(', ') || "Aucune fonction"}
+                </div>
                 
                 {!editForm.isNew && (
                   <div style={{ marginTop:"8px" }}>
@@ -263,23 +342,14 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 <div>
                   <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                     <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titre)</div>
-                    {isSuperAdmin && (
-                      <button onClick={() => { const f = prompt("Nouvelle fonction pour cet établissement ?"); if(f) handleAddJobTitle(f); }} style={{ background:"transparent", border:"none", color:t.accent, fontSize:"11px", fontWeight:"700", cursor:"pointer" }}>+ Créer fonction</button>
-                    )}
                   </div>
                   
-                  {/* On s'assure d'afficher toutes les fonctions de l'établissement + celles que l'utilisateur aurait déjà (même si supprimées globalement) */}
                   <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
                      {[...new Set([...orgJobTitles, ...editForm.jobTitles])].map(jt => (
-                       <div key={jt} style={{ display:"flex", alignItems:"center", justifyContent:"space-between", background:editForm.jobTitles.includes(jt)?t.accentBg:t.surface2, border:`1px solid ${editForm.jobTitles.includes(jt)?t.accentBd:t.border}`, padding:"8px 12px", borderRadius:"8px" }}>
-                         <label style={{ display:"flex", alignItems:"center", gap:"10px", cursor:"pointer", flex:1 }}>
-                           <input type="checkbox" checked={editForm.jobTitles.includes(jt)} onChange={()=>setEditForm({...editForm, jobTitles: toggleArrayItem(editForm.jobTitles, jt)})} style={{ width:"16px", height:"16px", accentColor:t.accent }} />
-                           <span style={{ fontSize:"13px", color:editForm.jobTitles.includes(jt)?t.accent:t.text, fontWeight:editForm.jobTitles.includes(jt)?"700":"500" }}>{jt}</span>
-                         </label>
-                         {isSuperAdmin && !editForm.jobTitles.includes(jt) && orgJobTitles.includes(jt) && (
-                           <button onClick={() => handleRemoveJobTitle(jt)} title="Supprimer cette fonction de l'établissement" style={{ background:"transparent", border:"none", color:t.red, fontSize:"14px", cursor:"pointer", padding:"0 4px" }}>🗑️</button>
-                         )}
-                       </div>
+                       <label key={jt} style={{ display:"flex", alignItems:"center", gap:"10px", background:editForm.jobTitles.includes(jt)?t.accentBg:t.surface2, border:`1px solid ${editForm.jobTitles.includes(jt)?t.accentBd:t.border}`, padding:"8px 12px", borderRadius:"8px", cursor:"pointer" }}>
+                         <input type="checkbox" checked={editForm.jobTitles.includes(jt)} onChange={()=>setEditForm({...editForm, jobTitles: toggleArrayItem(editForm.jobTitles, jt)})} style={{ width:"16px", height:"16px", accentColor:t.accent }} />
+                         <span style={{ fontSize:"13px", color:editForm.jobTitles.includes(jt)?t.accent:t.text, fontWeight:editForm.jobTitles.includes(jt)?"700":"500" }}>{jt}</span>
+                       </label>
                      ))}
                   </div>
                 </div>
@@ -344,9 +414,15 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
                 {isAdminOrSuper && (
                    <div style={{ marginTop:"10px", textAlign:"center" }}>
-                     <button onClick={handleArchiveUser} style={{ background:"transparent", border:"none", color:t.red, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
-                       Archiver ce collaborateur
-                     </button>
+                     {selectedPerson.archived ? (
+                        <button onClick={handleRestoreUser} style={{ background:"transparent", border:"none", color:t.green, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
+                          Restaurer ce collaborateur
+                        </button>
+                     ) : (
+                        <button onClick={handleArchiveUser} style={{ background:"transparent", border:"none", color:t.red, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
+                          Archiver ce collaborateur
+                        </button>
+                     )}
                    </div>
                 )}
               </>
