@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { CRITERES_LABELS } from "../data";
 
-export default function DashboardTab({ campaigns, activeCampaignId, setActiveCampaignId, currentAuditDate, stats, urgents, criteres, userProfile, handleEditAuditDate, handleCreateCampaign, t }) {
+export default function DashboardTab({ campaigns, activeCampaignId, setActiveCampaignId, currentAuditDate, stats, urgents, criteres, axes, setModalCritere, userProfile, handleEditAuditDate, handleCreateCampaign, t }) {
   
   const safeCriteres = Array.isArray(criteres) ? criteres : [];
   const safeUrgents = Array.isArray(urgents) ? urgents : [];
@@ -25,10 +25,8 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
 
   const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
 
-  // Calcul du nombre total de preuves
   const totalPreuves = useMemo(() => safeCriteres.reduce((acc, c) => acc + (c.fichiers?.length || 0) + (c.chemins_reseau?.length || 0) + (c.preuves ? 1 : 0), 0), [safeCriteres]);
 
-  // Récupérer la date de la dernière preuve ajoutée pour une ligne
   const getLastAddDate = (c) => {
     const dates = [];
     if (Array.isArray(c.fichiers)) c.fichiers.forEach(f => f.date && dates.push(new Date(f.date)));
@@ -98,7 +96,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               <div style={{ fontSize:"10px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Conformité globale</div>
               <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"46px", color:t.text, lineHeight:1, letterSpacing:"-1px" }}>{pct}<span style={{ fontSize:"22px", color:t.text2, fontWeight:"400" }}>%</span></div>
               <div style={{ display:"flex", alignItems:"center", gap:"12px", marginTop:"10px" }}>
-                {/* Jauge avec Dégradé Image 08d8a1 */}
                 <div style={{ flex: 1, maxWidth: "140px", height:"6px", background:t.goldBg, borderRadius:"3px", overflow:"hidden" }}>
                   <div style={{ width:`${pct}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #fcd34d)`, borderRadius:"3px" }}/>
                 </div>
@@ -131,10 +128,43 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
           ))}
         </div>
 
+        {/* ── PLAN D'ACTION (Priorités intégrées) ── */}
+        {axes && axes.length > 0 && (
+          <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", boxShadow:t.shadowSm }}>
+            <div style={{ display:"flex", alignItems:"center", gap:"12px", marginBottom:"16px" }}>
+              <div style={{ fontSize:"20px" }}>🎯</div>
+              <div>
+                <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:t.text, margin:0 }}>Plan d'action prioritaire</h3>
+                <div style={{ fontSize:"12px", color:t.text2 }}>Indicateurs nécessitant une intervention (Écarts et En cours)</div>
+              </div>
+            </div>
+            <div style={{ display:"flex", gap:"16px", overflowX:"auto", paddingBottom:"8px" }} className="scroll-container">
+              {axes.map(c => {
+                const isNC = c.statut === "non-conforme";
+                const theme = isNC ? { c:t.red, bg:t.redBg, bd:t.redBd, label:"Non conforme" } : { c:t.amber, bg:t.amberBg, bd:t.amberBd, label:"En cours" };
+                const d = days(c.delai);
+                return (
+                  <div key={c.id} onClick={() => setModalCritere(c)} style={{ minWidth:"280px", background:t.surface2, border:`1px solid ${theme.bd}`, borderLeft:`4px solid ${theme.c}`, borderRadius:"8px", padding:"16px", cursor:"pointer", transition:"transform 0.2s", boxShadow:`0 4px 12px ${theme.bg}` }} onMouseOver={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseOut={e=>e.currentTarget.style.transform="translateY(0)"}>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px" }}>
+                      <span style={{ fontSize:"16px", fontWeight:"800", color:t.text, fontFamily:"'Instrument Serif',serif" }}>{formatInd(c.critere, c.num)}</span>
+                      <span style={{ background:theme.bg, color:theme.c, fontSize:"10px", fontWeight:"800", padding:"3px 8px", borderRadius:"6px" }}>{theme.label}</span>
+                    </div>
+                    <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:"12px" }}>{c.titre}</div>
+                    <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", fontSize:"11px" }}>
+                      <span style={{ color:t.text2 }}>👤 {c.responsables?.[0]||"—"}</span>
+                      <span style={{ fontWeight:"800", color: d < 0 ? t.red : t.amber }}>{d < 0 ? "DÉPASSÉ" : `J-${d}`}</span>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px" }}>
           
-          {/* 📊 Table Aperçu - AVEC COLONNE DERNIER AJOUT */}
+          {/* 📊 Table Aperçu */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
@@ -176,10 +206,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                           </span>
                         </div>
                         <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
-                        
-                        {/* NOUVELLE COLONNE : Dernier Ajout */}
                         <span style={{ fontSize:"11px", color:t.text2, fontFamily:"'DM Mono',monospace" }}>{getLastAddDate(r)}</span>
-
                         <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"normal", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
                       </div>
                     );
@@ -212,7 +239,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                             {u.titre}
                           </span>
                         </div>
-                        
                         {d < 0 ? (
                           <span style={{ background:t.redBg, color:t.red, border:`1px solid ${t.redBd}`, padding:"2px 6px", borderRadius:"4px", fontSize:"9px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>DÉPASSÉ</span>
                         ) : (
@@ -225,7 +251,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               )}
             </div>
 
-            <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
+            <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow, flex:1 }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"14px" }}>⚡ Activité récente</div>
               {hist.length === 0 ? (
                 <div style={{ fontSize:"12px", color:t.text2, fontStyle:"italic" }}>Aucune activité.</div>
@@ -251,7 +277,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               )}
             </div>
 
-            {/* NOUVEAU WIDGET : COMPTEUR DE PREUVES POUR MOTIVER ! */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
                <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
                  <div style={{ width:"44px", height:"44px", borderRadius:"12px", background:t.greenBg, border:`1px solid ${t.greenBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px" }}>📁</div>
