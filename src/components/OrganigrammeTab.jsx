@@ -308,10 +308,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     );
   };
 
-  const currentIndex = modalCritere ? criteres.findIndex(c => c.id === modalCritere.id) : -1;
-  const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex !== -1 && currentIndex < criteres.length - 1;
-
   return (
     <div className="animate-fade-in" style={{ display:"flex", gap:"24px", height:"100%" }}>
       
@@ -418,11 +414,15 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 >
                   🔗 {isLinkingMode ? "Annuler liaison" : "Lier"}
                 </button>
-                <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 14px", borderRadius:"10px", fontSize:"12px", fontWeight:"800", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
+
+                <button onClick={() => setShowArchived(!showArchived)} style={{ background:showArchived?t.surface3:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}>
+                  📦 {showArchived ? "Retour" : "Archives"}
+                </button>
+                <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                   👤 Nouveau
                 </button>
                 {isSuperAdmin && (
-                  <button onClick={() => setIsSettingsOpen(true)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 14px", borderRadius:"10px", fontSize:"12px", fontWeight:"800", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
+                  <button onClick={() => setIsSettingsOpen(true)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                     ⚙️ Configurer
                   </button>
                 )}
@@ -435,7 +435,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         {isAdminOrSuper && isLinkingMode && !showArchived && (
           <div className="animate-fade-in" style={{ background: t.accentBg, border:`1px solid ${t.accentBd}`, padding:"12px 16px", borderRadius:"12px", display:"flex", alignItems:"center", gap:"16px", boxShadow:t.shadowSm }}>
              <div style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>
-               {!linkSourceId ? "1. Cliquez sur la carte Parent ➔" : "2. Cliquez sur les Enfants pour relier (ou retirer) ➔"}
+               {!linkSourceId ? "1. Cliquez sur l'étiquette Parent ➔" : "2. Cliquez sur les Enfants pour relier (ou retirer) ➔"}
              </div>
              <div style={{ display:"flex", gap:"8px", marginLeft:"auto", alignItems:"center" }}>
                 {LINE_COLORS.map(c => (
@@ -509,7 +509,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               )
             })}
 
-            {/* LE CORPS DE L'ORGANIGRAMME (Centré par rapport à la largeur de l'écran) */}
+            {/* LE CORPS DE L'ORGANIGRAMME */}
             <div style={{ display: "flex", flexDirection: "column", gap: "60px", width: "100%", maxWidth: "1600px", margin: "0 auto", position: "relative", zIndex: 10 }}>
               
               {showArchived ? (
@@ -523,7 +523,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 1)}
                     style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"24px", minWidth:"200px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
                   >
-                    {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 1 (Direction)</div>}
+                    {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser Niveau 1 (Direction)</div>}
                     {Object.entries(groupMembersByJob(level1)).map(([job, members]) => (
                        <JobGroupBox key={job} jobTitle={job} members={members} />
                     ))}
@@ -534,7 +534,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 2)}
                     style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"24px", minWidth:"400px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
                   >
-                    {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 2 (Responsables)</div>}
+                    {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser Niveau 2 (Responsables)</div>}
                     {Object.entries(groupMembersByJob(level2)).map(([job, members]) => (
                        <JobGroupBox key={job} jobTitle={job} members={members} />
                     ))}
@@ -545,7 +545,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 3)}
                     style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"24px", minWidth:"600px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
                   >
-                    {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 3 (Équipes)</div>}
+                    {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser Niveau 3 (Équipes)</div>}
                     {Object.entries(groupMembersByJob(level3)).map(([job, members]) => (
                        <JobGroupBox key={job} jobTitle={job} members={members} />
                     ))}
@@ -558,7 +558,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       </div>
 
-      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Adapté au contenu) ── */}
+      {/* ── ZONE DROITE : PANNEAU LATÉRAL ── */}
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
