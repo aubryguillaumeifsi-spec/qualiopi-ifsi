@@ -7,15 +7,14 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const [showArchived, setShowArchived] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false); 
   const [panelMode, setPanelMode] = useState('profile'); 
+  const [zoom, setZoom] = useState(1); // 🔍 NOUVEAU : État du Zoom
 
   // --- SYSTEME DE LIAISON ---
   const [isLinkingMode, setIsLinkingMode] = useState(false);
   const [linkSourceId, setLinkSourceId] = useState(null);
-  const [activeLinkColor, setActiveLinkColor] = useState('#3b82f6'); // Par défaut Bleu
+  const [activeLinkColor, setActiveLinkColor] = useState('#3b82f6');
   const [cardPositions, setCardPositions] = useState({});
-  const [svgSize, setSvgSize] = useState({ w: '100%', h: '100%' }); // Taille dynamique du SVG
   const containerRef = useRef(null);
-  const contentRef = useRef(null);
 
   const LINE_COLORS = [
     { label: 'Bleu IFSI', color: '#3b82f6' },
@@ -84,41 +83,43 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const selectedPerson = editForm?.id ? safeMembers.find(m => m.id === editForm.id) : null;
   const selectedPersonCriteres = selectedPerson ? getUserCriteres(selectedPerson) : [];
 
-  // --- CALCUL DES POSITIONS POUR LES LIGNES SVG (Ajusté pour le défilement) ---
+  // --- CALCUL DES POSITIONS POUR LES LIGNES SVG (Gérant le Zoom) ---
   const updatePositions = useCallback(() => {
-    if (!containerRef.current || !contentRef.current) return;
-    const containerRect = containerRef.current.getBoundingClientRect();
+    const wrapper = document.getElementById("zoom-wrapper");
+    if (!wrapper) return;
+    const wRect = wrapper.getBoundingClientRect();
     
-    setSvgSize({
-      w: contentRef.current.scrollWidth,
-      h: contentRef.current.scrollHeight
-    });
-
     const newPos = {};
     displayMembers.forEach(m => {
       const el = document.getElementById(`card-${m.id}`);
       if (el) {
-        const rect = el.getBoundingClientRect();
+        const cRect = el.getBoundingClientRect();
+        // Calcul des coordonnées relatives annulées du zoom
+        const left = (cRect.left - wRect.left) / zoom;
+        const top = (cRect.top - wRect.top) / zoom;
+        const width = cRect.width / zoom;
+        const height = cRect.height / zoom;
+
         newPos[m.id] = {
-          bottomX: rect.left - containerRect.left + containerRef.current.scrollLeft + rect.width / 2,
-          bottomY: rect.top - containerRect.top + containerRef.current.scrollTop + rect.height,
-          topX: rect.left - containerRect.left + containerRef.current.scrollLeft + rect.width / 2,
-          topY: rect.top - containerRect.top + containerRef.current.scrollTop,
-          midX: rect.left - containerRect.left + containerRef.current.scrollLeft + rect.width / 2,
-          midY: rect.top - containerRect.top + containerRef.current.scrollTop + rect.height / 2,
+          bottomX: left + width / 2,
+          bottomY: top + height,
+          topX: left + width / 2,
+          topY: top,
+          midX: left + width / 2,
+          midY: top + height / 2,
         };
       }
     });
     setCardPositions(newPos);
-  }, [displayMembers]);
+  }, [displayMembers, zoom]);
 
   useEffect(() => {
     const timer = setTimeout(updatePositions, 300);
     window.addEventListener('resize', updatePositions);
     return () => { clearTimeout(timer); window.removeEventListener('resize', updatePositions); };
-  }, [updatePositions, showArchived, editForm, isLinkingMode]);
+  }, [updatePositions, showArchived, editForm, isLinkingMode, zoom]);
 
-  // --- ACTIONS PANNEAU ---
+  // --- ACTIONS ---
   const handleArchiveUser = async () => {
     if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ?`)) {
       await handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, { archived: true });
@@ -198,7 +199,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const removeConnection = (connId) => {
     handleUpdateConnections(orgConnections.filter(c => c.id !== connId));
   };
-
+  
   const clearAllConnections = () => {
     if(window.confirm("Voulez-vous vraiment effacer TOUTES les lignes de connexion ?")) {
       handleUpdateConnections([]);
@@ -219,15 +220,15 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const groupMembersByJob = (membersArray) => {
     const groups = {};
     membersArray.forEach(m => {
-      const job = m.jobTitles[0] || "Sans fonction spécifique";
+      const job = m.jobTitles[0] || "Sans fonction";
       if (!groups[job]) groups[job] = [];
       groups[job].push(m);
     });
     return groups;
   };
 
-  // --- SOUS-COMPOSANT : L'ÉTIQUETTE D'IDENTITÉ CARRÉE (MINI-TAG) ---
-  const MiniIdentityTag = ({ m }) => {
+  // --- SOUS-COMPOSANT : LA VIGNETTE ULTRA-COMPACTE ---
+  const CompactCard = ({ m }) => {
     const rc = getRoleColor(m.roles[0]);
     const isSelected = editForm?.id === m.id;
     const isLinkingSource = isLinkingMode && linkSourceId === m.id;
@@ -240,78 +241,76 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         onDragStart={(e) => handleDragStart(e, m)}
         onClick={() => openViewPanel(m)}
         style={{
-          width: "120px", 
-          background: t.surface, 
-          border: `2px solid ${isLinkingSource ? activeLinkColor : isSelected ? rc.text : t.border}`, 
+          width: "115px", 
+          height: "46px", // Extrêmement compact !
+          background: rc.bg, 
+          border: `2px solid ${isLinkingSource ? activeLinkColor : isSelected ? rc.text : rc.bd}`, 
           borderRadius: "8px",
-          padding: "12px 8px", 
+          padding: "4px 8px", 
           display: "flex", 
           flexDirection: "column", 
-          alignItems: "center",
-          gap: "8px",
+          justifyContent: "center",
           cursor: isLinkingMode ? "crosshair" : isAdminOrSuper ? "grab" : "pointer", 
-          boxShadow: isLinkingSource ? `0 0 12px ${activeLinkColor}80` : isSelected ? `0 4px 12px ${rc.bg}` : t.shadowSm, 
+          boxShadow: isLinkingSource ? `0 0 12px ${activeLinkColor}80` : isSelected ? `0 4px 12px ${rc.bg}` : "none", 
           transition: "all 0.15s", 
           position: "relative", 
           zIndex: 10,
-          opacity: isActif ? 1 : 0.6
+          opacity: isActif ? 1 : 0.5
         }}
         onMouseOver={e => { e.currentTarget.style.transform="translateY(-2px)"; e.currentTarget.style.boxShadow=isLinkingSource ? `0 0 16px ${activeLinkColor}` : `0 4px 12px ${rc.bg}`; }}
-        onMouseOut={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow=isLinkingSource ? `0 0 12px ${activeLinkColor}80` : isSelected ? `0 4px 12px ${rc.bg}` : t.shadowSm; }}
+        onMouseOut={e => { e.currentTarget.style.transform="translateY(0)"; e.currentTarget.style.boxShadow=isLinkingSource ? `0 0 12px ${activeLinkColor}80` : isSelected ? `0 4px 12px ${rc.bg}` : "none"; }}
       >
-         <div style={{ width:"36px", height:"36px", borderRadius:"10px", background: rc.bg, border:`1px solid ${rc.bd}`, color: rc.text, display:"flex", alignItems:"center", justifyContent:"center", fontWeight:"800", fontSize:"13px", flexShrink:0 }}>
-           {m.prenom?.charAt(0).toUpperCase()}{m.nom ? m.nom.charAt(0).toUpperCase() : ""}
+         <div style={{ fontSize:"10px", fontWeight:"800", color:rc.text, textAlign:"center", lineHeight:"1.1", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+           {m.prenom}
+         </div>
+         <div style={{ fontSize:"10px", fontWeight:"800", color:rc.text, textAlign:"center", lineHeight:"1.1", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
+           {m.nom.toUpperCase()}
          </div>
          
-         <div style={{ fontSize:"11px", fontWeight:"800", color:t.text, textAlign:"center", lineHeight:"1.2", width:"100%", display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical", overflow:"hidden" }}>
-           {m.prenom} <br/> {m.nom}
-         </div>
-
-         {/* Mini Barre d'indicateurs */}
-         <div style={{ width:"100%", marginTop:"auto" }}>
-            <div style={{ textAlign:"center", fontSize:"9px", fontWeight:"700", color:t.text3, marginBottom:"4px" }}>
-              {m.stats.total > 0 ? `${m.stats.pct}% conf.` : "0 ind."}
-            </div>
-            <div style={{ height:"4px", background:t.surface2, borderRadius:"2px", display:"flex", gap:"1px", overflow:"hidden", border:`1px solid ${t.border}` }}>
-                {m.stats.conf > 0 && <div style={{ width:`${(m.stats.conf/m.stats.total)*100}%`, background:t.green, height:"100%" }}/>}
-                {m.stats.ec > 0 && <div style={{ width:`${(m.stats.ec/m.stats.total)*100}%`, background:t.amber, height:"100%" }}/>}
-                {m.stats.nc > 0 && <div style={{ width:`${(m.stats.nc/m.stats.total)*100}%`, background:t.red, height:"100%" }}/>}
-            </div>
+         {/* Mini Barre d'indicateurs intégrée en fond de carte */}
+         <div style={{ height:"4px", background:"rgba(0,0,0,0.06)", borderRadius:"2px", display:"flex", gap:"1px", overflow:"hidden", marginTop:"4px" }}>
+            {m.stats.conf > 0 && <div style={{ width:`${(m.stats.conf/m.stats.total)*100}%`, background:t.green, height:"100%" }}/>}
+            {m.stats.ec > 0 && <div style={{ width:`${(m.stats.ec/m.stats.total)*100}%`, background:t.amber, height:"100%" }}/>}
+            {m.stats.nc > 0 && <div style={{ width:`${(m.stats.nc/m.stats.total)*100}%`, background:t.red, height:"100%" }}/>}
          </div>
       </div>
     );
   };
 
-  // --- SOUS-COMPOSANT : LA BOÎTE DE GROUPE (Max 2 par ligne) ---
+  // --- SOUS-COMPOSANT : LA BOÎTE DE GROUPE ---
   const JobGroupBox = ({ jobTitle, members }) => {
     const groupColor = members.length > 0 ? getRoleColor(members[0].roles[0]) : { bg: t.surface2, bd: t.border, text: t.text };
     
     return (
       <div style={{ 
-        background: t.surface2, 
+        background: t.surface, 
         border: `1px solid ${t.border}`, 
-        borderTop: `4px solid ${groupColor.text}`,
-        borderRadius: "14px", 
-        padding: "16px", 
+        borderTop: `3px solid ${groupColor.text}`,
+        borderRadius: "10px", 
+        padding: "12px", 
         display: "flex", 
         flexDirection: "column", 
-        gap: "14px",
-        minWidth: "160px",
-        maxWidth: "300px", // Contraint pour forcer le retour à la ligne après 2 cartes (120px + 120px + gap)
+        gap: "10px",
+        minWidth: "140px",
         boxShadow: t.shadowSm,
         zIndex: 2,
         height: "fit-content"
       }}>
-        <div style={{ fontSize:"11px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px", textAlign:"center" }}>
-          {jobTitle} <span style={{ color:t.text3, fontWeight:"600" }}>({members.length})</span>
+        <div style={{ fontSize:"10px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"0.5px", textAlign:"center" }}>
+          {jobTitle}
         </div>
         {/* Grille forcée à 2 colonnes maximum */}
-        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:"10px", justifyContent:"center" }}>
-          {members.map(m => <MiniIdentityTag key={m.id} m={m} />)}
+        <div style={{ display:"grid", gridTemplateColumns:"repeat(2, 1fr)", gap:"6px", justifyContent:"center" }}>
+          {members.map(m => <CompactCard key={m.id} m={m} />)}
         </div>
       </div>
     );
   };
+
+  // NOUVEAU : SECURITE POUR LA MODALE DES INDICATEURS
+  const currentIndex = modalCritere ? criteres.findIndex(c => c.id === modalCritere.id) : -1;
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex !== -1 && currentIndex < criteres.length - 1;
 
   return (
     <div className="animate-fade-in" style={{ display:"flex", gap:"24px", height:"100%" }}>
@@ -398,33 +397,30 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             </div>
           </div>
 
-          <div style={{ display:"flex", gap:"12px", alignItems:"flex-start" }}>
-            <div style={{ background:t.surface, border:`1px solid ${t.border}`, padding:"10px 16px", borderRadius:"12px", boxShadow:t.shadowSm, display:"flex", alignItems:"center", gap:"12px" }}>
-               <span style={{ fontSize:"12px", fontWeight:"700", color:t.text2 }}>Effectif :</span>
-               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:t.text, lineHeight:1 }}>{safeMembers.length}</span>
+          <div style={{ display:"flex", gap:"12px", alignItems:"center", flexWrap:"wrap", justifyContent:"flex-end" }}>
+            <div style={{ background:t.surface, border:`1px solid ${t.border}`, padding:"8px 14px", borderRadius:"10px", boxShadow:t.shadowSm, display:"flex", alignItems:"center", gap:"10px" }}>
+               <span style={{ fontSize:"11px", fontWeight:"700", color:t.text2 }}>Effectif :</span>
+               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, lineHeight:1 }}>{safeMembers.length}</span>
+            </div>
+
+            {/* CONTROLE DE ZOOM */}
+            <div style={{ display:"flex", alignItems:"center", background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden" }}>
+               <button onClick={() => setZoom(z => Math.max(0.4, z - 0.1))} style={{ padding:"6px 12px", border:"none", background:"transparent", cursor:"pointer", color:t.text, fontWeight:"800" }}>-</button>
+               <div style={{ fontSize:"11px", fontWeight:"800", width:"40px", textAlign:"center", color:t.text }}>{Math.round(zoom * 100)}%</div>
+               <button onClick={() => setZoom(z => Math.min(1.5, z + 0.1))} style={{ padding:"6px 12px", border:"none", background:"transparent", cursor:"pointer", color:t.text, fontWeight:"800" }}>+</button>
             </div>
 
             {isAdminOrSuper && (
               <>
-                {/* BOUTON CONNEXION */}
                 <button 
                   onClick={() => { setIsLinkingMode(!isLinkingMode); setLinkSourceId(null); setPanelMode('profile'); setEditForm(null); updatePositions(); }} 
-                  style={{ background:isLinkingMode?t.accentBg:t.surface, border:`1px solid ${isLinkingMode?t.accentBd:t.border}`, color:isLinkingMode?t.accent:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}
+                  style={{ background:isLinkingMode?t.accentBg:t.surface, border:`1px solid ${isLinkingMode?t.accentBd:t.border}`, color:isLinkingMode?t.accent:t.text, padding:"8px 14px", borderRadius:"10px", fontSize:"12px", fontWeight:"800", cursor:"pointer", boxShadow:t.shadowSm }}
                 >
                   🔗 {isLinkingMode ? "Annuler liaison" : "Lier"}
                 </button>
-
-                <button onClick={() => setShowArchived(!showArchived)} style={{ background:showArchived?t.surface3:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm }}>
-                  📦 {showArchived ? "Retour" : "Archives"}
-                </button>
-                <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
+                <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"8px 14px", borderRadius:"10px", fontSize:"12px", fontWeight:"800", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                   👤 Nouveau
                 </button>
-                {isSuperAdmin && (
-                  <button onClick={() => setIsSettingsOpen(true)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
-                    ⚙️ Configurer
-                  </button>
-                )}
               </>
             )}
           </div>
@@ -434,7 +430,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         {isAdminOrSuper && isLinkingMode && !showArchived && (
           <div className="animate-fade-in" style={{ background: t.accentBg, border:`1px solid ${t.accentBd}`, padding:"12px 16px", borderRadius:"12px", display:"flex", alignItems:"center", gap:"16px", boxShadow:t.shadowSm }}>
              <div style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>
-               {!linkSourceId ? "1. Cliquez sur l'étiquette Parent ➔" : "2. Cliquez sur les Enfants pour relier (ou retirer) ➔"}
+               {!linkSourceId ? "1. Cliquez sur la carte Parent ➔" : "2. Cliquez sur les Enfants pour relier (ou retirer) ➔"}
              </div>
              <div style={{ display:"flex", gap:"8px", marginLeft:"auto", alignItems:"center" }}>
                 {LINE_COLORS.map(c => (
@@ -446,36 +442,34 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   />
                 ))}
                 <div style={{ width:"1px", height:"20px", background:t.border, margin:"0 10px" }} />
-                <button onClick={clearAllConnections} style={{ background:"transparent", border:"none", color:t.red, fontSize:"12px", fontWeight:"700", cursor:"pointer" }}>🗑️ Tout effacer</button>
+                <button onClick={clearAllConnections} style={{ background:"transparent", border:"none", color:t.red, fontSize:"12px", fontWeight:"800", cursor:"pointer" }}>🗑️ Tout effacer</button>
              </div>
           </div>
         )}
 
-        {/* L'ARBORESCENCE (Zone Blanche Scrollable) */}
-        <div ref={containerRef} className="scroll-container" style={{ flex:1, overflow:"auto", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", boxShadow:t.shadowSm, position:"relative" }}>
+        {/* L'ARBORESCENCE (Zone Blanche avec SVG + Zoom Intégré) */}
+        <div ref={containerRef} className="scroll-container" style={{ flex:1, overflow:"auto", background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"16px", boxShadow:t.shadowSm, position:"relative" }}>
           
-          <div ref={contentRef} style={{ minHeight: "100%", width: "100%", position: "relative", padding: "40px 20px" }}>
+          <div id="zoom-wrapper" style={{ transform: `scale(${zoom})`, transformOrigin: "top left", minWidth: "100%", minHeight: "100%", position: "relative", padding: "40px", display: "flex", flexDirection: "column", gap: "50px", alignItems: "center" }}>
             
             {/* CALQUE DES LIGNES SVG */}
             {!showArchived && (
-              <svg width={svgSize.w} height={svgSize.h} style={{ position: 'absolute', top: 0, left: 0, pointerEvents: 'none', zIndex: 1 }}>
+              <svg style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', zIndex: 1 }}>
                 {orgConnections.map(conn => {
                   const posA = cardPositions[conn.source];
                   const posB = cardPositions[conn.target];
                   if(!posA || !posB) return null;
 
                   let path = "";
-                  // Effet Râteau intelligent si cible en bas (Parent -> Enfant)
+                  // Ligne Râteau orthogonale pure (Parent haut -> Enfant bas)
                   if (posB.topY > posA.bottomY + 10) {
-                    const busY = posA.bottomY + 24; // Ligne de bus horizontale fixée à 24px sous le parent
+                    const busY = posA.bottomY + 24; 
                     path = `M ${posA.bottomX},${posA.bottomY} L ${posA.bottomX},${busY} L ${posB.topX},${busY} L ${posB.topX},${posB.topY}`;
                   } 
-                  // Si cible au dessus (Enfant -> Parent, rare mais possible)
                   else if (posB.bottomY < posA.topY - 10) {
                     const busY = posA.topY - 24;
                     path = `M ${posA.topX},${posA.topY} L ${posA.topX},${busY} L ${posB.bottomX},${busY} L ${posB.bottomX},${posB.bottomY}`;
                   } 
-                  // Si même niveau : Courbe simple
                   else {
                     path = `M ${posA.midX},${posA.midY} C ${posA.midX},${(posA.midY+posB.midY)/2} ${posB.midX},${(posA.midY+posB.midY)/2} ${posB.midX},${posB.midY}`;
                   }
@@ -487,7 +481,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               </svg>
             )}
 
-            {/* BOUTONS SUPPRESSION DES LIGNES (Si mode lien actif) */}
+            {/* BOUTONS SUPPRESSION DES LIGNES */}
             {isLinkingMode && !showArchived && orgConnections.map(conn => {
               const posA = cardPositions[conn.source];
               const posB = cardPositions[conn.target];
@@ -496,7 +490,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               let midX, midY;
               if (posB.topY > posA.bottomY + 10) {
                 midX = posB.topX;
-                midY = (posA.bottomY + 24 + posB.topY) / 2; // Positionné sur la branche descendante pour éviter superposition
+                midY = (posA.bottomY + 24 + posB.topY) / 2;
               } else {
                 midX = (posA.x + posB.x) / 2;
                 midY = (posA.y + posB.y) / 2;
@@ -512,18 +506,16 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
             {showArchived ? (
               <div style={{ display:"flex", flexWrap:"wrap", gap:"20px", justifyContent:"center", zIndex:10, position:"relative" }}>
-                {displayMembers.length === 0 ? <div style={{ color:t.text3, fontStyle:"italic" }}>Aucun archivé.</div> : displayMembers.map(m => <MiniIdentityTag key={m.id} m={m} />)}
+                {displayMembers.length === 0 ? <div style={{ color:t.text3, fontStyle:"italic" }}>Aucun archivé.</div> : displayMembers.map(m => <CompactCard key={m.id} m={m} />)}
               </div>
             ) : (
-              <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:"100%", gap:"60px", zIndex:10, position:"relative" }}>
-                
+              <>
                 {/* === NIVEAU 1 : DIRECTION === */}
                 <div 
                   onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 1)}
-                  style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"20px", width:"100%", maxWidth:"1200px", minHeight:"100px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
+                  style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", gap:"24px", minWidth:"200px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", zIndex:10, position:"relative" }}
                 >
-                  {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser Niveau 1 (Direction)</div>}
-                  
+                  {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 1 (Direction)</div>}
                   {Object.entries(groupMembersByJob(level1)).map(([job, members]) => (
                      <JobGroupBox key={job} jobTitle={job} members={members} />
                   ))}
@@ -532,10 +524,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 {/* === NIVEAU 2 : RESPONSABLES === */}
                 <div 
                   onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 2)}
-                  style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"20px", width:"100%", maxWidth:"1200px", minHeight:"100px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
+                  style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", gap:"24px", minWidth:"400px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", zIndex:10, position:"relative" }}
                 >
-                  {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser Niveau 2 (Responsables)</div>}
-                  
+                  {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 2 (Responsables)</div>}
                   {Object.entries(groupMembersByJob(level2)).map(([job, members]) => (
                      <JobGroupBox key={job} jobTitle={job} members={members} />
                   ))}
@@ -544,16 +535,14 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 {/* === NIVEAU 3 : ÉQUIPES === */}
                 <div 
                   onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 3)}
-                  style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", gap:"20px", width:"100%", maxWidth:"1200px", minHeight:"100px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", transition:"background 0.2s" }}
+                  style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", gap:"24px", minWidth:"600px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed transparent` : "none", borderRadius:"16px", zIndex:10, position:"relative" }}
                 >
-                  {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser Niveau 3 (Équipes)</div>}
-                  
+                  {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 3 (Équipes)</div>}
                   {Object.entries(groupMembersByJob(level3)).map(([job, members]) => (
                      <JobGroupBox key={job} jobTitle={job} members={members} />
                   ))}
                 </div>
-
-              </div>
+              </>
             )}
           </div>
         </div>
@@ -563,9 +552,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
-          {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-            
             {panelMode === 'indicators' && selectedPerson ? (
                <div style={{ display:"flex", alignItems:"center", gap:"12px", width:"100%" }}>
                  <button onClick={() => setPanelMode('profile')} style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", width:"36px", height:"36px", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:t.text, flexShrink:0, boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=t.surface3} onMouseOut={e=>e.currentTarget.style.background=t.surface}>
@@ -616,7 +603,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
           <div className="scroll-container" style={{ padding:"24px 20px", overflowY:"auto", display:"flex", flexDirection:"column", gap:"24px" }}>
             
-            {/* 🔴 VUE : LISTE DES INDICATEURS CLIQUABLES */}
             {panelMode === 'indicators' && selectedPerson && (
                <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
                   {selectedPersonCriteres.length === 0 ? (
@@ -649,7 +635,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                </div>
             )}
 
-            {/* 🔵 VUE : PROFIL COMPLET OU EDITION */}
             {panelMode === 'profile' && (
               <>
                 <div>
