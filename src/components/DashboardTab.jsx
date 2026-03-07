@@ -25,6 +25,26 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
 
   const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
 
+  // Calcul du nombre total de preuves
+  const totalPreuves = useMemo(() => safeCriteres.reduce((acc, c) => acc + (c.fichiers?.length || 0) + (c.chemins_reseau?.length || 0) + (c.preuves ? 1 : 0), 0), [safeCriteres]);
+
+  // Récupérer la date de la dernière preuve ajoutée pour une ligne
+  const getLastAddDate = (c) => {
+    const dates = [];
+    if (Array.isArray(c.fichiers)) c.fichiers.forEach(f => f.date && dates.push(new Date(f.date)));
+    if (Array.isArray(c.chemins_reseau)) c.chemins_reseau.forEach(cr => cr.date && dates.push(new Date(cr.date)));
+    if (Array.isArray(c.historique)) {
+      c.historique.forEach(h => {
+        if (h.type === 'preuve' || h.msg?.toLowerCase().includes('preuve') || h.msg?.toLowerCase().includes('fichier')) {
+          dates.push(new Date(h.date));
+        }
+      });
+    }
+    if (dates.length === 0) return "—";
+    const maxDate = new Date(Math.max(...dates));
+    return maxDate.toLocaleDateString("fr-FR").substring(0,5);
+  };
+
   return (
      <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", paddingBottom:"40px" }}>
         <style>{`
@@ -78,8 +98,9 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               <div style={{ fontSize:"10px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Conformité globale</div>
               <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"46px", color:t.text, lineHeight:1, letterSpacing:"-1px" }}>{pct}<span style={{ fontSize:"22px", color:t.text2, fontWeight:"400" }}>%</span></div>
               <div style={{ display:"flex", alignItems:"center", gap:"12px", marginTop:"10px" }}>
-                <div style={{ flex: 1, maxWidth: "140px", height:"5px", background:t.goldBg, borderRadius:"3px" }}>
-                  <div style={{ width:`${pct}%`, height:"100%", background:t.gold, borderRadius:"3px" }}/>
+                {/* Jauge avec Dégradé Image 08d8a1 */}
+                <div style={{ flex: 1, maxWidth: "140px", height:"6px", background:t.goldBg, borderRadius:"3px", overflow:"hidden" }}>
+                  <div style={{ width:`${pct}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #fcd34d)`, borderRadius:"3px" }}/>
                 </div>
                 <span style={{ fontSize:"10px", color:t.text3, fontWeight:"600" }}>Objectif 90%</span>
               </div>
@@ -113,22 +134,21 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px" }}>
           
-          {/* 📊 Table Aperçu - Sans restriction de hauteur pour éviter la disparition */}
+          {/* 📊 Table Aperçu - AVEC COLONNE DERNIER AJOUT */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
             </div>
             
             <div className="scroll-container" style={{ overflowX: "auto" }}>
-              <div style={{ minWidth: "600px" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-                  {["N°","Libellé","Statut","Responsable","Date"].map(h => (
+              <div style={{ minWidth: "750px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+                  {["N°","Libellé","Statut","Responsable","Dernier ajout","Date"].map(h => (
                     <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                   ))}
                 </div>
                 
-                {/* Scroll vertical interne avec hauteur maximale pour éviter que ça coupe */}
-                <div className="scroll-container" style={{ maxHeight: "500px", overflowY: "auto", paddingBottom: "10px" }}>
+                <div className="scroll-container" style={{ maxHeight: "600px", overflowY: "auto", paddingBottom: "10px" }}>
                   {safeCriteres.map((r, i) => {
                     const cConf = CRITERES_LABELS[r.critere] || { color: t.text2 };
                     const isConforme = r.statut === "conforme";
@@ -136,9 +156,8 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                     
                     return (
-                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                         
-                        {/* Numéro dans une belle Bulle colorée ! */}
                         <div>
                           <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif" }}>
                             {formatInd(r.critere, r.num)}
@@ -157,6 +176,10 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                           </span>
                         </div>
                         <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
+                        
+                        {/* NOUVELLE COLONNE : Dernier Ajout */}
+                        <span style={{ fontSize:"11px", color:t.text2, fontFamily:"'DM Mono',monospace" }}>{getLastAddDate(r)}</span>
+
                         <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"normal", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
                       </div>
                     );
@@ -202,7 +225,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               )}
             </div>
 
-            <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow, flex:1 }}>
+            <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"14px" }}>⚡ Activité récente</div>
               {hist.length === 0 ? (
                 <div style={{ fontSize:"12px", color:t.text2, fontStyle:"italic" }}>Aucune activité.</div>
@@ -227,6 +250,18 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                 })
               )}
             </div>
+
+            {/* NOUVEAU WIDGET : COMPTEUR DE PREUVES POUR MOTIVER ! */}
+            <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
+               <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
+                 <div style={{ width:"44px", height:"44px", borderRadius:"12px", background:t.greenBg, border:`1px solid ${t.greenBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px" }}>📁</div>
+                 <div>
+                   <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"4px" }}>Preuves capitalisées</div>
+                   <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.green, lineHeight:1, letterSpacing:"-1px" }}>{totalPreuves} <span style={{ fontSize:"14px", color:t.text2, fontFamily:"'Albert Sans', sans-serif", fontWeight:"500", letterSpacing:"0" }}>documents</span></div>
+                 </div>
+               </div>
+            </div>
+
           </div>
         </div>
      </div>
