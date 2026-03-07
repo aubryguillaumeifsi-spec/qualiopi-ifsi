@@ -26,14 +26,14 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
   const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
 
   return (
-     <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", height:"100%" }}>
+     <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", paddingBottom:"40px" }}>
         <style>{`
           .ca:hover  { transform:translateY(-2px); box-shadow:${t.shadowLg}!important; }
           .ro:hover  { background:${t.surface2}!important; cursor:default; }
           .ug:hover  { filter:brightness(1.04); transform:translateY(-2px); }
           .ca, .ug   { transition:all 0.18s ease; cursor: default; }
           .ro        { transition:background 0.12s; }
-          .scroll-container::-webkit-scrollbar { height: 6px; }
+          .scroll-container::-webkit-scrollbar { height: 6px; width: 6px; }
           .scroll-container::-webkit-scrollbar-track { background: transparent; }
           .scroll-container::-webkit-scrollbar-thumb { background: ${t.border2}; border-radius: 4px; }
         `}</style>
@@ -111,35 +111,36 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         </div>
 
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
-        <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px", flex:1 }}>
+        <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px" }}>
           
-          {/* 📊 Table Aperçu (AVEC BULLES) */}
+          {/* 📊 Table Aperçu - Sans restriction de hauteur pour éviter la disparition */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
             </div>
             
-            <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
-              <div style={{ minWidth: "550px" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            <div className="scroll-container" style={{ overflowX: "auto" }}>
+              <div style={{ minWidth: "600px" }}>
+                <div style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                   {["N°","Libellé","Statut","Responsable","Date"].map(h => (
                     <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                   ))}
                 </div>
                 
-                <div style={{ paddingBottom:"10px" }}>
-                  {safeCriteres.slice(0, 20).map((r, i) => {
+                {/* Scroll vertical interne avec hauteur maximale pour éviter que ça coupe */}
+                <div className="scroll-container" style={{ maxHeight: "500px", overflowY: "auto", paddingBottom: "10px" }}>
+                  {safeCriteres.map((r, i) => {
                     const cConf = CRITERES_LABELS[r.critere] || { color: t.text2 };
                     const isConforme = r.statut === "conforme";
                     const isNC = r.statut === "non-conforme";
                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                     
                     return (
-                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                         
                         {/* Numéro dans une belle Bulle colorée ! */}
                         <div>
-                          <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                          <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif" }}>
                             {formatInd(r.critere, r.num)}
                           </span>
                         </div>
