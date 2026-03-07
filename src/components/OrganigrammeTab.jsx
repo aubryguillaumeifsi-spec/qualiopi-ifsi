@@ -195,7 +195,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </div>
         </div>
 
-        {/* LA GRILLE DES CARTES (Avec padding top réparé pour l'ombre) */}
+        {/* LA GRILLE DES CARTES */}
         <div className="scroll-container" style={{ flex:1, overflowY:"auto", padding:"4px 8px 20px 4px" }}>
           
           {showArchived && <div style={{ fontSize:"14px", fontWeight:"800", color:t.text3, marginBottom:"16px", textTransform:"uppercase", letterSpacing:"1px" }}>📦 Membres Archivés</div>}
@@ -267,8 +267,8 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               <div style={{ flex:1 }}>
                 {editForm.isEditing ? (
                    <div style={{ display:"flex", gap:"8px", marginBottom:"4px" }}>
-                     <input type="text" value={editForm.prenom.toUpperCase()} onChange={e=>setEditForm({...editForm, prenom: e.target.value})} placeholder="Prénom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
-                     <input type="text" value={editForm.nom.toUpperCase()} onChange={e=>setEditForm({...editForm, nom: e.target.value})} placeholder="Nom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
+                     <input type="text" value={editForm.prenom} onChange={e=>setEditForm({...editForm, prenom: e.target.value.charAt(0).toUpperCase() + e.target.value.slice(1)})} placeholder="Prénom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
+                     <input type="text" value={editForm.nom} onChange={e=>setEditForm({...editForm, nom: e.target.value.toUpperCase()})} placeholder="Nom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
                    </div>
                 ) : (
                    <div style={{ fontSize:"20px", fontWeight:"800", color:t.text }}>{editForm.prenom} {editForm.nom}</div>
