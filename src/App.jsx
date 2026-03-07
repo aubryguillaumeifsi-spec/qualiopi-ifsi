@@ -26,7 +26,7 @@ function buildTokens(dark) {
     gold:"#d4a030", goldBg:"rgba(212,160,48,0.12)", goldBd:"rgba(212,160,48,0.3)",
     green:"#2cc880", greenBg:"rgba(44,200,128,0.1)", greenBd:"rgba(44,200,128,0.25)",
     red:"#f07070", redBg:"rgba(240,112,112,0.1)", redBd:"rgba(240,112,112,0.25)",
-    // Nouvel orange plus vif et clair pour le Dark Mode
+    // 🟠 NOUVEL ORANGE VIF POUR "EN COURS"
     amber:"#fbad14", amberBg:"rgba(251,173,20,0.12)", amberBd:"rgba(251,173,20,0.3)",
     shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)", shadowGold:"0 4px 16px rgba(212,160,48,0.18)",
   } : {
@@ -39,7 +39,7 @@ function buildTokens(dark) {
     gold:"#b07010", goldBg:"#fef4de", goldBd:"#f0cc70",
     green:"#0e7a50", greenBg:"#e8f9f3", greenBd:"#9dddc5",
     red:"#c42828", redBg:"#fdecea", redBd:"#f4a6a6",
-    // Nouvel orange plus vif et clair pour le Light Mode (pour bien trancher avec le rouge)
+    // 🟠 NOUVEL ORANGE VIF ET CLAIR POUR "EN COURS"
     amber:"#e08500", amberBg:"#fef6eb", amberBd:"#f8d799",
     shadow:"0 4px 6px -1px rgba(0,0,0,0.05)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)", shadowGold:"0 4px 16px rgba(176,112,16,0.18)",
   };
@@ -49,18 +49,18 @@ const DEFAULT_ROLES = ["Direction", "Formation", "Secrétariat", "Documentaliste
 const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Formateur IFSI", "Formateur IFAS", "Secrétaire", "TICE", "Documentaliste", "Référent ABS (handicap)", "Référent laïcité", "Ingénieur pédagogique"];
 
 const ROLE_PALETTE = [ 
-  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, // 0. Or (Direction)
-  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, // 1. Bleu (Qualité)
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, // 2. Rose framboise
-  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, // 3. Vert émeraude
-  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, // 4. Violet
-  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, // 5. Orange vif
-  { bg: "#ecfeff", border: "#7dd3fc", text: "#0369a1" }, // 6. Bleu ciel profond
-  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, // 7. Rouge vif
-  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, // 8. Cyan foncé
-  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, // 9. Jaune moutarde
-  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }, // 10. Indigo
-  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }  // 11. Fuchsia
+  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, 
+  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, 
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, 
+  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, 
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, 
+  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, 
+  { bg: "#ecfeff", border: "#7dd3fc", text: "#0369a1" }, 
+  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, 
+  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, 
+  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, 
+  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }, 
+  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }  
 ];
 
 const today = new Date();
@@ -395,7 +395,6 @@ function MainApp() {
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
 
-  // 🎯 GESTION DE LA STRUCTURE (Pôles et Fonctions)
   const handleManageStructure = async (type, action, oldVal, newVal) => {
     const docRef = doc(db, "etablissements", selectedIfsi);
     const snap = await getDoc(docRef);
@@ -605,8 +604,8 @@ function MainApp() {
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
-          {/* L'Organigramme reçoit la nouvelle fonction de management structurel */}
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} t={t} />}
+          {/* L'Organigramme reçoit bien setModalCritere et days pour que les indicateurs soient cliquables */}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
