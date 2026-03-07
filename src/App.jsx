@@ -105,7 +105,6 @@ function MainApp() {
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
 
-  // Modale pour la création de nouvel audit
   const [auditModal, setAuditModal] = useState({ show: false, name: "", date: "" });
 
   useEffect(() => {
@@ -172,7 +171,7 @@ function MainApp() {
 
   const handleLogout = () => signOut(auth);
 
-  // Fonctions de sécurité
+  // Fonctions système
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
@@ -295,7 +294,6 @@ function MainApp() {
     }
   };
 
-  // NOUVEAU : Édition Date / Création Campagne avec vraie fenêtre Modale !
   const submitAuditModal = () => {
     if(!auditModal.name || !auditModal.date) return alert("Veuillez remplir tous les champs.");
     const newId = Date.now().toString();
@@ -310,7 +308,7 @@ function MainApp() {
     saveData(newCampaigns);
   };
 
-  // Fonctions Organigramme passées en props
+  // NOUVEAU : Fonctions de gestion Organigramme Modulaire
   const handleAddOrgRole = (newRole) => {
     if (newRole && !orgRoles.includes(newRole)) setDoc(doc(db, "etablissements", selectedIfsi), { roles: [...orgRoles, newRole] }, { merge: true });
   };
@@ -318,6 +316,25 @@ function MainApp() {
     const fullName = `${prenom} ${nom.toUpperCase()}`;
     const newUser = { id: 'm_' + Date.now(), name: fullName, roles: [] };
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
+  };
+  const handleToggleUserRole = async (memberId, type, role) => {
+    if (type === 'account') {
+      const user = orgAccounts.find(u => u.id === memberId);
+      if (!user) return;
+      const currentRoles = user.orgRoles || [];
+      const newRoles = currentRoles.includes(role) ? currentRoles.filter(r => r !== role) : [...currentRoles, role];
+      await setDoc(doc(db, "users", memberId), { orgRoles: newRoles }, { merge: true });
+    } else if (type === 'manual') {
+      const updatedManuals = manualUsers.map(u => {
+        if (u.id === memberId) {
+          const currentRoles = u.roles || [];
+          const newRoles = currentRoles.includes(role) ? currentRoles.filter(r => r !== role) : [...currentRoles, role];
+          return { ...u, roles: newRoles };
+        }
+        return u;
+      });
+      await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true });
+    }
   };
 
   if (!authChecked) return null;
@@ -365,7 +382,6 @@ function MainApp() {
         main::-webkit-scrollbar-thumb { background: ${t.border}; border-radius: 4px; }
       `}</style>
 
-      {/* 🟢 Modale Propre pour un Nouvel Audit */}
       {auditModal.show && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
           <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", width:"420px", boxShadow:t.shadowLg }}>
@@ -432,7 +448,7 @@ function MainApp() {
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
-          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text, letterSpacing:"-0.2px", marginBottom:"12px" }}>
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.textNav, letterSpacing:"-0.2px", marginBottom:"12px" }}>
             {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
           </div>
           <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
@@ -487,10 +503,9 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {/* Historique : On passe "campaigns" et "activeCampaignId" au DashboardTab */}
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} t={t} />}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} handleToggleUserRole={handleToggleUserRole} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "axes" && <AxesTab axes={axes} days={days} dayColor={dayColor} setModalCritere={setModalCritere} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
@@ -503,5 +518,3 @@ function MainApp() {
 }
 
 export default function App() { return <ErrorBoundary><MainApp /></ErrorBoundary>; }
-
-
