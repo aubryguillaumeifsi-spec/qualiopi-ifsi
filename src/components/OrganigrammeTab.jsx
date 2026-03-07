@@ -8,6 +8,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const [isSettingsOpen, setIsSettingsOpen] = useState(false); 
   const [panelMode, setPanelMode] = useState('profile'); 
   const [zoom, setZoom] = useState(0.75); 
+  const [filtreRole, setFiltreRole] = useState(null); // 🎯 CORRECTION ICI : La variable est bien déclarée !
 
   // --- SYSTEME DE LIAISON ---
   const [isLinkingMode, setIsLinkingMode] = useState(false);
@@ -234,12 +235,13 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     return groups;
   };
 
-  // --- SOUS-COMPOSANT : CARTE MIDNIGHT AUTHORITY ---
+  // --- SOUS-COMPOSANT : CARTE COMPACTE ---
   const CompactCard = ({ m }) => {
     const rc = getRoleColor(m.roles[0]);
     const isSelected = editForm?.id === m.id;
     const isLinkingSource = isLinkingMode && linkSourceId === m.id;
     const isActif = m.status === "ACTIF";
+    const isFilteredOut = filtreRole && m.roles[0] !== filtreRole;
     const initials = `${(m.prenom || "?")[0]}${(m.nom || "?")[0]}`.toUpperCase();
     const conformeColor = m.stats.total > 0
       ? (m.stats.pct >= 80 ? t.green : m.stats.pct >= 40 ? t.amber : t.red)
@@ -272,9 +274,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           transition: "all 0.15s ease",
           position: "relative",
           zIndex: 10,
-          opacity: isActif ? 1 : 0.4,
+          opacity: isFilteredOut ? 0.15 : (isActif ? 1 : 0.4),
         }}
         onMouseOver={e => {
+          if (isFilteredOut) return;
           e.currentTarget.style.transform = "translateY(-2px) scale(1.02)";
           e.currentTarget.style.boxShadow = isLinkingSource
             ? `0 0 18px ${activeLinkColor}, 0 4px 16px rgba(0,0,0,0.5)`
@@ -282,6 +285,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           e.currentTarget.style.borderLeftColor = rc.text;
         }}
         onMouseOut={e => {
+          if (isFilteredOut) return;
           e.currentTarget.style.transform = "translateY(0) scale(1)";
           e.currentTarget.style.boxShadow = isLinkingSource
             ? `0 0 14px ${activeLinkColor}70, 0 2px 8px rgba(0,0,0,0.35)`
@@ -346,8 +350,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const JobGroupBox = ({ jobTitle, members }) => {
     const groupColor = members.length > 0 ? getRoleColor(members[0].roles[0]) : { bg: t.surface2, bd: t.border, text: t.text3 };
     
-    // 🎯 LOGIQUE MODIFIÉE ICI :
-    // Seules les fonctions contenant "formateur ifsi" (ou formatrice) s'afficheront sur 2 colonnes
     const titleLower = jobTitle.toLowerCase();
     const isIfsiFormatrice = titleLower.includes("formateur ifsi") || titleLower.includes("formatrice ifsi");
     const useDoubleColumn = isIfsiFormatrice && members.length > 1;
@@ -359,7 +361,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         alignItems: "center",
         gap: "8px",
         zIndex: 2,
-        alignSelf: "flex-start", // Empêche l'étirement vertical inutile
+        alignSelf: "flex-start", 
       }}>
         {/* Header minimaliste */}
         <div style={{
@@ -797,7 +799,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 </div>
 
-                {/* Affichage des Étiquettes en mode VUE */}
                 {!editForm.isEditing && editForm.tags && editForm.tags.length > 0 && (
                    <div style={{ marginTop:"8px" }}>
                      <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Missions</div>
@@ -839,7 +840,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       </div>
                     </div>
 
-                    {/* SELECTION DES ETIQUETTES EN MODE EDITION */}
                     <div>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                         <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Étiquettes (Missions transverses)</div>
