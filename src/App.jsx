@@ -26,7 +26,6 @@ function buildTokens(dark) {
     gold:"#d4a030", goldBg:"rgba(212,160,48,0.12)", goldBd:"rgba(212,160,48,0.3)",
     green:"#2cc880", greenBg:"rgba(44,200,128,0.1)", greenBd:"rgba(44,200,128,0.25)",
     red:"#f07070", redBg:"rgba(240,112,112,0.1)", redBd:"rgba(240,112,112,0.25)",
-    // 🟠 NOUVEL ORANGE VIF POUR "EN COURS"
     amber:"#fbad14", amberBg:"rgba(251,173,20,0.12)", amberBd:"rgba(251,173,20,0.3)",
     shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)", shadowGold:"0 4px 16px rgba(212,160,48,0.18)",
   } : {
@@ -39,7 +38,6 @@ function buildTokens(dark) {
     gold:"#b07010", goldBg:"#fef4de", goldBd:"#f0cc70",
     green:"#0e7a50", greenBg:"#e8f9f3", greenBd:"#9dddc5",
     red:"#c42828", redBg:"#fdecea", redBd:"#f4a6a6",
-    // 🟠 NOUVEL ORANGE VIF ET CLAIR POUR "EN COURS"
     amber:"#e08500", amberBg:"#fef6eb", amberBd:"#f8d799",
     shadow:"0 4px 6px -1px rgba(0,0,0,0.05)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)", shadowGold:"0 4px 16px rgba(176,112,16,0.18)",
   };
@@ -232,6 +230,7 @@ function MainApp() {
       name: u.name || (u.email ? u.email.split('@')[0] : "Utilisateur"), 
       roles: u.orgRoles || [], 
       jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
+      orgLevel: u.orgLevel || null,
       type: 'account', 
       email: u.email,
       phone: u.phone || "",
@@ -247,6 +246,7 @@ function MainApp() {
         name: u.name || "Membre", 
         roles: u.roles || [], 
         jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
+        orgLevel: u.orgLevel || null,
         type: 'manual',
         email: u.email || "",
         phone: u.phone || "",
@@ -468,6 +468,11 @@ function MainApp() {
     );
   };
 
+  // LA CORRECTION EST ICI ! Ces lignes assurent le bon fonctionnement du bouton Précédent/Suivant dans la modal
+  const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
       <link href={GFONT} rel="stylesheet" />
@@ -604,7 +609,6 @@ function MainApp() {
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
-          {/* L'Organigramme reçoit bien setModalCritere et days pour que les indicateurs soient cliquables */}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
