@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { CRITERES_LABELS } from "../data";
 
-export default function DashboardTab({ campaigns, activeCampaignId, setActiveCampaignId, currentAuditDate, stats, urgents, criteres, axes, setModalCritere, userProfile, handleEditAuditDate, handleCreateCampaign, t }) {
+export default function DashboardTab({ campaigns, activeCampaignId, setActiveCampaignId, currentAuditDate, stats, urgents, criteres, axes, setModalCritere, userProfile, handleEditAuditDate, handleCreateCampaign, handleAutoSave, t }) {
   
   const safeCriteres = Array.isArray(criteres) ? criteres : [];
   const safeUrgents = Array.isArray(urgents) ? urgents : [];
@@ -171,7 +171,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px" }}>
           
-          {/* 📊 Table Aperçu */}
+          {/* 📊 Table Aperçu - AVEC EDITION DE DATE INLINE */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
@@ -179,8 +179,8 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
             
             <div className="scroll-container" style={{ overflowX: "auto" }}>
               <div style={{ minWidth: "750px" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-                  {["N°","Libellé","Statut","Responsable","Dernier ajout","Date"].map(h => (
+                <div style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 105px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+                  {["N°","Libellé","Statut","Responsable","Dernier ajout","Échéance"].map(h => (
                     <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                   ))}
                 </div>
@@ -191,12 +191,13 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     const isConforme = r.statut === "conforme";
                     const isNC = r.statut === "non-conforme";
                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
-                    
+                    const d = days(r.delai);
+
                     return (
-                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                      <div key={i} className="ro" onClick={() => setModalCritere(r)} style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 105px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}`, cursor:"pointer" }}>
                         
                         <div>
-                          <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
+                          <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize:"12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
                             {formatInd(r.critere, r.num)}
                           </span>
                         </div>
@@ -214,7 +215,18 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                         </div>
                         <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
                         <span style={{ fontSize:"11px", color:t.text2, fontFamily:"'DM Mono',monospace" }}>{getLastAddDate(r)}</span>
-                        <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"normal", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
+                        
+                        {/* Champ Date Éditable Inline */}
+                        <input 
+                          type="date" 
+                          title="Modifier l'échéance"
+                          value={r.delai || ""} 
+                          onClick={(e) => e.stopPropagation()} 
+                          onChange={(e) => { e.stopPropagation(); handleAutoSave({...r, delai: e.target.value}); }} 
+                          style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"6px", padding:"4px 8px", fontSize:"10px", color: d < 0 && r.statut !== "conforme" && r.statut !== "non-concerne" ? t.red : t.text2, fontFamily:"'DM Mono',monospace", cursor:"pointer", outline:"none", width:"100%", transition:"all 0.2s" }}
+                          onMouseOver={e=>e.currentTarget.style.borderColor=t.accent}
+                          onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
+                        />
                       </div>
                     );
                   })}
