@@ -13,9 +13,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   // --- SYSTEME DE LIAISON ---
   const [isLinkingMode, setIsLinkingMode] = useState(false);
   const [linkSourceId, setLinkSourceId] = useState(null);
-  const [activeLinkColor, setActiveLinkColor] = useState('#3b82f6');
+  const [activeLinkColor, setActiveLinkColor] = useState('#3b82f6'); // Par défaut Bleu
   const [cardPositions, setCardPositions] = useState({});
   const containerRef = useRef(null);
+  const contentRef = useRef(null); // CORRECTION ICI : La variable est bien déclarée !
 
   const LINE_COLORS = [
     { label: 'Bleu IFSI', color: '#3b82f6' },
@@ -96,7 +97,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       const el = document.getElementById(`card-${m.id}`);
       if (el) {
         const cRect = el.getBoundingClientRect();
-        // Calcul pour annuler l'effet du zoom sur les coordonnées des lignes
+        // Calcul des positions relatives dézoomées
         const left = (cRect.left - wRect.left) / zoom;
         const top = (cRect.top - wRect.top) / zoom;
         const width = cRect.width / zoom;
@@ -214,6 +215,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     return `${critere}.${n}`;
   };
 
+  // --- SEPARATION PAR NIVEAU ---
   const level1 = displayMembers.filter(m => m.orgLevel === 1);
   const level2 = displayMembers.filter(m => m.orgLevel === 2);
   const level3 = displayMembers.filter(m => m.orgLevel === 3);
@@ -228,7 +230,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     return groups;
   };
 
-  // 🎯 VIGNETTE ULTRA-COMPACTE FAÇON CLAUDE (116px)
+  // --- SOUS-COMPOSANT : LA VIGNETTE ULTRA-COMPACTE ---
   const CompactCard = ({ m }) => {
     const rc = getRoleColor(m.roles[0]);
     const isSelected = editForm?.id === m.id;
@@ -312,10 +314,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     );
   };
 
-  // 🎯 BOÎTE DE GROUPE (Format Grille 2 colonnes automatique si plus de 3 membres)
+  // --- SOUS-COMPOSANT : LA BOÎTE DE GROUPE (Flottante) ---
   const JobGroupBox = ({ jobTitle, members }) => {
     const groupColor = members.length > 0 ? getRoleColor(members[0].roles[0]) : { bg: t.surface2, bd: t.border, text: t.text3 };
-    const useDoubleColumn = members.length > 3; // Grille à 2 colonnes activée pour les grands groupes
     
     return (
       <div style={{ 
@@ -323,14 +324,13 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         flexDirection: "column", 
         alignItems: "center",
         gap: "12px",
-        zIndex: 2,
-        alignSelf: "flex-start" // Empêche l'étirement vertical
+        zIndex: 2
       }}>
         {/* Titre Pilule flottante */}
         <div style={{ 
           display: "flex", alignItems: "center", gap: "6px",
           background: t.surface, border: `1px solid ${t.border}`, borderTop: `3px solid ${groupColor.text}`,
-          borderRadius: "20px", padding: "6px 16px",
+          borderRadius: "8px", padding: "6px 14px",
           boxShadow: t.shadowSm
         }}>
           <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: groupColor.text }} />
@@ -339,13 +339,8 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </span>
         </div>
         
-        {/* Grille de cartes intelligente */}
-        <div style={{ 
-          display: "grid", 
-          gridTemplateColumns: useDoubleColumn ? "repeat(2, 1fr)" : "1fr", 
-          gap: "10px", 
-          justifyContent: "center" 
-        }}>
+        {/* Grille de cartes */}
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px", maxWidth: "380px" }}>
           {members.map(m => <CompactCard key={m.id} m={m} />)}
         </div>
       </div>
@@ -367,7 +362,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               <button onClick={()=>setIsSettingsOpen(false)} style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"8px", cursor:"pointer", color:t.text }}>✕</button>
             </div>
             
+            {/* Grid 3 Colonnes */}
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"32px", overflowY:"auto", paddingBottom:"10px" }} className="scroll-container">
+              
+              {/* Colonne 1 : Pôles */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Pôles (Équipes)</div>
@@ -392,6 +390,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 </div>
               </div>
 
+              {/* Colonne 2 : Fonctions */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titres)</div>
@@ -413,6 +412,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 </div>
               </div>
 
+              {/* Colonne 3 : Étiquettes */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Étiquettes (Missions)</div>
@@ -444,6 +444,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         {/* LÉGENDES ET BOUTONS */}
         <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start" }}>
           
+          {/* Menu Filtre par Pôles Interactif */}
           <div style={{ display:"flex", alignItems:"center", gap:"10px", background:t.surface, padding:"10px 14px", borderRadius:"12px", border:`1px solid ${t.border}`, boxShadow:t.shadowSm, flexWrap:"wrap" }}>
             <span style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginRight:"4px" }}>Filtre :</span>
             {orgRoles.map(r => {
@@ -575,7 +576,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 1)}
                       style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"200px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
-                      {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser ici</div>}
+                      {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 1 – Direction)</div>}
                       {Object.entries(groupMembersByJob(level1)).map(([job, members]) => (
                          <JobGroupBox key={job} jobTitle={job} members={members} />
                       ))}
@@ -589,7 +590,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 2)}
                       style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"400px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
-                      {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser ici</div>}
+                      {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 2 – Responsables)</div>}
                       {Object.entries(groupMembersByJob(level2)).map(([job, members]) => (
                          <JobGroupBox key={job} jobTitle={job} members={members} />
                       ))}
@@ -603,7 +604,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 3)}
                       style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"600px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
-                      {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser ici</div>}
+                      {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 3 – Équipes)</div>}
                       {Object.entries(groupMembersByJob(level3)).map(([job, members]) => (
                          <JobGroupBox key={job} jobTitle={job} members={members} />
                       ))}
@@ -621,6 +622,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
+          {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             {panelMode === 'indicators' && selectedPerson ? (
                <div style={{ display:"flex", alignItems:"center", gap:"12px", width:"100%" }}>
@@ -734,6 +736,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 </div>
 
+                {/* Affichage des Étiquettes en mode VUE */}
                 {!editForm.isEditing && editForm.tags && editForm.tags.length > 0 && (
                    <div style={{ marginTop:"8px" }}>
                      <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Missions</div>
@@ -775,6 +778,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       </div>
                     </div>
 
+                    {/* SELECTION DES ETIQUETTES EN MODE EDITION */}
                     <div>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                         <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Étiquettes (Missions transverses)</div>
