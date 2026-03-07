@@ -4,16 +4,23 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   
   const [editForm, setEditForm] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false); // Modal d'édition des rôles
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false); 
 
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
+  const isSuperAdmin = userProfile?.role === "superadmin";
 
+  // ALGORITHME DE STATS RENFORCÉ ET EN TEMPS RÉEL
   const getUserStats = (person) => {
+    const personFullName = `${person.prenom} ${person.nom}`.trim().toLowerCase();
+    const personEmail = person.email ? person.email.toLowerCase() : null;
+
     const userCriteres = criteres.filter(c => 
-      c.responsables && c.responsables.some(resp => 
-        resp.toLowerCase().includes(person.nom.toLowerCase()) || 
-        (person.email && resp.toLowerCase().includes(person.email.toLowerCase()))
-      )
+      c.responsables && c.responsables.some(resp => {
+        const r = resp.toLowerCase().trim();
+        return r.includes(personFullName) || 
+               (personEmail && r.includes(personEmail)) || 
+               (person.nom && r.includes(person.nom.toLowerCase()));
+      })
     );
     
     const total = userCriteres.length;
@@ -34,10 +41,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     stats: getUserStats(m)
   }));
 
-  // Filtrage selon le mode Archives
   const displayMembers = safeMembers.filter(m => showArchived ? m.archived : !m.archived);
-
-  // Le membre actuellement visualisé ou édité (tiré de safeMembers pour avoir ses vraies stats à jour)
   const selectedPerson = editForm?.id ? safeMembers.find(m => m.id === editForm.id) : null;
 
   const handleArchiveUser = async () => {
@@ -85,7 +89,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   return (
     <div className="animate-fade-in" style={{ display:"flex", gap:"24px", height:"100%" }}>
       
-      {/* ── MODAL : CONFIGURATION DES PÔLES ET FONCTIONS ── */}
+      {/* ── MODAL : CONFIGURATION (SUPER ADMIN) ── */}
       {isSettingsOpen && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
           <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", width:"700px", boxShadow:t.shadowLg, display:"flex", flexDirection:"column", maxHeight:"80vh" }}>
@@ -98,7 +102,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             </div>
             
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"32px", overflowY:"auto", paddingBottom:"10px" }} className="scroll-container">
-              {/* Colonne Pôles */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Pôles (Équipes)</div>
@@ -117,7 +120,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 </div>
               </div>
 
-              {/* Colonne Fonctions */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titres)</div>
@@ -158,9 +160,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 )
               })}
-              {isAdminOrSuper && (
-                <button onClick={() => setIsSettingsOpen(true)} title="Gérer l'organisation" style={{ background:"transparent", border:"none", cursor:"pointer", marginLeft:"auto", color:t.text2 }}>⚙️</button>
-              )}
             </div>
 
             <div style={{ display:"flex", alignItems:"center", gap:"16px", background:t.surface, padding:"10px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, boxShadow:t.shadowSm, alignSelf:"flex-start" }}>
@@ -185,12 +184,18 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                   👤 Nouveau collaborateur
                 </button>
+                {/* BOUTON CONFIGURATION BIEN VISIBLE */}
+                {isSuperAdmin && (
+                  <button onClick={() => setIsSettingsOpen(true)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
+                    ⚙️ Configurer
+                  </button>
+                )}
               </>
             )}
           </div>
         </div>
 
-        {/* LA GRILLE DES CARTES (Avec padding pour éviter de couper la bordure au hover) */}
+        {/* LA GRILLE DES CARTES (Avec padding top réparé pour l'ombre) */}
         <div className="scroll-container" style={{ flex:1, overflowY:"auto", padding:"4px 8px 20px 4px" }}>
           
           {showArchived && <div style={{ fontSize:"14px", fontWeight:"800", color:t.text3, marginBottom:"16px", textTransform:"uppercase", letterSpacing:"1px" }}>📦 Membres Archivés</div>}
@@ -249,9 +254,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       </div>
 
-      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Vue / Création / Édition) ── */}
+      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Adapté au contenu) ── */}
       {editForm && (
-        <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden" }}>
+        <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
           {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
@@ -262,8 +267,8 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               <div style={{ flex:1 }}>
                 {editForm.isEditing ? (
                    <div style={{ display:"flex", gap:"8px", marginBottom:"4px" }}>
-                     <input type="text" value={editForm.prenom} onChange={e=>setEditForm({...editForm, prenom: e.target.value})} placeholder="Prénom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
-                     <input type="text" value={editForm.nom} onChange={e=>setEditForm({...editForm, nom: e.target.value})} placeholder="Nom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
+                     <input type="text" value={editForm.prenom.toUpperCase()} onChange={e=>setEditForm({...editForm, prenom: e.target.value})} placeholder="Prénom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
+                     <input type="text" value={editForm.nom.toUpperCase()} onChange={e=>setEditForm({...editForm, nom: e.target.value})} placeholder="Nom" style={{ width:"100%", border:`1px dashed ${t.border}`, background:"transparent", color:t.text, fontSize:"16px", fontWeight:"800", outline:"none" }} />
                    </div>
                 ) : (
                    <div style={{ fontSize:"20px", fontWeight:"800", color:t.text }}>{editForm.prenom} {editForm.nom}</div>
@@ -291,7 +296,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             </div>
           </div>
 
-          <div style={{ padding:"24px 20px", flex:1, overflowY:"auto", display:"flex", flexDirection:"column", gap:"24px" }}>
+          <div className="scroll-container" style={{ padding:"24px 20px", overflowY:"auto", display:"flex", flexDirection:"column", gap:"24px" }}>
             
             {/* CONTACT */}
             <div>
@@ -396,7 +401,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 </div>
 
-                <div style={{ display:"flex", gap:"12px", marginTop:"auto" }}>
+                <div style={{ display:"flex", gap:"12px", marginTop:"16px" }}>
                   <button 
                     onClick={() => selectedPerson.email ? (window.location.href = `mailto:${selectedPerson.email}`) : alert("Aucune adresse mail renseignée.")}
                     style={{ flex:1, background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"12px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", gap:"8px", transition:"all 0.2s", boxShadow:t.shadowSm }}
@@ -413,7 +418,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 </div>
 
                 {isAdminOrSuper && (
-                   <div style={{ marginTop:"10px", textAlign:"center" }}>
+                   <div style={{ marginTop:"16px", textAlign:"center", paddingBottom:"8px" }}>
                      {selectedPerson.archived ? (
                         <button onClick={handleRestoreUser} style={{ background:"transparent", border:"none", color:t.green, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
                           Restaurer ce collaborateur
