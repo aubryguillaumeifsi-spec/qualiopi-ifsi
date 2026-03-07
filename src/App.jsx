@@ -441,11 +441,11 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit avec date bien lisible dans tous les modes */}
+        {/* Prochain audit */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
-            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#ffffff" }}>
+            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#0c1118" }}>
                {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
@@ -464,7 +464,6 @@ function MainApp() {
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
           {menuBtn("dashboard", "Tableau de bord")}
           {menuBtn("criteres", "Indicateurs")}
-          {/* L'onglet Priorités a bien été retiré de la navigation puisque c'est sur le Dashboard ! */}
           {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme")}
           
           <div style={{ margin:"16px 12px", height:"1px", background:t.borderNav }}/>
@@ -504,11 +503,11 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {/* Note: "axes" est bien passé au DashboardTab pour afficher le plan d'action ! */}
-          {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} t={t} />}
+          {/* Note: handleAutoSave est bien passé ! */}
+          {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} handleAddOrgRole={handleAddOrgRole} handleAddManualUser={handleAddManualUser} handleUpdateUserRoles={handleUpdateUserRoles} t={t} />}
-          {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} t={t} />}
+          {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
           {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} t={t} />}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
