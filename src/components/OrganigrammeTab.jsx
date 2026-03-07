@@ -11,15 +11,32 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
 
   // ALGORITHME DE STATS RENFORCÉ ET EN TEMPS RÉEL
   const getUserStats = (person) => {
-    const personFullName = `${person.prenom} ${person.nom}`.trim().toLowerCase();
-    const personEmail = person.email ? person.email.toLowerCase() : null;
+    const p_prenom = (person.prenom || "").toLowerCase().trim();
+    const p_nom = (person.nom || "").toLowerCase().trim();
+    const p_email = (person.email || "").toLowerCase().trim();
 
     const userCriteres = criteres.filter(c => 
       c.responsables && c.responsables.some(resp => {
         const r = resp.toLowerCase().trim();
-        return r.includes(personFullName) || 
-               (personEmail && r.includes(personEmail)) || 
-               (person.nom && r.includes(person.nom.toLowerCase()));
+        if (!r) return false;
+
+        // Correspondance Email
+        if (p_email && r.includes(p_email)) return true;
+
+        // Correspondance Nom Complet
+        const fn1 = `${p_prenom} ${p_nom}`.trim();
+        const fn2 = `${p_nom} ${p_prenom}`.trim();
+        if (fn1 && fn1.length > 2 && r.includes(fn1)) return true;
+        if (fn2 && fn2.length > 2 && r.includes(fn2)) return true;
+
+        // Si le prénom et le nom sont distinctement dans la chaine
+        if (p_prenom && p_nom && r.includes(p_prenom) && r.includes(p_nom)) return true;
+
+        // Correspondance partielle (au cas où seul le nom ou le prénom est saisi)
+        if (p_nom && p_nom.length > 2 && r.includes(p_nom)) return true;
+        if (p_prenom && p_prenom.length > 2 && !p_nom && r.includes(p_prenom)) return true;
+
+        return false;
       })
     );
     
@@ -196,6 +213,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                   👤 Nouveau collaborateur
                 </button>
+                {/* BOUTON CONFIGURATION BIEN VISIBLE */}
                 {isSuperAdmin && (
                   <button onClick={() => setIsSettingsOpen(true)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                     ⚙️ Configurer
@@ -206,7 +224,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </div>
         </div>
 
-        {/* LA GRILLE DES CARTES */}
+        {/* LA GRILLE DES CARTES (Avec padding top réparé pour l'ombre) */}
         <div className="scroll-container" style={{ flex:1, overflowY:"auto", padding:"4px 8px 20px 4px" }}>
           
           {showArchived && <div style={{ fontSize:"14px", fontWeight:"800", color:t.text3, marginBottom:"16px", textTransform:"uppercase", letterSpacing:"1px" }}>📦 Membres Archivés</div>}
