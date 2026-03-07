@@ -1,6 +1,9 @@
 import React, { useState } from "react";
 import { CRITERES_LABELS, STATUT_CONFIG } from "../data";
 
+// ----------------------------------------------------------------------
+// 🎯 ONGLET : INDICATEURS
+// ----------------------------------------------------------------------
 export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilterStatut, filterCritere, setFilterCritere, filtered, days, setModalCritere, t }) {
   
   const [vue, setVue] = useState("table"); 
@@ -12,19 +15,14 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
     "non-concerne": filtered.filter(c => c.statut === "non-concerne").length
   };
 
-  // FONCTION INTELLIGENTE : Transforme "Indicateur 1" en "1.1"
-  const formatInd = (critere, num) => {
-    const match = String(num).match(/(\d+)$/);
-    const n = match ? match[1] : String(num).replace(/\D/g, '');
-    return `${critere}.${n}`;
-  };
+  const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
 
   return (
     <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", paddingBottom:"40px" }}>
       <style>{`
         .ro { transition:background 0.15s; cursor:pointer; }
         .ro:hover { background:${t.surface2}!important; }
-        .stat-card { transition:all 0.2s; cursor:pointer; border:1px solid ${t.border}; }
+        .stat-card { transition:all 0.2s; cursor:pointer; }
         .stat-card:hover { transform:translateY(-2px); box-shadow:${t.shadowMd}!important; }
         .fil:hover { border-color:${t.accent}!important; background:${t.accentBg}!important; color:${t.accent}!important; }
         .scroll-container::-webkit-scrollbar { height: 6px; width: 6px; }
@@ -32,7 +30,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         .scroll-container::-webkit-scrollbar-thumb { background: ${t.border2}; border-radius: 4px; }
       `}</style>
 
-      {/* ── 4 CARTES KPI ── */}
+      {/* ── 4 CARTES KPI (Avec bordures et ombres colorées) ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"12px" }}>
         {[
           { id:"conforme",     l:"Conformes",     v:statsCounts["conforme"],     c:t.green, bg:t.greenBg, bd:t.greenBd },
@@ -42,7 +40,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         ].map(s => {
           const isActive = filterStatut === s.id;
           return (
-            <div key={s.id} onClick={() => setFilterStatut(isActive ? "tous" : s.id)} className="stat-card" style={{ background: isActive ? s.bg : t.surface, borderColor: isActive ? s.bd : t.border, borderRadius:"10px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow: isActive ? t.shadowMd : `0 4px 12px ${s.bg}` }}>
+            <div key={s.id} onClick={() => setFilterStatut(isActive ? "tous" : s.id)} className="stat-card" style={{ background: isActive ? s.bg : t.surface, border: `1px solid ${isActive ? s.c : s.bd}`, borderRadius:"10px", padding:"14px 20px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow: isActive ? t.shadowMd : `0 4px 12px ${s.bg}` }}>
               <div>
                 <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"38px", color:t.text, lineHeight:1, letterSpacing:"-1px" }}>{s.v}</div>
                 <div style={{ fontSize:"12px", color:t.text2, fontWeight:"600", marginTop:"4px" }}>{s.l}</div>
@@ -89,7 +87,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"11px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── VUE TABLEAU (Anti-superposition et bulles) ── */}
+      {/* ── VUE TABLEAU ── */}
       {vue === "table" && (
         <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           
