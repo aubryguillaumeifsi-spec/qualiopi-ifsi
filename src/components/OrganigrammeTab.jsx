@@ -1,6 +1,7 @@
 import React, { useState } from "react";
+import { CRITERES_LABELS } from "../data";
 
-export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, t }) {
+export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, allIfsiMembers, criteres, userProfile, getRoleColor, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, setModalCritere, days, t }) {
   
   const [editForm, setEditForm] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -10,28 +11,37 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
   const isSuperAdmin = userProfile?.role === "superadmin";
 
-  const getUserStats = (person) => {
+  // 1️⃣ ALGORITHME DE RÉCUPÉRATION DES INDICATEURS (Sécurisé et tolérant)
+  const getUserCriteres = (person) => {
+    if (!person) return []; // SÉCURITÉ ANTI-CRASH ICI !
     const p_prenom = (person.prenom || "").toLowerCase().trim();
     const p_nom = (person.nom || "").toLowerCase().trim();
     const p_email = (person.email || "").toLowerCase().trim();
 
-    const userCriteres = criteres.filter(c => 
+    return criteres.filter(c => 
       c.responsables && c.responsables.some(resp => {
         const r = resp.toLowerCase().trim();
         if (!r) return false;
         if (p_email && r.includes(p_email)) return true;
+        
         const fn1 = `${p_prenom} ${p_nom}`.trim();
         const fn2 = `${p_nom} ${p_prenom}`.trim();
         if (fn1 && fn1.length > 2 && r.includes(fn1)) return true;
         if (fn2 && fn2.length > 2 && r.includes(fn2)) return true;
         if (p_prenom && p_nom && r.includes(p_prenom) && r.includes(p_nom)) return true;
+        
         const words = r.split(/[\s,;-]+/);
         if (p_nom && p_nom.length > 1 && words.includes(p_nom)) return true;
         if (p_prenom && p_prenom.length > 1 && words.includes(p_prenom)) return true;
         return false;
       })
     );
-    
+  };
+
+  // 2️⃣ ALGORITHME DE CALCUL DES STATS (Utilise la fonction au dessus)
+  const getUserStats = (person) => {
+    if (!person) return { total: 0, conf: 0, ec: 0, nc: 0, pct: 0 }; // SÉCURITÉ
+    const userCriteres = getUserCriteres(person);
     const total = userCriteres.length;
     const conf = userCriteres.filter(c => c.statut === "conforme").length;
     const ec = userCriteres.filter(c => c.statut === "en-cours").length;
@@ -60,8 +70,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   }));
 
   const displayMembers = safeMembers.filter(m => showArchived ? m.archived : !m.archived);
+  
+  // Personne sélectionnée et ses indicateurs
   const selectedPerson = editForm?.id ? safeMembers.find(m => m.id === editForm.id) : null;
-  const selectedPersonCriteres = getUserStats(selectedPerson); // Juste pour vérifier, la fonction complète est au dessus
+  const selectedPersonCriteres = selectedPerson ? getUserCriteres(selectedPerson) : [];
 
   // --- ACTIONS ---
   const handleArchiveUser = async () => {
@@ -123,6 +135,12 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   };
 
   const handleDragOver = (e) => e.preventDefault();
+
+  const formatInd = (critere, num) => {
+    const match = String(num).match(/(\d+)$/);
+    const n = match ? match[1] : String(num).replace(/\D/g, '');
+    return `${critere}.${n}`;
+  };
 
   // --- SEPARATION PAR NIVEAU ---
   const level1 = displayMembers.filter(m => m.orgLevel === 1);
@@ -287,7 +305,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </div>
         </div>
 
-        {/* L'ARBORESCENCE (Scrollable verticalement et horizontalement) */}
+        {/* L'ARBORESCENCE */}
         <div className="scroll-container" style={{ flex:1, overflow:"auto", padding:"20px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", alignItems:"center", boxShadow:t.shadowSm, minHeight:"600px" }}>
           
           {showArchived ? (
@@ -297,62 +315,49 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           ) : (
             <div style={{ display:"flex", flexDirection:"column", alignItems:"center", width:"100%", paddingBottom:"40px", minWidth:"max-content" }}>
               
-              {/* === NIVEAU 1 : DIRECTION === */}
+              {/* === NIVEAU 1 === */}
               <div 
                 onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 1)}
                 style={{ display:"flex", justifyContent:"center", gap:"30px", position:"relative", paddingBottom:"40px", minWidth:"200px", minHeight:"150px", border: isAdminOrSuper ? `2px dashed transparent` : "none", transition:"all 0.2s" }}
                 onDragEnter={e=>e.currentTarget.style.borderColor=t.border} onDragLeave={e=>e.currentTarget.style.borderColor="transparent"}
               >
                 {level1.length === 0 && isAdminOrSuper && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 1</div>}
-                
-                {/* Ligne Horizontale Connecteur N1 */}
                 {level1.length > 1 && <div style={{ position:"absolute", top:"75px", left:"75px", right:"75px", height:"2px", background:t.border, zIndex:1 }}/>}
-
                 {level1.map(m => (
                   <div key={m.id} style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center" }}>
-                    {/* Trait descendant N1 -> N2 */}
                     {level2.length > 0 && <div style={{ position:"absolute", top:"150px", width:"2px", height:"40px", background:t.border, zIndex:1 }}/>}
                     <SquareCard m={m} />
                   </div>
                 ))}
               </div>
 
-              {/* === NIVEAU 2 : RESPONSABLES === */}
+              {/* === NIVEAU 2 === */}
               <div 
                 onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 2)}
                 style={{ display:"flex", justifyContent:"center", gap:"40px", position:"relative", paddingBottom:"40px", minWidth:"400px", minHeight:"150px", border: isAdminOrSuper ? `2px dashed transparent` : "none", transition:"all 0.2s" }}
                 onDragEnter={e=>e.currentTarget.style.borderColor=t.border} onDragLeave={e=>e.currentTarget.style.borderColor="transparent"}
               >
                 {level2.length === 0 && isAdminOrSuper && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 2</div>}
-
-                {/* Ligne Horizontale Supérieure N2 (reliée à N1) */}
                 {level2.length > 1 && level1.length > 0 && <div style={{ position:"absolute", top:"-40px", left:"75px", right:"75px", height:"2px", background:t.border, zIndex:1 }}/>}
-
                 {level2.map(m => (
                   <div key={m.id} style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center" }}>
-                    {/* Trait ascendant N2 -> N1 */}
                     {level1.length > 0 && <div style={{ position:"absolute", top:"-40px", width:"2px", height:"40px", background:t.border, zIndex:1 }}/>}
-                    {/* Trait descendant N2 -> N3 */}
                     {level3.length > 0 && <div style={{ position:"absolute", top:"150px", width:"2px", height:"40px", background:t.border, zIndex:1 }}/>}
                     <SquareCard m={m} />
                   </div>
                 ))}
               </div>
 
-              {/* === NIVEAU 3 : ÉQUIPES === */}
+              {/* === NIVEAU 3 === */}
               <div 
                 onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 3)}
                 style={{ display:"flex", justifyContent:"center", gap:"20px", position:"relative", minWidth:"600px", minHeight:"150px", border: isAdminOrSuper ? `2px dashed transparent` : "none", transition:"all 0.2s", padding:"0 40px" }}
                 onDragEnter={e=>e.currentTarget.style.borderColor=t.border} onDragLeave={e=>e.currentTarget.style.borderColor="transparent"}
               >
                 {level3.length === 0 && isAdminOrSuper && <div style={{ position:"absolute", inset:0, display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5 }}>Glisser Niveau 3</div>}
-
-                {/* Ligne Horizontale Supérieure N3 (reliée à N2) */}
                 {level3.length > 1 && level2.length > 0 && <div style={{ position:"absolute", top:"-40px", left:"115px", right:"115px", height:"2px", background:t.border, zIndex:1 }}/>}
-
                 {level3.map(m => (
                   <div key={m.id} style={{ position:"relative", display:"flex", flexDirection:"column", alignItems:"center" }}>
-                    {/* Trait ascendant N3 -> N2 */}
                     {level2.length > 0 && <div style={{ position:"absolute", top:"-40px", width:"2px", height:"40px", background:t.border, zIndex:1 }}/>}
                     <SquareCard m={m} />
                   </div>
@@ -364,14 +369,13 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       </div>
 
-      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Adapté) ── */}
+      {/* ── ZONE DROITE : PANNEAU LATÉRAL ── */}
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
-          {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             
-            {panelMode === 'indicators' ? (
+            {panelMode === 'indicators' && selectedPerson ? (
                <div style={{ display:"flex", alignItems:"center", gap:"12px", width:"100%" }}>
                  <button onClick={() => setPanelMode('profile')} style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"8px", width:"36px", height:"36px", display:"flex", alignItems:"center", justifyContent:"center", cursor:"pointer", color:t.text, flexShrink:0, boxShadow:t.shadowSm }}>
                    ⬅️
@@ -422,44 +426,12 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           <div className="scroll-container" style={{ padding:"24px 20px", overflowY:"auto", display:"flex", flexDirection:"column", gap:"24px" }}>
             
             {/* 🔴 VUE : LISTE DES INDICATEURS */}
-            {panelMode === 'indicators' && (
+            {panelMode === 'indicators' && selectedPerson && (
                <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
-                  {criteres.filter(c => 
-                      c.responsables && c.responsables.some(resp => {
-                        const r = resp.toLowerCase().trim();
-                        const p_email = (selectedPerson.email || "").toLowerCase().trim();
-                        const fn1 = `${selectedPerson.prenom} ${selectedPerson.nom}`.toLowerCase().trim();
-                        const fn2 = `${selectedPerson.nom} ${selectedPerson.prenom}`.toLowerCase().trim();
-                        if (!r) return false;
-                        if (p_email && r.includes(p_email)) return true;
-                        if (fn1 && fn1.length > 2 && r.includes(fn1)) return true;
-                        if (fn2 && fn2.length > 2 && r.includes(fn2)) return true;
-                        if (selectedPerson.prenom && selectedPerson.nom && r.includes(selectedPerson.prenom.toLowerCase()) && r.includes(selectedPerson.nom.toLowerCase())) return true;
-                        const words = r.split(/[\s,;-]+/);
-                        if (selectedPerson.nom && selectedPerson.nom.length > 1 && words.includes(selectedPerson.nom.toLowerCase())) return true;
-                        if (selectedPerson.prenom && selectedPerson.prenom.length > 1 && words.includes(selectedPerson.prenom.toLowerCase())) return true;
-                        return false;
-                      })
-                    ).length === 0 ? (
+                  {selectedPersonCriteres.length === 0 ? (
                     <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontStyle:"italic", fontSize:"13px" }}>Aucun indicateur assigné.</div>
                   ) : (
-                    criteres.filter(c => 
-                      c.responsables && c.responsables.some(resp => {
-                        const r = resp.toLowerCase().trim();
-                        const p_email = (selectedPerson.email || "").toLowerCase().trim();
-                        const fn1 = `${selectedPerson.prenom} ${selectedPerson.nom}`.toLowerCase().trim();
-                        const fn2 = `${selectedPerson.nom} ${selectedPerson.prenom}`.toLowerCase().trim();
-                        if (!r) return false;
-                        if (p_email && r.includes(p_email)) return true;
-                        if (fn1 && fn1.length > 2 && r.includes(fn1)) return true;
-                        if (fn2 && fn2.length > 2 && r.includes(fn2)) return true;
-                        if (selectedPerson.prenom && selectedPerson.nom && r.includes(selectedPerson.prenom.toLowerCase()) && r.includes(selectedPerson.nom.toLowerCase())) return true;
-                        const words = r.split(/[\s,;-]+/);
-                        if (selectedPerson.nom && selectedPerson.nom.length > 1 && words.includes(selectedPerson.nom.toLowerCase())) return true;
-                        if (selectedPerson.prenom && selectedPerson.prenom.length > 1 && words.includes(selectedPerson.prenom.toLowerCase())) return true;
-                        return false;
-                      })
-                    ).map(c => {
+                    selectedPersonCriteres.map(c => {
                        const isConforme = c.statut === "conforme";
                        const isNC = c.statut === "non-conforme";
                        const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : c.statut === "en-cours" ? "En cours" : "Non évalué";
@@ -489,7 +461,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             {/* 🔵 VUE : PROFIL COMPLET OU EDITION */}
             {panelMode === 'profile' && (
               <>
-                {/* CONTACT */}
                 <div>
                   <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Contact</div>
                   <div style={{ display:"flex", flexDirection:"column", gap:"12px" }}>
@@ -518,7 +489,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 </div>
 
-                {/* FORMULAIRE PÔLES & FONCTIONS (En mode Édition) */}
                 {editForm.isEditing && (
                   <>
                     <hr style={{ border:0, borderTop:`1px solid ${t.border}` }}/>
@@ -556,7 +526,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </>
                 )}
 
-                {/* INDICATEURS & BOUTONS (En mode Vue) */}
                 {!editForm.isEditing && selectedPerson && (
                   <>
                     <hr style={{ border:0, borderTop:`1px solid ${t.border}` }}/>
