@@ -102,24 +102,33 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
             </div>
             
             <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"32px", overflowY:"auto", paddingBottom:"10px" }} className="scroll-container">
+              
+              {/* Colonne Pôles */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Pôles (Équipes)</div>
                   <button onClick={() => { const v = prompt("Nouveau Pôle ?"); if(v) handleManageStructure('role', 'add', null, v); }} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
-                  {orgRoles.map(r => (
-                    <div key={r} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px" }}>
-                      <span style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>{r}</span>
-                      <div style={{ display:"flex", gap:"8px" }}>
-                        <button onClick={() => { const v = prompt("Renommer le pôle (Met à jour tous les membres) :", r); if(v && v!==r) handleManageStructure('role', 'edit', r, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
-                        <button onClick={() => { if(window.confirm(`Supprimer le pôle "${r}" pour tout le monde ?`)) handleManageStructure('role', 'delete', r); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
+                  {orgRoles.map(r => {
+                    const rc = getRoleColor(r);
+                    return (
+                      <div key={r} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:rc.bg, border:`1px solid ${rc.bd}`, padding:"8px 12px", borderRadius:"8px" }}>
+                        <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                          <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:rc.text }}/>
+                          <span style={{ fontSize:"13px", color:rc.text, fontWeight:"700" }}>{r}</span>
+                        </div>
+                        <div style={{ display:"flex", gap:"8px" }}>
+                          <button onClick={() => { const v = prompt("Renommer le pôle (Met à jour tous les membres) :", r); if(v && v!==r) handleManageStructure('role', 'edit', r, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
+                          <button onClick={() => { if(window.confirm(`Supprimer le pôle "${r}" pour tout le monde ?`)) handleManageStructure('role', 'delete', r); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </div>
 
+              {/* Colonne Fonctions */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titres)</div>
@@ -128,7 +137,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
                   {orgJobTitles.map(j => (
                     <div key={j} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px" }}>
-                      <span style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>{j}</span>
+                      <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+                        <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:t.text3 }}/>
+                        <span style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>{j}</span>
+                      </div>
                       <div style={{ display:"flex", gap:"8px" }}>
                         <button onClick={() => { const v = prompt("Renommer la fonction (Met à jour tous les membres) :", j); if(v && v!==j) handleManageStructure('jobTitle', 'edit', j, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
                         <button onClick={() => { if(window.confirm(`Supprimer la fonction "${j}" pour tout le monde ?`)) handleManageStructure('jobTitle', 'delete', j); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
@@ -184,7 +196,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 <button onClick={openCreatePanel} style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                   👤 Nouveau collaborateur
                 </button>
-                {/* BOUTON CONFIGURATION BIEN VISIBLE */}
                 {isSuperAdmin && (
                   <button onClick={() => setIsSettingsOpen(true)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 16px", borderRadius:"12px", fontSize:"13px", fontWeight:"700", cursor:"pointer", boxShadow:t.shadowSm, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
                     ⚙️ Configurer
