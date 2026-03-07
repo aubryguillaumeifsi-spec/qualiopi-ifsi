@@ -23,7 +23,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
 
   const hist = useMemo(() => [...safeCriteres].flatMap(c => Array.isArray(c.historique) ? c.historique.map(h => ({ ...h, num: c.num, critere: c.critere })) : []).sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5), [safeCriteres]);
 
-  // Utilitaire pour formater en "1.1", "2.4", etc.
   const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
 
   return (
@@ -44,7 +43,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
           <div>
             <div style={{ fontSize:"11px", fontWeight:"700", color:t.gold, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Campagne d'audit active</div>
             <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
-              {/* Menu déroulant refait façon "SaaS Pro" */}
               <div style={{ position: "relative", display: "inline-block" }}>
                 <select value={activeCampaignId || ""} onChange={(e) => setActiveCampaignId(e.target.value)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 36px 10px 16px", borderRadius:"8px", fontSize:"18px", fontWeight:"800", outline:"none", cursor:"pointer", appearance:"none", boxShadow:t.shadowSm, fontFamily:"'Instrument Serif',serif" }}>
                   {campaigns?.map(c => <option key={c.id} value={c.id} style={{fontFamily:"'Albert Sans', sans-serif", fontSize:"14px", fontWeight:"500", color:"#000"}}>{c.name}</option>)}
@@ -115,7 +113,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px", flex:1 }}>
           
-          {/* 📊 Table Aperçu */}
+          {/* 📊 Table Aperçu (AVEC BULLES) */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
@@ -123,8 +121,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
             
             <div className="scroll-container" style={{ overflowX: "auto", overflowY: "auto", flex: 1 }}>
               <div style={{ minWidth: "550px" }}>
-                {/* Plus de place pour le libellé vu que le numéro est très court */}
-                <div style={{ display:"grid", gridTemplateColumns:"50px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+                <div style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                   {["N°","Libellé","Statut","Responsable","Date"].map(h => (
                     <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                   ))}
@@ -138,11 +135,13 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
                     
                     return (
-                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"50px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 100px 110px 50px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                         
-                        {/* Numéro compact type "1.1" */}
-                        <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:cConf.color, whiteSpace:"nowrap" }}>
-                          {formatInd(r.critere, r.num)}
+                        {/* Numéro dans une belle Bulle colorée ! */}
+                        <div>
+                          <span style={{ display:"inline-block", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 10px", borderRadius: "8px", fontSize: "12px", fontWeight: "800", whiteSpace: "nowrap" }}>
+                            {formatInd(r.critere, r.num)}
+                          </span>
                         </div>
                         
                         <div style={{ minWidth: 0 }}>
@@ -169,7 +168,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
           {/* ⚡ Panel de droite */}
           <div style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
             
-            {/* Échéances proches avec bulle réparée */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
               <div style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>🚨 Échéances proches</div>
               {safeUrgents.length === 0 ? (
@@ -183,9 +181,8 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     return (
                       <div key={i} className="ug" style={{ background: t.surface2, border:`1px solid ${t.border2}`, borderRadius:"8px", padding:"10px 12px", display:"flex", justifyContent:"space-between", alignItems:"center", boxShadow:t.shadowSm }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px", flex:1, overflow:"hidden" }}>
-                          {/* Numéro dans la bulle colorée */}
                           <span style={{ background: cConf.bg, color: cConf.color, border: `1px solid ${cConf.bd}`, padding: "2px 6px", borderRadius: "6px", fontSize:"11px", fontWeight: "800", flexShrink: 0 }}>
-                            {formatInd(u.critere, u.num)}
+                            {formatInd(u.critere, u.num)} 
                           </span>
                           <span style={{ fontSize:"12px", fontWeight:"500", color:t.text, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
                             {u.titre}
