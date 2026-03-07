@@ -22,7 +22,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
       <style>{`
         .ro { transition:background 0.15s; cursor:pointer; }
         .ro:hover { background:${t.surface2}!important; }
-        .stat-card { transition:all 0.2s; cursor:pointer; }
+        .stat-card { transition:all 0.2s; cursor:pointer; border:1px solid ${t.border}; }
         .stat-card:hover { transform:translateY(-2px); box-shadow:${t.shadowMd}!important; }
         .fil:hover { border-color:${t.accent}!important; background:${t.accentBg}!important; color:${t.accent}!important; }
         .scroll-container::-webkit-scrollbar { height: 6px; width: 6px; }
@@ -30,7 +30,7 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         .scroll-container::-webkit-scrollbar-thumb { background: ${t.border2}; border-radius: 4px; }
       `}</style>
 
-      {/* ── 4 CARTES KPI (Bordures colorées) ── */}
+      {/* ── 4 CARTES KPI ── */}
       <div style={{ display:"grid", gridTemplateColumns:"repeat(4, 1fr)", gap:"12px" }}>
         {[
           { id:"conforme",     l:"Conformes",     v:statsCounts["conforme"],     c:t.green, bg:t.greenBg, bd:t.greenBd },
@@ -87,14 +87,14 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
         <div style={{ fontSize:"11px", color:t.text3, whiteSpace:"nowrap" }}><strong>{filtered.length}</strong> résultats</div>
       </div>
 
-      {/* ── VUE TABLEAU (Avec colonne Preuves) ── */}
+      {/* ── VUE TABLEAU ── */}
       {vue === "table" && (
         <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", overflow:"hidden", boxShadow:t.shadowSm, flex:1, display:"flex", flexDirection:"column" }}>
           
           <div className="scroll-container" style={{ overflowX: "auto" }}>
-            <div style={{ minWidth: "800px" }}>
-              {/* Ajout de la colonne "Preuves" dans la grille */}
-              <div style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 110px 110px 80px 105px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+            <div style={{ minWidth: "750px" }}>
+              {/* Le GAP: 12px est ajouté ici pour s'aligner exactement sur les lignes du tableau ! */}
+              <div style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 110px 110px 80px 105px", gap:"12px", padding:"8px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
                 {["N°", "Libellé", "Statut", "Responsable", "Preuves", "Échéance"].map(h => (
                   <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                 ))}
@@ -112,13 +112,12 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                      const themeStatut = { "conforme": { c:t.green, bg:t.greenBg, bd:t.greenBd }, "non-conforme": { c:t.red, bg:t.redBg, bd:t.redBd }, "en-cours": { c:t.amber, bg:t.amberBg, bd:t.amberBd }, "non-concerne": { c:t.text3, bg:t.surface3, bd:t.border } }[c.statut] || { c:t.text2, bg:t.surface2, bd:t.border };
                      const d = days(c.delai);
 
-                     // NOUVEAU : Calcul des preuves totales et validées
                      const totalPreuves = (c.fichiers?.length||0) + (c.chemins_reseau?.length||0) + (c.preuves ? 1 : 0);
                      const validPreuves = (c.fichiers?.filter(f=>f.validated)?.length||0) + (c.chemins_reseau?.filter(cr=>cr.validated)?.length||0) + (c.preuves ? 1 : 0);
                      const preuvesColor = totalPreuves === 0 ? t.text3 : (validPreuves === totalPreuves ? t.green : t.amber);
 
                      return (
-                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 110px 110px 80px 105px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                       <div key={c.id} className="ro" onClick={() => setModalCritere(c)} style={{ display:"grid", gridTemplateColumns:"80px minmax(200px, 1fr) 110px 110px 80px 105px", alignItems:"center", gap:"12px", padding:"10px 24px", borderBottom:`1px solid ${t.border2}`, cursor:"pointer" }}>
                           
                           <div>
                             <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
@@ -142,10 +141,9 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
                             {c.responsables?.[0] || "—"}
                           </span>
 
-                          {/* NOUVELLE COLONNE : PREUVES */}
+                          {/* COLONNE PREUVES - EMOJI RETIRÉ */}
                           <div style={{ display:"flex", alignItems:"center", gap:"6px", color:preuvesColor }}>
-                            <span style={{ fontSize:"14px" }}>📁</span>
-                            <span style={{ fontSize:"11px", fontWeight:"800", fontFamily:"'DM Mono',monospace" }}>
+                            <span style={{ fontSize:"12px", fontWeight:"800", fontFamily:"'DM Mono',monospace" }}>
                               {totalPreuves > 0 ? `${validPreuves}/${totalPreuves}` : "0"}
                             </span>
                           </div>
@@ -237,6 +235,9 @@ export function CriteresTab({ searchTerm, setSearchTerm, filterStatut, setFilter
   );
 }
 
+// ----------------------------------------------------------------------
+// 🔥 ONGLET : PRIORITÉS 
+// ----------------------------------------------------------------------
 export function LivreBlancTab({ currentIfsiName, criteres, t }) {
   return (
     <div className="animate-fade-in" style={{ maxWidth:"1000px", margin:"0 auto", paddingBottom:"40px" }}>
