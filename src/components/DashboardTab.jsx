@@ -1,7 +1,7 @@
 import React, { useMemo } from "react";
 import { CRITERES_LABELS } from "../data";
 
-export default function DashboardTab({ campaigns, activeCampaignId, setActiveCampaignId, currentAuditDate, stats, urgents, criteres, axes, setModalCritere, userProfile, handleEditAuditDate, handleCreateCampaign, t }) {
+export default function DashboardTab({ campaigns, activeCampaignId, setActiveCampaignId, currentAuditDate, stats, urgents, criteres, axes, setModalCritere, userProfile, handleEditAuditDate, handleCreateCampaign, handleAutoSave, handleArchiveCampaign, handleDeleteCampaign, t }) {
   
   const safeCriteres = Array.isArray(criteres) ? criteres : [];
   const safeUrgents = Array.isArray(urgents) ? urgents : [];
@@ -43,6 +43,12 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
     return maxDate.toLocaleDateString("fr-FR").substring(0,5);
   };
 
+  // Sécurité et affichage des boutons d'archive
+  const currentCamp = campaigns?.find(c => c.id === activeCampaignId);
+  const isArchived = currentCamp?.archived || false;
+  const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
+  const isSuperAdmin = userProfile?.role === "superadmin";
+
   return (
      <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px", paddingBottom:"40px" }}>
         <style>{`
@@ -63,17 +69,37 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
             <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
               <div style={{ position: "relative", display: "inline-block" }}>
                 <select value={activeCampaignId || ""} onChange={(e) => setActiveCampaignId(e.target.value)} style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"10px 36px 10px 16px", borderRadius:"8px", fontSize:"18px", fontWeight:"800", outline:"none", cursor:"pointer", appearance:"none", boxShadow:t.shadowSm, fontFamily:"'Instrument Serif',serif" }}>
-                  {campaigns?.map(c => <option key={c.id} value={c.id} style={{fontFamily:"'Albert Sans', sans-serif", fontSize:"14px", fontWeight:"500", color:"#000"}}>{c.name}</option>)}
+                  {campaigns?.map(c => <option key={c.id} value={c.id} style={{fontFamily:"'Albert Sans', sans-serif", fontSize:"14px", fontWeight:"500", color:"#000"}}>{c.name} {c.archived ? "📦 (Archivé)" : ""}</option>)}
                 </select>
                 <div style={{ position: "absolute", right: "12px", top: "50%", transform: "translateY(-50%)", pointerEvents: "none", fontSize: "12px", color: t.text3 }}>▼</div>
               </div>
+
+              {/* NOUVEAU : BADGE ET BOUTONS D'ARCHIVAGE */}
+              {isArchived && (
+                 <span style={{ background:t.surface3, color:t.text3, border:`1px solid ${t.border}`, padding:"4px 10px", borderRadius:"6px", fontSize:"10px", fontWeight:"800", textTransform:"uppercase" }}>Archivé (Lecture Seule)</span>
+              )}
+
+              {isAdminOrSuper && (
+                 <div style={{ display:"flex", gap:"8px", marginLeft:"8px" }}>
+                    {!isArchived ? (
+                       <button onClick={() => handleArchiveCampaign(activeCampaignId, true)} title="Archiver cet audit" style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text2, padding:"8px", borderRadius:"8px", cursor:"pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.color=t.amber} onMouseOut={e=>e.currentTarget.style.color=t.text2}>📦</button>
+                    ) : (
+                       <>
+                         <button onClick={() => handleArchiveCampaign(activeCampaignId, false)} title="Désarchiver cet audit" style={{ background:t.surface2, border:`1px solid ${t.border}`, color:t.text2, padding:"8px", borderRadius:"8px", cursor:"pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.color=t.green} onMouseOut={e=>e.currentTarget.style.color=t.text2}>🔄</button>
+                         {isSuperAdmin && (
+                           <button onClick={() => handleDeleteCampaign(activeCampaignId)} title="Supprimer définitivement" style={{ background:t.redBg, border:`1px solid ${t.redBd}`, color:t.red, padding:"8px", borderRadius:"8px", cursor:"pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=t.red} onMouseOut={e=>e.currentTarget.style.background=t.redBg}>🗑️</button>
+                         )}
+                       </>
+                    )}
+                 </div>
+              )}
             </div>
           </div>
           
           <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
             <div style={{ display:"flex", alignItems:"center", gap:"8px", background:t.surface, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px", boxShadow:t.shadowSm }}>
               <span style={{ fontSize:"12px", color:t.text2, fontWeight:"600" }}>Date d'évaluation :</span>
-              {userProfile?.role !== "lecteur" ? (
+              {userProfile?.role !== "lecteur" && !isArchived ? (
                 <input type="date" value={currentAuditDate} onChange={(e) => handleEditAuditDate(e.target.value)} style={{ background:t.surface2, border:`1px solid ${t.border2}`, borderRadius:"6px", padding:"4px 8px", fontSize:"12px", color:t.text, cursor:"pointer", colorScheme: "dark" }} />
               ) : (
                 <span style={{ fontSize:"13px", color:t.text, fontWeight:"700" }}>{new Date(currentAuditDate).toLocaleDateString("fr-FR")}</span>
@@ -179,8 +205,8 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
             
             <div className="scroll-container" style={{ overflowX: "auto" }}>
               <div style={{ minWidth: "750px" }}>
-                <div style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-                  {["N°","Libellé","Statut","Responsable","Dernier ajout","Date"].map(h => (
+                <div style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 105px", gap:"10px", padding:"8px 20px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
+                  {["N°","Libellé","Statut","Responsable","Dernier ajout","Échéance"].map(h => (
                     <span key={h} style={{ fontSize:"9px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
                   ))}
                 </div>
@@ -191,9 +217,10 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                     const isConforme = r.statut === "conforme";
                     const isNC = r.statut === "non-conforme";
                     const labelStatut = isConforme ? "Conforme" : isNC ? "Non conforme" : r.statut === "en-cours" ? "En cours" : "Non évalué";
-                    
+                    const d = days(r.delai);
+
                     return (
-                      <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
+                      <div key={i} className="ro" onClick={() => setModalCritere(r)} style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 105px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}`, cursor:"pointer" }}>
                         
                         <div>
                           <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
@@ -214,7 +241,19 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                         </div>
                         <span style={{ fontSize:"11px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>{r.responsables?.[0] || "—"}</span>
                         <span style={{ fontSize:"11px", color:t.text2, fontFamily:"'DM Mono',monospace" }}>{getLastAddDate(r)}</span>
-                        <span style={{ fontSize:"11px", color:t.text3, textAlign:"right", fontWeight:"normal", fontFamily:"'DM Mono',monospace" }}>{r.delai ? new Date(r.delai).toLocaleDateString("fr-FR").substring(0,5) : "—"}</span>
+                        
+                        {/* Édition de date à la volée */}
+                        <input 
+                          type="date" 
+                          title="Modifier l'échéance"
+                          value={r.delai || ""} 
+                          onClick={(e) => e.stopPropagation()} 
+                          onChange={(e) => { e.stopPropagation(); handleAutoSave({...r, delai: e.target.value}); }} 
+                          disabled={isArchived}
+                          style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"6px", padding:"4px 8px", fontSize:"10px", color: d < 0 && r.statut !== "conforme" && r.statut !== "non-concerne" ? t.red : t.text2, fontFamily:"'DM Mono',monospace", cursor:isArchived?"not-allowed":"pointer", outline:"none", width:"100%", transition:"all 0.2s" }}
+                          onMouseOver={e=>e.currentTarget.style.borderColor=isArchived?t.border:t.accent}
+                          onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
+                        />
                       </div>
                     );
                   })}
@@ -285,7 +324,6 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               )}
             </div>
 
-            {/* WIDGET PREUVES - EMOJI REMPLACÉ PAR UN SVG DESIGN */}
             <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", padding:"16px", boxShadow:t.shadow }}>
                <div style={{ display:"flex", alignItems:"center", gap:"14px" }}>
                  <div style={{ width:"44px", height:"44px", borderRadius:"12px", background:t.greenBg, border:`1px solid ${t.greenBd}`, color:t.green, display:"flex", alignItems:"center", justifyContent:"center" }}>
