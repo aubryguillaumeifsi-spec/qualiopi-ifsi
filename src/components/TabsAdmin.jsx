@@ -5,11 +5,14 @@ import React from "react";
 // ----------------------------------------------------------------------
 export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser, selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm, sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t }) {
   
+  // Sécurité anti-crash et filtrage du Super Admin pour la confidentialité
   const safeUsers = Array.isArray(sortedTeamUsers) ? sortedTeamUsers : [];
+  const displayUsers = safeUsers.filter(u => u.role !== "superadmin");
 
   return (
     <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"20px", maxWidth:"1000px", margin:"0 auto" }}>
       
+      {/* HEADER ADMINISTRATION */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"24px 32px", boxShadow:t.shadowSm, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
         <div style={{ display:"flex", alignItems:"center", gap:"16px" }}>
           <div style={{ width:"48px", height:"48px", borderRadius:"12px", background:t.accentBg, border:`1px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"22px" }}>👥</div>
@@ -20,34 +23,34 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
         </div>
       </div>
 
+      {/* TABLEAU DES MEMBRES */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", overflow:"hidden", boxShadow:t.shadowSm }}>
         <div style={{ padding:"16px 24px", borderBottom:`1px solid ${t.border}`, display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2 }}>
           <span style={{ fontSize:"14px", fontWeight:"800", color:t.text }}>Membres du réseau</span>
           <input 
             type="text" placeholder="Rechercher un email..." 
             value={teamSearchTerm} onChange={(e) => setTeamSearchTerm(e.target.value)}
-            style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"8px 14px", borderRadius:"8px", fontSize:"13px", outline:"none", width:"220px" }}
+            style={{ background:t.surface, border:`1px solid ${t.border}`, color:t.text, padding:"8px 14px", borderRadius:"8px", fontSize:"13px", outline:"none", width:"220px", transition:"all 0.2s" }}
           />
         </div>
 
         <div style={{ display:"grid", gridTemplateColumns:"minmax(200px, 1fr) 120px 200px 100px", padding:"12px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
-          {["Utilisateur", "Rôle", "Établissement rattaché", "Actions"].map(h => (
+          {["Utilisateur", "Rôle", "Établissement", "Actions"].map(h => (
             <span key={h} style={{ fontSize:"10px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"0.8px" }}>{h}</span>
           ))}
         </div>
 
         <div style={{ overflowY:"auto", maxHeight:"400px" }}>
-          {safeUsers.length === 0 ? (
+          {displayUsers.length === 0 ? (
             <div style={{ padding:"40px", textAlign:"center", color:t.text3, fontSize:"13px", fontStyle:"italic" }}>Aucun utilisateur trouvé.</div>
           ) : (
-            safeUsers.map(u => {
+            displayUsers.map(u => {
               const ifsiName = ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId;
-              const isSuper = u.role === "superadmin";
-              const roleColor = isSuper ? t.gold : u.role === "admin" ? t.accent : t.green;
-              const roleBg = isSuper ? t.goldBg : u.role === "admin" ? t.accentBg : t.greenBg;
+              const roleColor = u.role === "admin" ? t.accent : t.green;
+              const roleBg = u.role === "admin" ? t.accentBg : t.greenBg;
 
               return (
-                <div key={u.id} style={{ display:"grid", gridTemplateColumns:"minmax(200px, 1fr) 120px 200px 100px", alignItems:"center", gap:"10px", padding:"16px 24px", borderBottom:`1px solid ${t.border2}` }}>
+                <div key={u.id} className="ro" style={{ display:"grid", gridTemplateColumns:"minmax(200px, 1fr) 120px 200px 100px", alignItems:"center", gap:"10px", padding:"16px 24px", borderBottom:`1px solid ${t.border2}`, transition:"background 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=t.surface2} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
                   <div style={{ display:"flex", alignItems:"center", gap:"12px" }}>
                     <div style={{ width:"36px", height:"36px", borderRadius:"8px", background:t.surface3, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"13px", fontWeight:"800", color:t.text }}>
                       {u.email ? u.email.charAt(0).toUpperCase() : "?"}
@@ -62,13 +65,13 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
                   </div>
 
                   <span style={{ fontSize:"12px", color:t.text2, whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis" }}>
-                    {isSuper ? "Tous (Réseau global)" : ifsiName}
+                    {ifsiName}
                   </span>
 
                   <div style={{ display:"flex", gap:"8px" }}>
-                    <button onClick={() => handleSendResetEmail(u.email)} title="Réinitialiser le mot de passe" style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"8px", borderRadius:"6px", cursor:"pointer", color:t.text2 }}>🔑</button>
-                    {userProfile?.role === "superadmin" && !isSuper && (
-                      <button onClick={() => handleDeleteUser(u.id)} title="Supprimer l'accès" style={{ background:t.redBg, border:`1px solid ${t.redBd}`, padding:"8px", borderRadius:"6px", cursor:"pointer", color:t.red }}>🗑️</button>
+                    <button onClick={() => handleSendResetEmail(u.email)} title="Réinitialiser le mot de passe" style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"8px", borderRadius:"6px", cursor:"pointer", color:t.text2, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>🔑</button>
+                    {userProfile?.role === "superadmin" && (
+                      <button onClick={() => handleDeleteUser(u.id)} title="Supprimer l'accès" style={{ background:t.redBg, border:`1px solid ${t.redBd}`, padding:"8px", borderRadius:"6px", cursor:"pointer", color:t.red, transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.background=t.red} onMouseOut={e=>e.currentTarget.style.background=t.redBg}>🗑️</button>
                     )}
                   </div>
                 </div>
@@ -89,7 +92,7 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
               <option value="user">Éditeur (Standard)</option>
               <option value="admin">Administrateur IFSI</option>
             </select>
-            <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ background:t.accent, color:"white", border:"none", padding:"12px 24px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:isCreatingUser?"not-allowed":"pointer", boxShadow:`0 4px 12px ${t.accentBd}` }}>
+            <button onClick={handleCreateUser} disabled={isCreatingUser} style={{ background:t.accent, color:"white", border:"none", padding:"12px 24px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:isCreatingUser?"not-allowed":"pointer", boxShadow:`0 4px 12px ${t.accentBd}`, transition:"transform 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseOut={e=>e.currentTarget.style.transform="translateY(0)"}>
               {isCreatingUser ? "Création..." : "Envoyer l'invitation"}
             </button>
           </div>
@@ -100,13 +103,13 @@ export function EquipeTab({ userProfile, newMember, setNewMember, isCreatingUser
 }
 
 // ----------------------------------------------------------------------
-// 👤 ONGLET : COMPTE PERSONNEL (Reproduction des images 7 à 11)
+// 👤 ONGLET : COMPTE PERSONNEL (Profil)
 // ----------------------------------------------------------------------
 export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleChangePassword, isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode, t }) {
   return (
-    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"24px", maxWidth:"800px", margin:"0 auto", paddingBottom:"40px" }}>
+    <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"20px", maxWidth:"800px", margin:"0 auto", paddingBottom:"40px" }}>
       
-      {/* 1. Header Profil (Image 7) */}
+      {/* Header Profil */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", display:"flex", alignItems:"center", gap:"24px", boxShadow:t.shadowSm }}>
         <div style={{ width:"80px", height:"80px", borderRadius:"20px", background:t.accentBg, border:`2px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", fontSize:"32px", fontWeight:"800", color:t.accent, flexShrink:0 }}>
           {auth.currentUser?.email?.charAt(0).toUpperCase()}
@@ -122,7 +125,7 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
         </div>
       </div>
 
-      {/* 2. Apparence (Image 8) */}
+      {/* Apparence */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", overflow:"hidden", boxShadow:t.shadowSm }}>
         <div style={{ padding:"20px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
           <span style={{ fontSize:"16px", fontWeight:"800", color:t.text }}>🎨 Apparence & Accessibilité</span>
@@ -142,7 +145,7 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center" }}>
             <div>
               <div style={{ fontSize:"15px", fontWeight:"700", color:t.text, marginBottom:"6px" }}>Mode Daltonien</div>
-              <div style={{ fontSize:"13px", color:t.text2 }}>Remplace le rouge/vert par des couleurs à fort contraste (Orange/Bleu).</div>
+              <div style={{ fontSize:"13px", color:t.text2 }}>Remplace le rouge/vert par des couleurs à fort contraste.</div>
             </div>
             <button onClick={() => setIsColorblindMode(!isColorblindMode)} style={{ background:isColorblindMode?t.accent:t.surface2, color:isColorblindMode?"white":t.text, border:`1px solid ${isColorblindMode?t.accentBd:t.border}`, padding:"10px 20px", borderRadius:"8px", fontSize:"13px", fontWeight:"700", cursor:"pointer", transition:"all 0.2s" }}>
               {isColorblindMode ? "Activé" : "Désactivé"}
@@ -152,7 +155,7 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
         </div>
       </div>
 
-      {/* 3. Sécurité (Image 10) */}
+      {/* Sécurité */}
       <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", overflow:"hidden", boxShadow:t.shadowSm }}>
         <div style={{ padding:"20px 24px", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
           <span style={{ fontSize:"16px", fontWeight:"800", color:t.text }}>🔒 Sécurité du compte</span>
@@ -172,7 +175,7 @@ export function CompteTab({ auth, userProfile, pwdUpdate, setPwdUpdate, handleCh
         </div>
       </div>
 
-      {/* 4. Zone Danger (Image 11) */}
+      {/* Zone Danger */}
       <div style={{ background:t.surface, border:`1px solid ${t.dangerBd}`, borderRadius:"16px", overflow:"hidden", boxShadow:t.shadowSm }}>
         <div style={{ padding:"24px 32px" }}>
           <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"26px", color:t.danger, marginBottom:"8px" }}>⚠️ Zone dangereuse</div>
