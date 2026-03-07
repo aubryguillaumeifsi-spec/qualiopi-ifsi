@@ -132,6 +132,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {axes && axes.length > 0 && (
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"12px", padding:"20px", boxShadow:t.shadowSm }}>
             <div style={{ marginBottom:"16px" }}>
+              {/* Plus d'emoji cible ici, look pro et épuré */}
               <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:t.text, margin:0 }}>Plan d'action prioritaire</h3>
               <div style={{ fontSize:"12px", color:t.text2, marginTop:"4px" }}>Indicateurs nécessitant une intervention (Écarts et En cours)</div>
             </div>
@@ -144,7 +145,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                 return (
                   <div key={c.id} onClick={() => setModalCritere(c)} style={{ minWidth:"280px", background:t.surface2, border:`1px solid ${theme.bd}`, borderLeft:`4px solid ${theme.c}`, borderRadius:"8px", padding:"16px", cursor:"pointer", transition:"transform 0.2s", boxShadow:`0 4px 12px ${theme.bg}` }} onMouseOver={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseOut={e=>e.currentTarget.style.transform="translateY(0)"}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px" }}>
-                      <span style={{ background: cConf.bg, color: cConf.color, border: `1px solid ${cConf.bd}`, padding: "4px 8px", borderRadius: "6px", fontSize:"12px", fontWeight: "800" }}>
+                      <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
                         {formatInd(c.critere, c.num)}
                       </span>
                       <span style={{ background:theme.bg, color:theme.c, fontSize:"10px", fontWeight:"800", padding:"3px 8px", borderRadius:"6px" }}>{theme.label}</span>
@@ -164,7 +165,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px" }}>
           
-          {/* 📊 Table Aperçu - AVEC BULLE COMPACTE */}
+          {/* 📊 Table Aperçu */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
@@ -189,7 +190,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                       <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                         
                         <div>
-                          <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize:"12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
+                          <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
                             {formatInd(r.critere, r.num)}
                           </span>
                         </div>
