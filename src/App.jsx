@@ -43,23 +43,20 @@ function buildTokens(dark) {
   };
 }
 
-const DEFAULT_ROLES = ["Direction", "Qualité & Conformité", "Formation", "Administration", "Pôle Stages", "Secrétariat"];
-// NOUVEAU : Fonctions de base
-const DEFAULT_JOB_TITLES = ["Directrice", "Directeur", "Formateur", "Formatrice", "Secrétaire", "Responsable Qualité"];
+// 🎯 LISTES PAR DÉFAUT DEMANDÉES
+const DEFAULT_ROLES = ["Direction", "Formation", "Secrétariat", "Documentaliste", "Qualité"];
+const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Formateur IFSI", "Formateur IFAS", "Secrétaire", "TICE", "Documentaliste", "Référent ABS (handicap)", "Référent laïcité", "Ingénieur pédagogique"];
 
 const ROLE_PALETTE = [ 
-  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, 
-  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, 
-  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, 
-  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, 
-  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, 
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, 
-  { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" }, 
-  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, 
-  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, 
-  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, 
-  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }, 
-  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }  
+  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, // Or
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, // Violet
+  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, // Vert
+  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, // Bleu
+  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, // Orange
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, // Rose
+  { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" }, // Ciel
+  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, // Rouge
+  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, // Cyan
 ];
 
 const today = new Date();
@@ -198,7 +195,7 @@ function MainApp() {
     try {
       const cred = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
-      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], mustChangePassword: true, status: "ACTIF" });
+      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], jobTitles: [], mustChangePassword: true, status: "ACTIF" });
       alert("✅ Compte créé !");
       setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
       secondaryAuth.signOut();
@@ -218,11 +215,12 @@ function MainApp() {
   const currentAuditDate = currentCampaign?.auditDate || "2026-10-15";
   
   const orgRoles = useMemo(() => ifsiData?.roles || DEFAULT_ROLES, [ifsiData]);
-  const orgJobTitles = useMemo(() => ifsiData?.jobTitles || DEFAULT_JOB_TITLES, [ifsiData]); // NOUVEAU
+  const orgJobTitles = useMemo(() => ifsiData?.jobTitles || DEFAULT_JOB_TITLES, [ifsiData]); 
   
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
   const orgAccounts = useMemo(() => teamUsers.filter(u => u.etablissementId === selectedIfsi && u.role !== "superadmin"), [teamUsers, selectedIfsi]);
 
+  // 🎯 UNIFICATION DES PROFILS : On assure que jobTitles est toujours un tableau
   const allIfsiMembers = useMemo(() => [
     ...orgAccounts.map(u => ({ 
       id: u.id, 
@@ -230,10 +228,10 @@ function MainApp() {
       nom: u.nom || (u.email && u.email.includes('.') ? u.email.split('@')[0].split('.')[1] : ""), 
       name: u.name || (u.email ? u.email.split('@')[0] : "Utilisateur"), 
       roles: u.orgRoles || [], 
+      jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
       type: 'account', 
       email: u.email,
       phone: u.phone || "",
-      jobTitle: u.jobTitle || "Membre",
       status: u.status || "ACTIF",
       archived: u.archived || false
     })),
@@ -245,10 +243,10 @@ function MainApp() {
         nom: u.nom || parts.slice(1).join(' ') || "", 
         name: u.name || "Membre", 
         roles: u.roles || [], 
+        jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
         type: 'manual',
         email: u.email || "",
         phone: u.phone || "",
-        jobTitle: u.jobTitle || "Membre",
         status: u.status || "ACTIF",
         archived: u.archived || false
       };
@@ -379,23 +377,27 @@ function MainApp() {
     }
   };
 
-  // NOUVEAU : Ajouter un titre de fonction personnalisé
+  // Ajout / Suppression des fonctions disponibles pour l'établissement
   const handleAddJobTitle = (newTitle) => {
     if (newTitle && !orgJobTitles.includes(newTitle)) {
       setDoc(doc(db, "etablissements", selectedIfsi), { jobTitles: [...orgJobTitles, newTitle] }, { merge: true });
     }
   };
+  const handleRemoveJobTitle = (titleToRemove) => {
+    if (window.confirm(`Supprimer définitivement la fonction "${titleToRemove}" de la liste des choix possibles ?`)) {
+      setDoc(doc(db, "etablissements", selectedIfsi), { jobTitles: orgJobTitles.filter(t => t !== titleToRemove) }, { merge: true });
+    }
+  };
 
-  // NOUVEAU : Ajout de collaborateur refait pour prendre le formulaire complet
   const handleAddManualUser = (userData) => {
     const newUser = { 
       id: 'm_' + Date.now(), 
       prenom: userData.prenom.trim(), 
       nom: userData.nom.toUpperCase().trim(), 
       name: `${userData.prenom.trim()} ${userData.nom.toUpperCase().trim()}`, 
-      roles: [], 
+      roles: userData.roles || [], 
       status: "ACTIF", 
-      jobTitle: userData.jobTitle || orgJobTitles[0] || "Membre",
+      jobTitles: userData.jobTitles || [],
       email: userData.email || "",
       phone: userData.phone || ""
     };
@@ -429,10 +431,6 @@ function MainApp() {
       </button>
     );
   };
-
-  const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
-  const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
@@ -505,7 +503,6 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit avec date bien lisible dans tous les modes */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -570,8 +567,7 @@ function MainApp() {
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
-          {/* L'Organigramme reçoit les nouvelles fonctions personnalisables */}
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleAddJobTitle={handleAddJobTitle} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} t={t} />}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleAddJobTitle={handleAddJobTitle} handleRemoveJobTitle={handleRemoveJobTitle} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
