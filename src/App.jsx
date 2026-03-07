@@ -46,16 +46,20 @@ function buildTokens(dark) {
 const DEFAULT_ROLES = ["Direction", "Formation", "Secrétariat", "Documentaliste", "Qualité"];
 const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Formateur IFSI", "Formateur IFAS", "Secrétaire", "TICE", "Documentaliste", "Référent ABS (handicap)", "Référent laïcité", "Ingénieur pédagogique"];
 
+// 🎨 PALETTE DE COULEURS ÉLARGIE ET TRÈS CONTRASTÉE
 const ROLE_PALETTE = [ 
-  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, // Or
-  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, // Violet
-  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, // Vert
-  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, // Bleu
-  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, // Orange
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, // Rose
-  { bg: "#e0f2fe", border: "#bae6fd", text: "#0369a1" }, // Ciel
-  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, // Rouge
-  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, // Cyan
+  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, // 0. Or (Direction)
+  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, // 1. Bleu (Qualité)
+  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, // 2. Rose framboise
+  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, // 3. Vert émeraude
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, // 4. Violet
+  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, // 5. Orange vif
+  { bg: "#ecfeff", border: "#7dd3fc", text: "#0369a1" }, // 6. Bleu ciel profond
+  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, // 7. Rouge vif
+  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, // 8. Cyan foncé
+  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, // 9. Jaune moutarde
+  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }, // 10. Indigo
+  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }  // 11. Fuchsia
 ];
 
 const today = new Date();
@@ -463,10 +467,6 @@ function MainApp() {
       </button>
     );
   };
-
-  const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
-  const hasPrev = currentIndex > 0;
-  const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
