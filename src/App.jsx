@@ -44,7 +44,9 @@ function buildTokens(dark) {
 }
 
 const DEFAULT_ROLES = ["Direction", "Formation", "Secrétariat", "Documentaliste", "Qualité"];
-const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Formateur IFSI", "Formateur IFAS", "Secrétaire", "TICE", "Documentaliste", "Référent ABS (handicap)", "Référent laïcité", "Ingénieur pédagogique"];
+const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Formateur IFSI", "Formateur IFAS", "Secrétaire", "TICE", "Documentaliste", "Ingénieur pédagogique"];
+// 🎯 NOUVEAU : Les étiquettes (missions transverses)
+const DEFAULT_TAGS = ["Référent Laïcité", "Référent ABS", "Référent Simulation", "Référent Qualité", "AFGSU"];
 
 const ROLE_PALETTE = [ 
   { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, 
@@ -197,7 +199,7 @@ function MainApp() {
     try {
       const cred = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
-      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], jobTitles: [], mustChangePassword: true, status: "ACTIF", orgLevel: 3 });
+      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], jobTitles: [], tags: [], mustChangePassword: true, status: "ACTIF", orgLevel: 3 });
       alert("✅ Compte créé !");
       setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
       secondaryAuth.signOut();
@@ -218,6 +220,7 @@ function MainApp() {
   
   const orgRoles = useMemo(() => ifsiData?.roles || DEFAULT_ROLES, [ifsiData]);
   const orgJobTitles = useMemo(() => ifsiData?.jobTitles || DEFAULT_JOB_TITLES, [ifsiData]); 
+  const orgTags = useMemo(() => ifsiData?.tags || DEFAULT_TAGS, [ifsiData]); // NOUVEAU
   const orgConnections = useMemo(() => ifsiData?.orgConnections || [], [ifsiData]);
   
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
@@ -231,6 +234,7 @@ function MainApp() {
       name: u.name || (u.email ? u.email.split('@')[0] : "Utilisateur"), 
       roles: u.orgRoles || [], 
       jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
+      tags: Array.isArray(u.tags) ? u.tags : [], // NOUVEAU
       orgLevel: u.orgLevel || null,
       type: 'account', 
       email: u.email,
@@ -247,6 +251,7 @@ function MainApp() {
         name: u.name || "Membre", 
         roles: u.roles || [], 
         jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
+        tags: Array.isArray(u.tags) ? u.tags : [], // NOUVEAU
         orgLevel: u.orgLevel || null,
         type: 'manual',
         email: u.email || "",
@@ -282,7 +287,7 @@ function MainApp() {
       const nom = prompt("Nom de l'établissement :"); 
       if (nom?.trim()) { 
         const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); 
-        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, jobTitles: DEFAULT_JOB_TITLES, archived: false }); 
+        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, jobTitles: DEFAULT_JOB_TITLES, tags: DEFAULT_TAGS, archived: false }); 
         setSelectedIfsi(id); 
       } else {
         setSelectedIfsi(null); setTimeout(() => setSelectedIfsi(selectedIfsi), 0);
@@ -390,9 +395,10 @@ function MainApp() {
       roles: userData.roles || [], 
       status: "ACTIF", 
       jobTitles: userData.jobTitles || [],
+      tags: userData.tags || [],
       email: userData.email || "",
       phone: userData.phone || "",
-      orgLevel: 3 // On les place par défaut en équipe
+      orgLevel: 3 
     };
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
@@ -402,7 +408,11 @@ function MainApp() {
     const snap = await getDoc(docRef);
     if(!snap.exists()) return;
     const data = snap.data();
-    let arr = type === 'role' ? (data.roles || DEFAULT_ROLES) : (data.jobTitles || DEFAULT_JOB_TITLES);
+    
+    let arr = type === 'role' ? (data.roles || DEFAULT_ROLES) : 
+              type === 'jobTitle' ? (data.jobTitles || DEFAULT_JOB_TITLES) : 
+              (data.tags || DEFAULT_TAGS);
+              
     let mUsers = data.manualUsers || [];
 
     if (action === 'add') {
@@ -412,7 +422,8 @@ function MainApp() {
         if (!newVal || arr.includes(newVal)) return;
         arr = arr.map(x => x === oldVal ? newVal : x);
         if (type === 'role') mUsers = mUsers.map(u => ({...u, roles: (u.roles||[]).map(r => r === oldVal ? newVal : r)}));
-        else mUsers = mUsers.map(u => ({...u, jobTitles: (u.jobTitles||[]).map(j => j === oldVal ? newVal : j)}));
+        else if (type === 'jobTitle') mUsers = mUsers.map(u => ({...u, jobTitles: (u.jobTitles||[]).map(j => j === oldVal ? newVal : j)}));
+        else if (type === 'tag') mUsers = mUsers.map(u => ({...u, tags: (u.tags||[]).map(t => t === oldVal ? newVal : t)}));
         
         orgAccounts.forEach(async (user) => {
            if (type === 'role' && user.orgRoles?.includes(oldVal)) {
@@ -421,11 +432,15 @@ function MainApp() {
            if (type === 'jobTitle' && user.jobTitles?.includes(oldVal)) {
                await setDoc(doc(db, "users", user.id), { jobTitles: user.jobTitles.map(j => j === oldVal ? newVal : j) }, { merge: true });
            }
+           if (type === 'tag' && user.tags?.includes(oldVal)) {
+               await setDoc(doc(db, "users", user.id), { tags: user.tags.map(t => t === oldVal ? newVal : t) }, { merge: true });
+           }
         });
     } else if (action === 'delete') {
         arr = arr.filter(x => x !== oldVal);
         if (type === 'role') mUsers = mUsers.map(u => ({...u, roles: (u.roles||[]).filter(r => r !== oldVal)}));
-        else mUsers = mUsers.map(u => ({...u, jobTitles: (u.jobTitles||[]).filter(j => j !== oldVal)}));
+        else if (type === 'jobTitle') mUsers = mUsers.map(u => ({...u, jobTitles: (u.jobTitles||[]).filter(j => j !== oldVal)}));
+        else if (type === 'tag') mUsers = mUsers.map(u => ({...u, tags: (u.tags||[]).filter(t => t !== oldVal)}));
         
         orgAccounts.forEach(async (user) => {
            if (type === 'role' && user.orgRoles?.includes(oldVal)) {
@@ -434,17 +449,23 @@ function MainApp() {
            if (type === 'jobTitle' && user.jobTitles?.includes(oldVal)) {
                await setDoc(doc(db, "users", user.id), { jobTitles: user.jobTitles.filter(j => j !== oldVal) }, { merge: true });
            }
+           if (type === 'tag' && user.tags?.includes(oldVal)) {
+               await setDoc(doc(db, "users", user.id), { tags: user.tags.filter(t => t !== oldVal) }, { merge: true });
+           }
         });
     }
 
-    const updates = type === 'role' ? { roles: arr, manualUsers: mUsers } : { jobTitles: arr, manualUsers: mUsers };
+    const updates = { manualUsers: mUsers };
+    if (type === 'role') updates.roles = arr;
+    else if (type === 'jobTitle') updates.jobTitles = arr;
+    else if (type === 'tag') updates.tags = arr;
+
     await setDoc(docRef, updates, { merge: true });
   };
 
   const handleUpdateConnections = async (newConns) => {
     await setDoc(doc(db, "etablissements", selectedIfsi), { orgConnections: newConns }, { merge: true });
   };
-
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
@@ -474,7 +495,6 @@ function MainApp() {
     );
   };
 
-  // CORRECTIF ICI : hasPrev et hasNext sont bien définis pour la modale
   const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
@@ -615,7 +635,7 @@ function MainApp() {
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
