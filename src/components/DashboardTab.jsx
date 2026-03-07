@@ -23,7 +23,12 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
 
   const hist = useMemo(() => [...safeCriteres].flatMap(c => Array.isArray(c.historique) ? c.historique.map(h => ({ ...h, num: c.num, critere: c.critere })) : []).sort((a,b) => new Date(b.date) - new Date(a.date)).slice(0, 5), [safeCriteres]);
 
-  const formatInd = (critere, num) => `${critere}.${String(num).replace(/\D/g, '')}`;
+  // FONCTION INTELLIGENTE : Transforme "Indicateur 1" en "1.1" pour gagner de la place
+  const formatInd = (critere, num) => {
+    const match = String(num).match(/(\d+)$/);
+    const n = match ? match[1] : String(num).replace(/\D/g, '');
+    return `${critere}.${n}`;
+  };
 
   const totalPreuves = useMemo(() => safeCriteres.reduce((acc, c) => acc + (c.fichiers?.length || 0) + (c.chemins_reseau?.length || 0) + (c.preuves ? 1 : 0), 0), [safeCriteres]);
 
@@ -142,11 +147,14 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
               {axes.map(c => {
                 const isNC = c.statut === "non-conforme";
                 const theme = isNC ? { c:t.red, bg:t.redBg, bd:t.redBd, label:"Non conforme" } : { c:t.amber, bg:t.amberBg, bd:t.amberBd, label:"En cours" };
+                const cConf = CRITERES_LABELS[c.critere] || { bg:t.surface2, bd:t.border, color:t.text };
                 const d = days(c.delai);
                 return (
                   <div key={c.id} onClick={() => setModalCritere(c)} style={{ minWidth:"280px", background:t.surface2, border:`1px solid ${theme.bd}`, borderLeft:`4px solid ${theme.c}`, borderRadius:"8px", padding:"16px", cursor:"pointer", transition:"transform 0.2s", boxShadow:`0 4px 12px ${theme.bg}` }} onMouseOver={e=>e.currentTarget.style.transform="translateY(-2px)"} onMouseOut={e=>e.currentTarget.style.transform="translateY(0)"}>
                     <div style={{ display:"flex", justifyContent:"space-between", alignItems:"flex-start", marginBottom:"8px" }}>
-                      <span style={{ fontSize:"16px", fontWeight:"800", color:t.text, fontFamily:"'Instrument Serif',serif" }}>{formatInd(c.critere, c.num)}</span>
+                      <span style={{ background: cConf.bg, color: cConf.color, border: `1px solid ${cConf.bd}`, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800" }}>
+                        {formatInd(c.critere, c.num)}
+                      </span>
                       <span style={{ background:theme.bg, color:theme.c, fontSize:"10px", fontWeight:"800", padding:"3px 8px", borderRadius:"6px" }}>{theme.label}</span>
                     </div>
                     <div style={{ fontSize:"13px", color:t.text, fontWeight:"500", whiteSpace:"nowrap", overflow:"hidden", textOverflow:"ellipsis", marginBottom:"12px" }}>{c.titre}</div>
@@ -164,7 +172,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
         {/* ── ROW 2 : TABLE + PANEL DROIT ── */}
         <div style={{ display:"grid", gridTemplateColumns:"1fr 300px", gap:"16px" }}>
           
-          {/* 📊 Table Aperçu */}
+          {/* 📊 Table Aperçu - AVEC BULLE COMPACTE */}
           <div style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"10px", boxShadow:t.shadow, display:"flex", flexDirection:"column", overflow: "hidden" }}>
             <div style={{ padding:"12px 20px", borderBottom:`1px solid ${t.border}` }}>
               <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color:t.text }}>Aperçu des indicateurs</span>
@@ -189,7 +197,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                       <div key={i} className="ro" style={{ display:"grid", gridTemplateColumns:"70px minmax(180px, 1fr) 90px 100px 90px 60px", gap:"10px", alignItems:"center", padding:"10px 20px", borderBottom:`1px solid ${t.border2}` }}>
                         
                         <div>
-                          <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif" }}>
+                          <span style={{ display:"inline-flex", alignItems:"center", justifyContent:"center", background: cConf.bg, border: `1px solid ${cConf.bd}`, color: cConf.color, padding: "4px 8px", borderRadius: "6px", fontSize: "12px", fontWeight: "800", fontFamily: "'Albert Sans', sans-serif", whiteSpace: "nowrap" }}>
                             {formatInd(r.critere, r.num)}
                           </span>
                         </div>
@@ -239,6 +247,7 @@ export default function DashboardTab({ campaigns, activeCampaignId, setActiveCam
                             {u.titre}
                           </span>
                         </div>
+                        
                         {d < 0 ? (
                           <span style={{ background:t.redBg, color:t.red, border:`1px solid ${t.redBd}`, padding:"2px 6px", borderRadius:"4px", fontSize:"9px", fontWeight:"800", marginLeft:"10px", whiteSpace:"nowrap" }}>DÉPASSÉ</span>
                         ) : (
