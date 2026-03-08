@@ -137,7 +137,7 @@ export function EquipeTab({
   selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm,
   sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t,
   ifsiData, handleSaveEtab, criteres, 
-  isDarkMode, setIsDarkMode
+  isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode
 }) {
 
   const [tab, setTab]                 = useState("parametres"); // Ouvert par défaut sur paramètres pour te montrer
@@ -343,7 +343,6 @@ export function EquipeTab({
 
     const sortedCriteres = [...criteres].sort((a,b) => (a.critere === b.critere ? a.num - b.num : a.critere - b.critere));
 
-    // Construction d'une page HTML stylisée compréhensible par Excel
     const htmlContent = `
       <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
       <head>
@@ -983,7 +982,7 @@ export function EquipeTab({
 
           {filteredDocs.length === 0 ? (
             <div style={{ textAlign: "center", color: t.text3, fontSize: "13px", padding: "40px", background:t.surface, borderRadius:"12px", border:`1px dashed ${t.border}` }}>
-              Aucun document ne correspond à vos critères.
+              Aucun document ne correspond à vos filtres.
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "12px" }}>
@@ -1102,9 +1101,28 @@ export function EquipeTab({
         <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
 
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🎨 Affichage (Local)</div>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🔔 Notifications email</div>
+            {[
+              { k: "connexion",    l: "Nouvelles connexions",       sub: "Alerte à chaque login"    },
+              { k: "modification", l: "Modifications indicateurs",  sub: "Changement de statut"     },
+              { k: "export",       l: "Exports PDF",                sub: "Après chaque export"      },
+              { k: "alerte",       l: "Alertes de sécurité",        sub: "Connexions échouées", colorKey: "red" },
+            ].map(n => (
+              <div key={n.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${t.border2}` }}>
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: "600", color: t.text }}>{n.l}</div>
+                  <div style={{ fontSize: "9px", color: t.text3 }}>{n.sub}</div>
+                </div>
+                <Toggle val={notifPrefs[n.k]} onChange={() => toggleNotif(n.k)} colorKey={n.colorKey || "accent"} t={t} />
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🎨 Affichage</div>
             {[
               { l: "Thème sombre",   sub: "Interface Midnight Authority", val: isDarkMode,      set: () => setIsDarkMode(v => !v)      },
+              { l: "Mode daltonien", sub: "Remplace rouge/vert",          val: isColorblindMode, set: () => setIsColorblindMode(v => !v) },
             ].map(p => (
               <div key={p.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${t.border2}` }}>
                 <div>
@@ -1114,10 +1132,17 @@ export function EquipeTab({
                 <Toggle val={p.val} onChange={p.set} t={t} />
               </div>
             ))}
+            <div style={{ paddingTop: "10px" }}>
+              <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "6px" }}>Langue</label>
+              <select style={{ width: "100%", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none" }}>
+                <option>Français</option>
+                <option>English</option>
+              </select>
+            </div>
           </div>
 
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports qualitatifs</div>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports & sauvegardes</div>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
               <div>
@@ -1134,7 +1159,36 @@ export function EquipeTab({
               </div>
               <button onClick={handleExportJson} style={{ padding: "5px 11px", background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter JSON</button>
             </div>
-            
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>Sauvegarde complète</div>
+                <div style={{ fontSize: "9px", color: t.text3 }}>Archive ZIP</div>
+              </div>
+              <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: t.goldBg, border: `1px solid ${t.goldBd}`, color: t.gold, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter ZIP</button>
+            </div>
+          </div>
+
+          <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.red, marginBottom: "6px" }}>⚠ Zone dangereuse</div>
+            <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>Actions irréversibles — nécessitent confirmation</div>
+            {[
+              { l: "Réinitialiser les indicateurs", sub: "Remet à zéro la campagne active", k: "amber" },
+              { l: "Supprimer l'établissement",     sub: "Supprime toutes les données",     k: "red"   },
+            ].map(a => {
+              const { c, bg, bd } = sc(t, a.k);
+              return (
+                <div key={a.l} style={{ padding: "9px 11px", background: bg, border: `1px solid ${bd}`, borderRadius: "7px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: "600", color: c }}>{a.l}</div>
+                    <div style={{ fontSize: "9px", color: t.text3 }}>{a.sub}</div>
+                  </div>
+                  <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: "transparent", border: `1px solid ${bd}`, color: c, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer", flexShrink: 0, marginLeft: "8px" }}>
+                    Exécuter
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -1143,7 +1197,7 @@ export function EquipeTab({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  CompteTab
+//  CompteTab (Inchangé)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CompteTab({
@@ -1302,6 +1356,33 @@ export function CompteTab({
                 {pwdError}
               </div>
             )}
+          </div>
+        </div>
+      </div>
+
+      <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
+        <div style={{ padding: "24px 32px" }}>
+          <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: t.red, marginBottom: "6px" }}>⚠️ Zone dangereuse</div>
+          <div style={{ fontSize: "12px", color: t.text2, marginBottom: "20px" }}>Ces actions sont définitives et ne peuvent pas être annulées.</div>
+          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "10px" }}>
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: t.text, marginBottom: "3px" }}>Exporter mes données</div>
+                <div style={{ fontSize: "11px", color: t.text3 }}>Télécharger toutes mes données au format JSON</div>
+              </div>
+              <button onClick={() => alert("Export en cours…")} style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, padding: "9px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
+                Exporter
+              </button>
+            </div>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "10px" }}>
+              <div>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: t.red, marginBottom: "3px" }}>Désactiver mon compte</div>
+                <div style={{ fontSize: "11px", color: t.red, opacity: 0.75 }}>Votre accès sera suspendu immédiatement</div>
+              </div>
+              <button onClick={() => alert("Contactez votre Super Admin.")} style={{ background: t.red, border: "none", color: "white", padding: "9px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.redBd}` }}>
+                Désactiver
+              </button>
+            </div>
           </div>
         </div>
       </div>
