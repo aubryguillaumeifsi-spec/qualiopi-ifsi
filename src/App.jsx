@@ -10,6 +10,7 @@ import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
+// 🎯 IMPORT DE STORAGE (Pour la médiathèque)
 import { db, auth, storage, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -193,6 +194,7 @@ function MainApp() {
   
   const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
   
+  // 🎯 FONCTION POUR SAUVEGARDER L'ETABLISSEMENT (Onglet Administration)
   const handleSaveEtab = async (fields) => {
     if (!selectedIfsi) return;
     await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true });
@@ -362,7 +364,7 @@ function MainApp() {
     }
   };
 
-  // 🎯 CORRECTION : Restauration de la logique Index/Suivant/Précédent pour ne pas faire planter la modale
+  // 🎯 CORRECTION CRUCIALE : CALCUL DES INDEX POUR LA MODALE DES INDICATEURS
   const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
@@ -403,6 +405,7 @@ function MainApp() {
     }
   };
 
+  // 🎯 FONCTION DE SUPPRESSION DÉFINITIVE D'UN MEMBRE DANS L'ORGANIGRAMME
   const handleHardDeleteMember = async (memberId, type) => {
     if (type === 'account') {
       await deleteDoc(doc(db, "users", memberId));
@@ -573,7 +576,7 @@ function MainApp() {
         </div>
       )}
 
-      {/* 🎯 CORRECTION ICI : La DetailModal est restaurée avec ses props exactes */}
+      {/* 🎯 MODALE DES INDICATEURS */}
       {modalCritere && (
         <DetailModal 
           critere={modalCritere} 
@@ -584,6 +587,8 @@ function MainApp() {
           isReadOnly={isArchive} 
           isAuditMode={isAuditMode} 
           allMembers={allIfsiMembers} 
+          rolePalette={ROLE_PALETTE} 
+          orgRoles={orgRoles} 
           hasPrev={hasPrev} 
           hasNext={hasNext} 
         />
@@ -620,6 +625,7 @@ function MainApp() {
           )}
         </div>
 
+        {/* Prochain audit */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -689,7 +695,8 @@ function MainApp() {
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
           
-          {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
+          {/* 🎯 ONGLET EQUIPE AVEC CRITERES PASSÉS EN PROP */}
+          {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
           
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
         </div>
