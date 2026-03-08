@@ -51,6 +51,13 @@ function timeAgo(isoString) {
   return new Date(isoString).toLocaleDateString("fr-FR");
 }
 
+function formatMonthYear(dateString) {
+  if (!dateString) return "—";
+  const d = new Date(dateString);
+  if (isNaN(d.getTime())) return dateString;
+  return d.toLocaleDateString("fr-FR", { month: "short", year: "numeric" });
+}
+
 async function writeLog(ifsiId, action, detail, type = "admin") {
   if (!ifsiId || !auth.currentUser) return;
   try {
@@ -127,7 +134,7 @@ export function EquipeTab({
   isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode,
 }) {
 
-  const [tab, setTab]                 = useState("membres");
+  const [tab, setTab]                 = useState("etablissement"); // Ouvert par défaut sur Établissement pour tester
   const [roleFilter, setRoleFilter]   = useState("tous");
   const [statusFilter, setStatusFilter] = useState("tous");
   const [showInvite, setShowInvite]   = useState(false);
@@ -140,6 +147,7 @@ export function EquipeTab({
   const [etabSaving, setEtabSaving] = useState(false);
   const [etabSaved, setEtabSaved]  = useState(false);
 
+  // Initialisation dynamique des données
   useEffect(() => {
     if (ifsiData && !etabForm) {
       setEtabForm({
@@ -150,7 +158,14 @@ export function EquipeTab({
         tel:        ifsiData.tel         || "",
         email:      ifsiData.email       || "",
         directrice: ifsiData.directrice  || "",
-        dateAudit:  ifsiData.dateAudit   || "",
+        dateCertif: ifsiData.dateCertif  || "", // Date initiale Qualiopi
+        dateAudit:  ifsiData.dateAudit   || "", // Date de l'audit
+        agrements:  ifsiData.agrements   || [ // Agréments par défaut si vide
+          { l: "DREETS AuRA",          v: "Agrément actif",    k: "green" },
+          { l: "ARS — Autorisation",   v: "150 places",        k: "green" },
+          { l: "Ministère Santé",      v: "IFAS · 35 places",  k: "green" },
+          { l: "HAS — Simulation",     v: "⚠ À renouveler",   k: "amber" },
+        ]
       });
     }
   }, [ifsiData]);
@@ -172,7 +187,9 @@ export function EquipeTab({
       tel:         etabForm.tel,
       email:       etabForm.email,
       directrice:  etabForm.directrice,
+      dateCertif:  etabForm.dateCertif,
       dateAudit:   etabForm.dateAudit,
+      agrements:   etabForm.agrements
     });
     await writeLog(selectedIfsi, "Paramètres établissement modifiés", "Identité mise à jour");
     setEtabSaving(false);
@@ -300,7 +317,6 @@ export function EquipeTab({
     return true;
   });
 
-  // Action : Suspendre / Activer un compte
   const handleToggleStatus = async (user) => {
     const newStatus = user.status === "ACTIF" ? "INACTIF" : "ACTIF";
     if (window.confirm(`Voulez-vous vraiment passer le compte de ${user.email} en statut ${newStatus} ?`)) {
@@ -308,7 +324,6 @@ export function EquipeTab({
     }
   };
 
-  // ── Suppression confirmée ──────────────────────────
   const doDeleteUser = async () => {
     if (!confirmDel) return;
     setDeleting(true);
@@ -642,18 +657,18 @@ export function EquipeTab({
       )}
 
       {/* ══════════════════════════════════════════════════
-          ONGLET 2 — ÉTABLISSEMENT
+          ONGLET 2 — ÉTABLISSEMENT (NOUVEAU - INTERACTIF)
       ══════════════════════════════════════════════════ */}
       {tab === "etablissement" && (
-        <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "14px", alignItems: "start" }}>
+        <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "20px", alignItems: "start" }}>
 
-          {/* Formulaire identité */}
+          {/* Formulaire identité & Agréments */}
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
             <div style={{ padding: "13px 18px", borderBottom: `1px solid ${t.border}`, background: t.surface2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text }}>Identité de l'établissement</span>
+              <span style={{ fontFamily: "'Instrument Serif',serif", fontSize: "16px", color: t.text }}>Identité & Configurations</span>
               {etabDirty && !etabSaved && (
                 <span style={{ background: t.amberBg, border: `1px solid ${t.amberBd}`, color: t.amber, fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "5px" }}>
-                  Non sauvegardé
+                  Modifications non sauvegardées
                 </span>
               )}
               {etabSaved && (
@@ -664,67 +679,138 @@ export function EquipeTab({
             </div>
 
             {etabForm ? (
-              <div style={{ padding: "18px", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                <div style={{ gridColumn: "1/-1" }}>
-                  <Field label="Nom de l'établissement" value={etabForm.nom} onChange={e => updateEtabField("nom", e.target.value)} t={t} />
+              <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "24px" }}>
+                
+                {/* BLOC 1 : INFORMATIONS GÉNÉRALES */}
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Informations générales</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="Nom de l'établissement" value={etabForm.nom} onChange={e => updateEtabField("nom", e.target.value)} t={t} />
+                    </div>
+                    <Field label="Directrice / Directeur"    value={etabForm.directrice} onChange={e => updateEtabField("directrice", e.target.value)} t={t} />
+                    <Field label="Téléphone"                 value={etabForm.tel}        onChange={e => updateEtabField("tel",        e.target.value)} type="tel" t={t} />
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="Adresse email contact"   value={etabForm.email}      onChange={e => updateEtabField("email",      e.target.value)} type="email" t={t} />
+                    </div>
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="Adresse postale complète"value={etabForm.adresse}    onChange={e => updateEtabField("adresse",    e.target.value)} t={t} />
+                    </div>
+                  </div>
                 </div>
-                <Field label="N° NDA"                    value={etabForm.nda}        onChange={e => updateEtabField("nda",        e.target.value)} t={t} />
-                <Field label="N° Certification Qualiopi" value={etabForm.certif}     onChange={e => updateEtabField("certif",     e.target.value)} t={t} />
-                <div style={{ gridColumn: "1/-1" }}>
-                  <Field label="Adresse"                 value={etabForm.adresse}    onChange={e => updateEtabField("adresse",    e.target.value)} t={t} />
-                </div>
-                <Field label="Téléphone"                 value={etabForm.tel}        onChange={e => updateEtabField("tel",        e.target.value)} type="tel" t={t} />
-                <Field label="Email"                     value={etabForm.email}      onChange={e => updateEtabField("email",      e.target.value)} type="email" t={t} />
-                <Field label="Directrice / Directeur"    value={etabForm.directrice} onChange={e => updateEtabField("directrice", e.target.value)} t={t} />
-                <Field label="Date d'audit prévue"       value={etabForm.dateAudit}  onChange={e => updateEtabField("dateAudit",  e.target.value)} type="date" t={t} />
 
-                <div style={{ gridColumn: "1/-1", display: "flex", justifyContent: "flex-end", gap: "8px", paddingTop: "6px", borderTop: `1px solid ${t.border}` }}>
+                <hr style={{ border:0, borderTop:`1px dashed ${t.border}` }} />
+
+                {/* BLOC 2 : QUALIOPI */}
+                <div>
+                  <div style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Qualiopi</div>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="N° NDA (Numéro de Déclaration d'Activité)" value={etabForm.nda} onChange={e => updateEtabField("nda", e.target.value)} t={t} />
+                    </div>
+                    <div style={{ gridColumn: "1/-1" }}>
+                      <Field label="N° Certification Qualiopi" value={etabForm.certif} onChange={e => updateEtabField("certif", e.target.value)} t={t} />
+                    </div>
+                    <Field label="Date d'obtention initiale" value={etabForm.dateCertif} onChange={e => updateEtabField("dateCertif", e.target.value)} type="date" t={t} />
+                    <Field label="Date d'audit prévue"       value={etabForm.dateAudit}  onChange={e => updateEtabField("dateAudit",  e.target.value)} type="date" t={t} />
+                  </div>
+                </div>
+
+                <hr style={{ border:0, borderTop:`1px dashed ${t.border}` }} />
+
+                {/* BLOC 3 : AGRÉMENTS (ÉDITEUR DYNAMIQUE) */}
+                <div>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
+                    <span style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px" }}>
+                      Agréments & Autorisations
+                    </span>
+                    <button onClick={() => updateEtabField("agrements", [...etabForm.agrements, { l: "", v: "", k: "green" }])}
+                      style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "4px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}
+                    >
+                      + Ajouter
+                    </button>
+                  </div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+                    {etabForm.agrements.map((ag, i) => (
+                      <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+                        <input value={ag.l} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].l = e.target.value; updateEtabField("agrements", newAg); }}
+                          placeholder="Nom (ex: ARS)"
+                          style={{ flex: 1, padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
+                        />
+                        <input value={ag.v} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].v = e.target.value; updateEtabField("agrements", newAg); }}
+                          placeholder="Valeur (ex: 150 places)"
+                          style={{ flex: 1, padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
+                        />
+                        <select value={ag.k} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].k = e.target.value; updateEtabField("agrements", newAg); }}
+                          style={{ width: "95px", padding: "8px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none", cursor:"pointer" }}
+                        >
+                          <option value="green">Succès</option>
+                          <option value="amber">Alerte</option>
+                          <option value="red">Erreur</option>
+                        </select>
+                        <button onClick={() => { const newAg = etabForm.agrements.filter((_, idx) => idx !== i); updateEtabField("agrements", newAg); }}
+                          style={{ background: t.redBg, border: `1px solid ${t.redBd}`, color: t.red, width: "28px", height: "28px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink:0 }}
+                        >✕</button>
+                      </div>
+                    ))}
+                    {etabForm.agrements.length === 0 && (
+                       <div style={{ fontSize: "11px", color: t.text3, fontStyle: "italic", padding:"10px 0" }}>Aucun agrément configuré. Cliquez sur + Ajouter.</div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", paddingTop: "16px", borderTop: `1px solid ${t.border}` }}>
                   <button
-                    onClick={() => { setEtabForm(null); setEtabDirty(false); }}
-                    style={{ padding: "8px 16px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "7px", color: t.text2, fontSize: "11px", fontWeight: "600", cursor: "pointer" }}
+                    onClick={() => { setEtabForm(null); setEtabDirty(false); setTimeout(() => setEtabForm({...ifsiData}), 10); }}
+                    style={{ padding: "10px 18px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "8px", color: t.text2, fontSize: "12px", fontWeight: "700", cursor: "pointer" }}
                   >Annuler</button>
                   <button
                     onClick={saveEtab} disabled={!etabDirty || etabSaving}
-                    style={{ padding: "8px 16px", background: t.accent, border: "none", borderRadius: "7px", color: "white", fontSize: "11px", fontWeight: "700", cursor: !etabDirty ? "not-allowed" : "pointer", opacity: !etabDirty ? 0.5 : 1, boxShadow: `0 4px 10px ${t.accentBd}` }}
-                  >{etabSaving ? "Sauvegarde…" : "💾 Enregistrer"}</button>
+                    style={{ padding: "10px 24px", background: t.accent, border: "none", borderRadius: "8px", color: "white", fontSize: "12px", fontWeight: "700", cursor: !etabDirty ? "not-allowed" : "pointer", opacity: !etabDirty ? 0.5 : 1, boxShadow: `0 4px 12px ${t.accentBd}` }}
+                  >{etabSaving ? "Sauvegarde…" : "💾 Enregistrer les modifications"}</button>
                 </div>
               </div>
             ) : (
-              <div style={{ padding: "40px", textAlign: "center", color: t.text3, fontSize: "12px" }}>Chargement…</div>
+              <div style={{ padding: "40px", textAlign: "center", color: t.text3, fontSize: "12px" }}>Chargement des données…</div>
             )}
           </div>
 
-          {/* Colonne droite : Qualiopi + agréments */}
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ background: t.goldBg, border: `1px solid ${t.goldBd}`, borderRadius: "12px", padding: "16px 18px", boxShadow: `0 4px 16px ${t.goldBd}` }}>
-              <div style={{ fontSize: "9px", fontWeight: "800", color: t.gold, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Certification Qualiopi</div>
-              <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "4px" }}>{etabForm?.certif || "—"}</div>
-              <div style={{ fontSize: "10px", color: t.text3, marginBottom: "10px" }}>Valide jusqu'au 15 oct. 2027</div>
-              <div style={{ height: "4px", background: `rgba(212,160,48,0.15)`, borderRadius: "2px", marginBottom: "4px" }}>
+          {/* Colonne droite : Aperçu Qualiopi + agréments */}
+          <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            
+            <div style={{ background: t.goldBg, border: `1px solid ${t.goldBd}`, borderRadius: "12px", padding: "20px", boxShadow: `0 4px 16px ${t.goldBd}` }}>
+              <div style={{ fontSize: "10px", fontWeight: "800", color: t.gold, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Certification Qualiopi</div>
+              <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "18px", color: t.text, marginBottom: "4px" }}>{etabForm?.certif || "Non renseigné"}</div>
+              <div style={{ fontSize: "11px", color: t.text3, marginBottom: "12px" }}>
+                Prochain audit prévu le {etabForm?.dateAudit ? new Date(etabForm.dateAudit).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'}) : "—"}
+              </div>
+              <div style={{ height: "4px", background: `rgba(212,160,48,0.15)`, borderRadius: "2px", marginBottom: "6px" }}>
                 <div style={{ width: "62%", height: "100%", background: `linear-gradient(90deg,${t.gold},#f0c060)`, borderRadius: "2px" }} />
               </div>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "9px", color: t.gold, fontWeight: "700" }}>
-                <span>Délivré oct. 2021</span><span>Renouvellement oct. 2027</span>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: t.gold, fontWeight: "700" }}>
+                <span>Délivré {etabForm?.dateCertif ? formatMonthYear(etabForm.dateCertif) : "—"}</span>
+                <span>Renouvellement {etabForm?.dateAudit ? formatMonthYear(etabForm.dateAudit) : "—"}</span>
               </div>
             </div>
 
-            <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "14px 16px", boxShadow: t.shadowSm }}>
-              <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "14px", color: t.text, marginBottom: "11px" }}>Agréments</div>
-              {[
-                { l: "DREETS AuRA",          v: "Agrément actif",    k: "green" },
-                { l: "ARS — Autorisation",   v: "150 places",        k: "green" },
-                { l: "Ministère Santé",      v: "IFAS · 35 places",  k: "green" },
-                { l: "HAS — Simulation",     v: "⚠ À renouveler",   k: "amber" },
-              ].map(ag => {
-                const { c, bg, bd } = sc(t, ag.k);
-                return (
-                  <div key={ag.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "7px 0", borderBottom: `1px solid ${t.border2}` }}>
-                    <span style={{ fontSize: "11px", color: t.text2 }}>{ag.l}</span>
-                    <span style={{ background: bg, border: `1px solid ${bd}`, color: c, fontSize: "9px", fontWeight: "700", padding: "2px 7px", borderRadius: "4px" }}>{ag.v}</span>
-                  </div>
-                );
-              })}
+            <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px", boxShadow: t.shadowSm }}>
+              <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "16px", color: t.text, marginBottom: "12px" }}>Agréments & Autorisations</div>
+              
+              {etabForm?.agrements?.length === 0 ? (
+                 <div style={{ fontSize:"11px", color:t.text3, fontStyle:"italic" }}>Aucun agrément à afficher.</div>
+              ) : (
+                etabForm?.agrements?.map((ag, idx) => {
+                  const { c, bg, bd } = sc(t, ag.k || "green");
+                  return (
+                    <div key={idx} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderBottom: idx === etabForm.agrements.length - 1 ? "none" : `1px solid ${t.border2}` }}>
+                      <span style={{ fontSize: "12px", color: t.text2, fontWeight:"500" }}>{ag.l || "Sans nom"}</span>
+                      <span style={{ background: bg, border: `1px solid ${bd}`, color: c, fontSize: "10px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>{ag.v || "—"}</span>
+                    </div>
+                  );
+                })
+              )}
             </div>
+
           </div>
         </div>
       )}
