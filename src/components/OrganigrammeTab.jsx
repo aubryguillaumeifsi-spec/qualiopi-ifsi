@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { CRITERES_LABELS } from "../data";
 
-export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, orgTags, allIfsiMembers, criteres, userProfile, getRoleColor, rolePalette, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, orgConnections, handleUpdateConnections, setModalCritere, days, t }) {
+export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitles, orgTags, allIfsiMembers, criteres, userProfile, getRoleColor, rolePalette, handleManageStructure, handleAddManualUser, handleUpdateUserDetail, handleHardDeleteMember, orgConnections, handleUpdateConnections, setModalCritere, days, t }) {
   
   const [editForm, setEditForm] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
@@ -9,9 +8,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const [panelMode, setPanelMode] = useState('profile'); 
   const [zoom, setZoom] = useState(0.75); 
   const [filtreRole, setFiltreRole] = useState(null); 
-  
-  // Modale de configuration moderne
-  const [structModal, setStructModal] = useState(null);
+  const [colorPickerRole, setColorPickerRole] = useState(null);
 
   // --- SYSTEME DE LIAISON ---
   const [isLinkingMode, setIsLinkingMode] = useState(false);
@@ -22,6 +19,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const containerRef = useRef(null);
   const contentRef = useRef(null);
 
+  // Modale de configuration moderne
+  const [structModal, setStructModal] = useState(null);
+
   const LINE_COLORS = [
     { label: 'Bleu IFSI', color: '#3b82f6' },
     { label: 'Vert IFAS', color: '#10b981' },
@@ -30,7 +30,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     { label: 'Orange Transv.', color: '#f59e0b' }
   ];
 
-  // 🎯 CORRECTION ICI : Les deux variables sont bien présentes !
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
   const isSuperAdmin = userProfile?.role === "superadmin";
 
@@ -132,6 +131,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     return () => { clearTimeout(timer); window.removeEventListener('resize', updatePositions); };
   }, [updatePositions, showArchived, editForm, isLinkingMode, zoom]);
 
+  // --- ACTIONS PANNEAU ---
   const handleArchiveUser = async () => {
     if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ?`)) {
       await handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, { archived: true });
@@ -219,13 +219,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     }
   };
 
-  const formatInd = (critere, num) => {
-    const match = String(num).match(/(\d+)$/);
-    const n = match ? match[1] : String(num).replace(/\D/g, '');
-    return `${critere}.${n}`;
-  };
-
-  // 🎯 GESTION DE LA MODALE DE CONFIGURATION (Ajout/Édition/Suppression + Couleurs)
+  // 🎯 GESTION DE LA MODALE DE CONFIGURATION
   const openStructModal = (type, action, oldVal = "") => {
     let defaultColorIdx = 0;
     if (type === 'role' && action === 'edit' && rolePalette) {
@@ -287,17 +281,17 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         onDragStart={(e) => handleDragStart(e, m)}
         onClick={() => openViewPanel(m)}
         style={{
-          width: "116px",
-          minHeight: "114px",
+          width: "96px",
+          minHeight: "104px",
           background: isSelected ? rc.bg : t.surface,
           border: `1px solid ${isLinkingSource ? activeLinkColor : isSelected ? rc.text : t.border}`,
-          borderLeft: `4px solid ${isLinkingSource ? activeLinkColor : rc.text}`,
+          borderLeft: `3px solid ${isLinkingSource ? activeLinkColor : rc.text}`,
           borderRadius: "8px",
-          padding: "12px 10px 10px",
+          padding: "8px 7px 7px",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: "8px",
+          gap: "5px",
           cursor: isLinkingMode ? "crosshair" : isAdminOrSuper ? "grab" : "pointer",
           boxShadow: isLinkingSource
             ? `0 0 14px ${activeLinkColor}70, 0 2px 8px rgba(0,0,0,0.35)`
@@ -327,39 +321,40 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         }}
       >
         <div style={{
-          width: "32px", height: "32px", borderRadius: "6px",
+          width: "26px", height: "26px", borderRadius: "6px",
           background: rc.bg, border: `1px solid ${rc.bd}`,
           display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: "11px", fontWeight: "800", color: rc.text, flexShrink: 0,
+          fontSize: "9px", fontWeight: "800", color: rc.text, flexShrink: 0,
+          letterSpacing: "-0.5px",
         }}>
           {initials}
         </div>
 
         <div style={{ width: "100%", textAlign: "center", lineHeight: "1.25" }}>
-          <div style={{ fontSize: "11px", fontWeight: "700", color: t.text, wordBreak: "break-word" }}>
+          <div style={{ fontSize: "10px", fontWeight: "600", color: t.text, wordBreak: "break-word" }}>
             {m.prenom}
           </div>
-          <div style={{ fontSize: "10px", fontWeight: "800", color: t.text2, letterSpacing: "0.3px", wordBreak: "break-word", textTransform: "uppercase", marginTop:"2px" }}>
-            {m.nom}
+          <div style={{ fontSize: "9px", fontWeight: "700", color: t.text2, letterSpacing: "0.3px", wordBreak: "break-word" }}>
+            {m.nom.toUpperCase()}
           </div>
         </div>
 
         {m.tags && m.tags.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "2px", width: "100%", marginTop:"2px" }}>
+          <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "2px", width: "100%" }}>
             {m.tags.slice(0, 2).map(tag => (
               <span key={tag} style={{
                 background: t.accentBg, color: t.accent,
-                fontSize: "6.5px", fontWeight: "800", padding: "2px 5px",
-                borderRadius: "4px", textTransform: "uppercase", letterSpacing: "0.4px"
+                fontSize: "6px", fontWeight: "800", padding: "1px 3px",
+                borderRadius: "3px", textTransform: "uppercase", letterSpacing: "0.4px"
               }}>
-                {tag.length > 10 ? tag.slice(0, 9) + "…" : tag}
+                {tag.length > 9 ? tag.slice(0, 8) + "…" : tag}
               </span>
             ))}
           </div>
         )}
 
-        <div style={{ width: "100%", marginTop: "auto", paddingTop:"6px" }}>
-          <div style={{ height: "4px", background: t.border, borderRadius: "2px", display: "flex", overflow: "hidden" }}>
+        <div style={{ width: "100%", marginTop: "auto" }}>
+          <div style={{ height: "3px", background: t.border, borderRadius: "2px", display: "flex", overflow: "hidden" }}>
             {m.stats.total > 0 ? (
               <>
                 {m.stats.conf > 0 && <div style={{ width: `${(m.stats.conf / m.stats.total) * 100}%`, background: t.green, height: "100%", opacity: 0.9 }} />}
@@ -367,10 +362,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                 {m.stats.nc > 0 && <div style={{ width: `${(m.stats.nc / m.stats.total) * 100}%`, background: t.red, height: "100%", opacity: 0.9 }} />}
               </>
             ) : (
-              <div style={{ width: "100%", background: t.surface3, height: "100%" }} />
+              <div style={{ width: "100%", background: t.border, height: "100%" }} />
             )}
           </div>
-          <div style={{ fontSize: "8px", fontWeight: "700", color: conformeColor, textAlign: "center", marginTop: "4px" }}>
+          <div style={{ fontSize: "7.5px", fontWeight: "700", color: conformeColor, textAlign: "center", marginTop: "3px", letterSpacing: "0.2px" }}>
             {m.stats.total > 0 ? `${m.stats.pct}% conf.` : "0 ind."}
           </div>
         </div>
@@ -391,30 +386,36 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        gap: "12px",
+        gap: "8px",
         zIndex: 2,
-        alignSelf: "flex-start",
+        alignSelf: "flex-start", 
       }}>
-        {/* Header minimaliste */}
         <div style={{
-          display: "flex", alignItems: "center", gap: "6px",
+          display: "flex", alignItems: "center", gap: "5px",
           background: t.surface,
           border: `1px solid ${t.border}`,
-          borderTop: `3px solid ${groupColor.text}`,
-          borderRadius: "8px",
-          padding: "6px 14px",
-          boxShadow: t.shadowSm
+          borderTop: `2px solid ${groupColor.text}`,
+          borderRadius: "6px",
+          padding: "5px 10px",
+          width: "100%",
+          justifyContent: "center",
         }}>
-          <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: groupColor.text }} />
-          <span style={{ fontSize: "10px", fontWeight: "800", color: t.text2, textTransform: "uppercase", letterSpacing: "0.5px" }}>
+          <div style={{
+            width: "6px", height: "6px", borderRadius: "50%",
+            background: groupColor.text, flexShrink: 0, opacity: 0.9,
+          }} />
+          <span style={{
+            fontSize: "9px", fontWeight: "800", color: t.text2,
+            textTransform: "uppercase", letterSpacing: "0.8px",
+            textAlign: "center", lineHeight: 1.2,
+          }}>
             {jobTitle}
           </span>
         </div>
 
-        {/* Grille de cartes */}
         <div style={{
           display: "grid",
-          gridTemplateColumns: useDoubleColumn ? "repeat(2, 116px)" : "1fr",
+          gridTemplateColumns: useDoubleColumn ? "repeat(2, 96px)" : "1fr",
           gap: useDoubleColumn ? "12px 24px" : "12px",
           justifyContent: "center"
         }}>
@@ -450,7 +451,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                    <input type="text" value={structModal.newVal} onChange={e => setStructModal({...structModal, newVal: e.target.value})} placeholder="Saisir le nom..." style={{ width:"100%", padding:"12px 16px", borderRadius:"10px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontWeight:"600" }} autoFocus />
                  </div>
 
-                 {/* SÉLECTEUR DE COULEUR SI C'EST UN PÔLE ET QUE LA PALETTE EST DISPO */}
                  {structModal.type === 'role' && rolePalette && (
                    <div>
                      <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px", display:"block" }}>Couleur du Pôle</label>
@@ -509,7 +509,29 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     return (
                       <div key={r} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:rc.bg, border:`1px solid ${rc.bd}`, padding:"8px 12px", borderRadius:"8px" }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                          <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:rc.text }}/>
+                          
+                          {/* SÉLECTEUR DE COULEUR INTERACTIF (Raccourci visuel) */}
+                          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+                            <div
+                              onClick={() => setColorPickerRole(colorPickerRole === r ? null : r)}
+                              style={{ width: "14px", height: "14px", borderRadius: "50%", background: rc.text, cursor: "pointer", border: `2px solid ${t.surface}`, boxShadow: `0 0 0 1px ${rc.bd}` }}
+                              title="Changer la couleur du Pôle"
+                            />
+                            {colorPickerRole === r && (
+                              <div style={{ position: "absolute", top: "24px", left: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", padding: "8px", display: "flex", gap: "6px", flexWrap: "wrap", width: "120px", zIndex: 100, boxShadow: t.shadowLg }}>
+                                {rolePalette.map((pal, idx) => (
+                                  <div
+                                    key={idx}
+                                    onClick={() => { handleManageStructure('roleColor', 'edit', r, idx); setColorPickerRole(null); }}
+                                    style={{ width: "18px", height: "18px", borderRadius: "50%", background: pal.text, cursor: "pointer", border: rc.text === pal.text ? `2px solid ${t.text}` : "none", transition:"transform 0.1s" }}
+                                    onMouseOver={e=>e.currentTarget.style.transform="scale(1.2)"}
+                                    onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}
+                                  />
+                                ))}
+                              </div>
+                            )}
+                          </div>
+
                           <span style={{ fontSize:"13px", color:rc.text, fontWeight:"700" }}>{r}</span>
                         </div>
                         <div style={{ display:"flex", gap:"8px" }}>
@@ -532,7 +554,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   {orgJobTitles.map(j => (
                     <div key={j} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                        <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:t.text3 }}/>
+                        <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:t.text3 }}/>
                         <span style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>{j}</span>
                       </div>
                       <div style={{ display:"flex", gap:"8px" }}>
@@ -629,7 +651,8 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </div>
         </div>
 
-        {isLinkingMode && !showArchived && (
+        {/* OUTIL DE LIAISON (Lignes) */}
+        {isAdminOrSuper && isLinkingMode && !showArchived && (
           <div className="animate-fade-in" style={{ background: t.accentBg, border:`1px solid ${t.accentBd}`, padding:"12px 16px", borderRadius:"12px", display:"flex", alignItems:"center", gap:"16px", boxShadow:t.shadowSm }}>
              <div style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>
                {!linkSourceId ? "1. Cliquez sur la carte Parent ➔" : "2. Cliquez sur les Enfants pour relier (ou retirer) ➔"}
@@ -649,7 +672,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </div>
         )}
 
-        {/* L'ARBORESCENCE (Conteneur Scrollable Fixe + Zone SVG/Zoom Compensée) */}
+        {/* L'ARBORESCENCE */}
         <div ref={containerRef} className="scroll-container" style={{ flex:1, overflow:"auto", background: t.bg, border:`1px solid ${t.border}`, borderRadius:"16px", boxShadow:t.shadowSm, position:"relative" }}>
           
           <div id="zoom-wrapper" ref={contentRef} style={{ transform: `scale(${zoom})`, transformOrigin: "top left", width: `${100/zoom}%`, minHeight: `${100/zoom}%`, position: "relative", padding: "60px 40px", display: "flex", flexDirection: "column", gap: "60px", alignItems: "center" }}>
@@ -663,7 +686,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   if(!posA || !posB) return null;
 
                   let path = "";
-                  // Ligne Râteau orthogonale pure (Parent haut -> Enfant bas)
                   if (posB.topY > posA.bottomY + 10) {
                     const busY = posA.bottomY + 30; 
                     path = `M ${posA.bottomX},${posA.bottomY} L ${posA.bottomX},${busY} L ${posB.topX},${busY} L ${posB.topX},${posB.topY}`;
@@ -683,7 +705,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               </svg>
             )}
 
-            {/* BOUTONS SUPPRESSION DES LIGNES */}
             {isLinkingMode && !showArchived && orgConnections.map(conn => {
               const posA = cardPositions[conn.source];
               const posB = cardPositions[conn.target];
@@ -706,7 +727,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               )
             })}
 
-            {/* LE CORPS DE L'ORGANIGRAMME (Structure 3 niveaux horizontaux) */}
+            {/* LE CORPS DE L'ORGANIGRAMME */}
             <div style={{ display: "flex", flexDirection: "column", gap: "60px", width: "100%", position: "relative", zIndex: 10 }}>
               
               {showArchived ? (
@@ -720,7 +741,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     <div style={{ fontSize: "10px", fontWeight: "800", color: t.text3, letterSpacing: "2px", textTransform: "uppercase", opacity:0.6 }}>Niveau 1 — Direction</div>
                     <div 
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 1)}
-                      style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"200px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
+                      style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", alignItems:"flex-start", gap:"40px", minWidth:"200px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
                       {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 1 – Direction)</div>}
                       {Object.entries(groupMembersByJob(level1)).map(([job, members]) => (
@@ -734,7 +755,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     <div style={{ fontSize: "10px", fontWeight: "800", color: t.text3, letterSpacing: "2px", textTransform: "uppercase", opacity:0.6 }}>Niveau 2 — Responsables</div>
                     <div 
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 2)}
-                      style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"400px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
+                      style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", alignItems:"flex-start", gap:"40px", minWidth:"400px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
                       {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 2 – Responsables)</div>}
                       {Object.entries(groupMembersByJob(level2)).map(([job, members]) => (
@@ -748,7 +769,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     <div style={{ fontSize: "10px", fontWeight: "800", color: t.text3, letterSpacing: "2px", textTransform: "uppercase", opacity:0.6 }}>Niveau 3 — Équipes</div>
                     <div 
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 3)}
-                      style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"600px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
+                      style={{ display:"flex", flexWrap:"nowrap", justifyContent:"center", alignItems:"flex-start", gap:"40px", minWidth:"600px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
                       {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 3 – Équipes)</div>}
                       {Object.entries(groupMembersByJob(level3)).map(([job, members]) => (
@@ -764,11 +785,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       </div>
 
-      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Adapté au contenu) ── */}
+      {/* ── ZONE DROITE : PANNEAU LATÉRAL ── */}
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
-          {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             {panelMode === 'indicators' && selectedPerson ? (
                <div style={{ display:"flex", alignItems:"center", gap:"12px", width:"100%" }}>
@@ -882,7 +902,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 </div>
 
-                {/* Affichage des Étiquettes en mode VUE */}
                 {!editForm.isEditing && editForm.tags && editForm.tags.length > 0 && (
                    <div style={{ marginTop:"8px" }}>
                      <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Missions</div>
@@ -924,7 +943,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       </div>
                     </div>
 
-                    {/* SELECTION DES ETIQUETTES EN MODE EDITION */}
                     <div>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                         <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Étiquettes (Missions transverses)</div>
@@ -996,14 +1014,27 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       </button>
                     </div>
 
+                    {/* BOUTONS RESTAURER ET SUPPRIMER DÉFINITIVEMENT */}
                     {isAdminOrSuper && (
-                       <div style={{ marginTop:"16px", textAlign:"center", paddingBottom:"8px" }}>
+                       <div style={{ marginTop:"24px", display:"flex", flexDirection:"column", gap:"10px", alignItems:"center", paddingBottom:"8px" }}>
                          {selectedPerson.archived ? (
-                            <button onClick={handleRestoreUser} style={{ background:"transparent", border:"none", color:t.green, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
-                              Restaurer ce collaborateur
-                            </button>
+                            <>
+                              <button onClick={handleRestoreUser} style={{ background:"transparent", border:"none", color:t.green, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
+                                Restaurer ce collaborateur
+                              </button>
+                              {isSuperAdmin && (
+                                 <button onClick={async () => {
+                                   if(window.confirm(`⚠️ ACTION IRRÉVERSIBLE\nVoulez-vous vraiment supprimer DÉFINITIVEMENT ${selectedPerson.prenom} ${selectedPerson.nom} ?\nSon profil et ses statistiques disparaîtront à jamais.`)) {
+                                     await handleHardDeleteMember(selectedPerson.id, selectedPerson.type);
+                                     setEditForm(null);
+                                   }
+                                 }} style={{ background:"transparent", border:"none", color:t.red, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
+                                   Supprimer définitivement
+                                 </button>
+                              )}
+                            </>
                          ) : (
-                            <button onClick={handleArchiveUser} style={{ background:"transparent", border:"none", color:t.red, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
+                            <button onClick={handleArchiveUser} style={{ background:"transparent", border:"none", color:t.amber, fontSize:"11px", fontWeight:"700", cursor:"pointer", textDecoration:"underline" }}>
                               Archiver ce collaborateur
                             </button>
                          )}
