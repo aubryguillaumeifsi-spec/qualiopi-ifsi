@@ -10,7 +10,6 @@ import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
-// 🎯 AJOUT DE STORAGE ICI
 import { db, auth, storage, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -194,7 +193,6 @@ function MainApp() {
   
   const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
   
-  // 🎯 NOUVEAU : Fonction de sauvegarde de l'établissement pour le nouvel onglet
   const handleSaveEtab = async (fields) => {
     if (!selectedIfsi) return;
     await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true });
@@ -363,6 +361,11 @@ function MainApp() {
       }
     }
   };
+
+  // 🎯 CORRECTION : Restauration de la logique Index/Suivant/Précédent pour ne pas faire planter la modale
+  const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
+  const hasPrev = currentIndex > 0;
+  const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
 
   const saveModal = (updated, action) => { 
     handleAutoSave(updated); 
@@ -570,8 +573,20 @@ function MainApp() {
         </div>
       )}
 
+      {/* 🎯 CORRECTION ICI : La DetailModal est restaurée avec ses props exactes */}
       {modalCritere && (
-        <DetailModal critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} onAutoSave={handleAutoSave} saveData={saveData} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} hasPrev={false} hasNext={false} />
+        <DetailModal 
+          critere={modalCritere} 
+          onClose={() => setModalCritere(null)} 
+          onSave={saveModal} 
+          onAutoSave={handleAutoSave} 
+          saveData={saveData} 
+          isReadOnly={isArchive} 
+          isAuditMode={isAuditMode} 
+          allMembers={allIfsiMembers} 
+          hasPrev={hasPrev} 
+          hasNext={hasNext} 
+        />
       )}
 
       {/* 🧭 SIDEBAR GAUCHE */}
@@ -605,7 +620,6 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit avec date bien lisible dans tous les modes */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -675,7 +689,6 @@ function MainApp() {
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
           
-          {/* NOUVEAU : Le nouvel onglet Equipe */}
           {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
           
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
