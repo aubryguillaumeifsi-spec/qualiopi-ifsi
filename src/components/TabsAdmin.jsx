@@ -129,18 +129,19 @@ function Field({ label, value, onChange, type = "text", placeholder = "", hint =
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  EquipeTab (Administration Globale)
+//  EquipeTab (Administration Globale de l'IFSI)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function EquipeTab({
   userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser,
   selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm,
   sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t,
-  ifsiData, handleSaveEtab, criteres, 
-  isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode
+  ifsiData, handleSaveEtab, criteres
 }) {
 
-  const [tab, setTab]                 = useState("membres");
+  const [tab, setTab] = useState("membres");
+  
+  // -- Modales et filtres
   const [roleFilter, setRoleFilter]   = useState("tous");
   const [statusFilter, setStatusFilter] = useState("tous");
   const [showInvite, setShowInvite]   = useState(false);
@@ -173,7 +174,7 @@ export function EquipeTab({
         ]
       });
     }
-  }, [ifsiData]);
+  }, [ifsiData, etabForm]);
 
   const updateEtabField = (key, val) => {
     setEtabForm(f => ({ ...f, [key]: val }));
@@ -216,7 +217,7 @@ export function EquipeTab({
     const baseDocs = [...documents];
     const preuveDocs = [];
 
-    if (criteres) {
+    if (Array.isArray(criteres)) {
       criteres.forEach(crit => {
         if (crit.preuves && Array.isArray(crit.preuves)) {
           crit.preuves.forEach((p, idx) => {
@@ -303,12 +304,6 @@ export function EquipeTab({
     await writeLog(selectedIfsi, "Document supprimé", docMeta.name, "admin");
   };
 
-  const handleValidateDoc = async (docMeta) => {
-    const updated = documents.map(d => d.id === docMeta.id ? { ...d, validated: true } : d);
-    await setDoc(doc(db, "etablissements", selectedIfsi), { documents: updated }, { merge: true });
-    await writeLog(selectedIfsi, "Document validé", docMeta.name, "admin");
-  };
-
   // ── Journal ────────────────────────────────────────
   const [logs, setLogs] = useState([]);
   useEffect(() => {
@@ -328,7 +323,7 @@ export function EquipeTab({
     await setDoc(doc(db, "etablissements", selectedIfsi), { notifPrefs: updated }, { merge: true });
   };
 
-  // 🎯 EXPORT JSON
+  // EXPORT JSON
   const handleExportJson = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(criteres, null, 2));
     const dlAnchorElem = document.createElement('a');
@@ -337,7 +332,7 @@ export function EquipeTab({
     dlAnchorElem.click();
   };
 
-  // 🎯 SUPERBE EXPORT EXCEL (HTML to XLS)
+  // EXPORT EXCEL
   const handleExportExcel = () => {
     if (!criteres || criteres.length === 0) return alert("Aucun indicateur disponible à l'export.");
 
@@ -922,12 +917,259 @@ export function EquipeTab({
         </div>
       )}
 
+      {/* ══════════════════════════════════════════════════
+          ONGLET 3 — MÉDIATHÈQUE 
+      ══════════════════════════════════════════════════ */}
+      {tab === "mediatheque" && (
+        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          <div style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, borderRadius: "10px", padding: "14px 18px", display: "flex", gap: "12px", alignItems: "center" }}>
+            <span style={{ fontSize: "20px" }}>🛡️</span>
+            <div>
+              <div style={{ fontSize: "12px", fontWeight: "800", color: t.accent, marginBottom: "2px" }}>Rappel de Confidentialité & RGPD</div>
+              <div style={{ fontSize: "11px", color: t.text2, lineHeight: "1.4" }}>
+                Cet espace est partagé avec toute l'équipe. Veillez à ne déposer <strong>aucune donnée personnelle sensible, médicale ou non anonymisée</strong> (dossiers de patients, notes nominatives d'étudiants, etc.).
+              </div>
+            </div>
+          </div>
+
+          <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+            <input
+              value={docSearch} onChange={e => setDocSearch(e.target.value)}
+              placeholder="Rechercher un document…"
+              style={{ width: "220px", padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
+            />
+            <div style={{ display: "flex", gap: "6px", flexWrap:"wrap" }}>
+              {["tous", ...DOC_CATS].map(c => {
+                const cc = CAT_COLORS[c];
+                return (
+                  <button key={c} onClick={() => setDocCatFilter(c)} style={{
+                    padding: "6px 12px", borderRadius: "6px", cursor: "pointer",
+                    border: `1px solid ${docCatFilter === c ? (cc ? cc.c + "60" : t.accentBd) : t.border}`,
+                    background: docCatFilter === c ? (cc ? cc.bg : t.surface) : "transparent",
+                    color: docCatFilter === c ? (cc ? cc.c : t.text2) : t.text2,
+                    fontSize: "11px", fontWeight: "700", transition: "all 0.12s",
+                  }}>{c === "tous" ? "Tout" : c}</button>
+                );
+              })}
+            </div>
+
+            <div style={{ marginLeft: "auto" }}>
+              <button
+                onClick={() => fileInputRef.current?.click()}
+                style={{ padding: "8px 16px", background: t.accent, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.accentBd}` }}
+              >+ Déposer un document</button>
+              <input ref={fileInputRef} type="file" hidden accept=".pdf,.docx,.xlsx,.pptx,.jpg,.png"
+                onChange={e => { if (e.target.files[0]) handleFileSelect(e.target.files[0]); e.target.value = ""; }} />
+            </div>
+          </div>
+
+          {uploadProgress !== null && (
+            <div style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, borderRadius: "8px", padding: "10px 14px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: t.accent, marginBottom: "6px", fontWeight:"700" }}>
+                <span>Envoi en cours…</span><span>{uploadProgress}%</span>
+              </div>
+              <div style={{ height: "4px", background: t.border, borderRadius: "2px", overflow: "hidden" }}>
+                <div style={{ width: `${uploadProgress}%`, height: "100%", background: `linear-gradient(90deg,${t.accent},${t.accent})`, transition: "width 0.3s", borderRadius: "2px" }} />
+              </div>
+            </div>
+          )}
+
+          {filteredDocs.length === 0 ? (
+            <div style={{ textAlign: "center", color: t.text3, fontSize: "13px", padding: "40px", background:t.surface, borderRadius:"12px", border:`1px dashed ${t.border}` }}>
+              Aucun document ne correspond à vos filtres.
+            </div>
+          ) : (
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "12px" }}>
+              {filteredDocs.map(docMeta => {
+                const cc = CAT_COLORS[docMeta.cat] || CAT_COLORS["Autre"];
+                return (
+                  <div key={docMeta.id}
+                    style={{ background: t.surface, border: `1px solid ${docMeta.isPreuve ? cc.c+"40" : t.border}`, borderRadius: "12px", padding: "16px", boxShadow: t.shadowSm, transition: "all 0.15s", position:"relative", overflow:"hidden" }}
+                    onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = t.shadow; }}
+                    onMouseOut={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = t.shadowSm; }}
+                  >
+                    {docMeta.isPreuve && <div style={{ position:"absolute", top:0, left:0, width:"4px", height:"100%", background:cc.c }} />}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                      <span style={{ background: cc.bg, color: cc.c, border: `1px solid ${cc.c}30`, fontSize: "9px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>{docMeta.cat}</span>
+                      
+                      {docMeta.isPreuve ? (
+                        <span style={{ fontSize:"9px", fontWeight:"700", color:t.text3 }}>Indicateur {docMeta.indicNum}</span>
+                      ) : (
+                        docMeta.validated
+                          ? <span style={{ background: t.greenBg, border: `1px solid ${t.greenBd}`, color: t.green, fontSize: "9px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>✓ Validé</span>
+                          : <span style={{ background: t.amberBg, border: `1px solid ${t.amberBd}`, color: t.amber, fontSize: "9px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>En attente</span>
+                      )}
+                    </div>
+                    
+                    <div style={{ fontSize: "13px", fontWeight: "700", color: t.text, lineHeight: "1.4", marginBottom: "6px", wordBreak:"break-word" }}>{docMeta.name}</div>
+                    <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>{docMeta.author} · {docMeta.size} · {formatMonthYear(docMeta.date)}</div>
+                    
+                    <div style={{ display: "flex", gap: "6px" }}>
+                      <a href={docMeta.downloadURL} target="_blank" rel="noreferrer"
+                        style={{ flex: 1, padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text, fontSize: "11px", fontWeight: "700", cursor: "pointer", textAlign: "center", textDecoration: "none", transition:"all 0.2s" }}
+                        onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
+                      >
+                        👁 Ouvrir
+                      </a>
+
+                      {!docMeta.isPreuve && (
+                        <>
+                          <button onClick={() => setEditDocModal(docMeta)} title="Renommer / Modifier"
+                            style={{ width: "32px", padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text2, fontSize: "12px", cursor: "pointer", transition:"all 0.2s" }}
+                            onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
+                          >
+                            ✏️
+                          </button>
+                          <button onClick={() => handleDeleteDoc(docMeta)} title="Supprimer"
+                            style={{ width: "32px", padding: "7px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", color: t.red, fontSize: "11px", cursor: "pointer", transition:"all 0.2s" }}
+                            onMouseOver={e=>{e.currentTarget.style.background=t.red; e.currentTarget.style.color="white";}} onMouseOut={e=>{e.currentTarget.style.background=t.redBg; e.currentTarget.style.color=t.red;}}
+                          >
+                            ✕
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════
+          ONGLET 4 — JOURNAL D'ACCÈS
+      ══════════════════════════════════════════════════ */}
+      {tab === "journal" && (
+        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+          {logs.some(l => l.type === "alert") && (
+            <div style={{ background: t.redBg, border: `1px solid ${t.redBd}`, borderLeft: `3px solid ${t.red}`, borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px" }}>
+              <span style={{ fontSize: "14px" }}>⚠️</span>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "700", color: t.red }}>Tentative(s) de connexion suspecte(s) détectée(s)</div>
+                <div style={{ fontSize: "9.5px", color: t.text3, marginTop: "1px" }}>Vérifiez le journal ci-dessous.</div>
+              </div>
+            </div>
+          )}
+
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
+            <div style={{ padding: "12px 18px", borderBottom: `1px solid ${t.border}`, background: t.surface2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+              <span style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text }}>Journal d'activité</span>
+              <span style={{ fontSize: "10px", color: t.text3 }}>{logs.length} événements récents</span>
+            </div>
+
+            {logs.length === 0 ? (
+              <div style={{ padding: "40px", textAlign: "center", color: t.text3, fontSize: "12px", fontStyle: "italic" }}>Aucun événement enregistré.</div>
+            ) : logs.map((log, i) => {
+              const cfg = LOG_CFG[log.type] || LOG_CFG.admin;
+              const { c, bg, bd } = sc(t, cfg.colorKey);
+              return (
+                <div key={log.id}
+                  style={{ display: "grid", gridTemplateColumns: "28px 1fr 180px 110px", gap: "10px", padding: "10px 18px", borderBottom: i < logs.length - 1 ? `1px solid ${t.border2}` : "none", alignItems: "center", transition: "background 0.1s" }}
+                  onMouseOver={e => e.currentTarget.style.background = t.surface2}
+                  onMouseOut={e => e.currentTarget.style.background = "transparent"}
+                >
+                  <div style={{ width: "24px", height: "24px", borderRadius: "6px", background: bg, border: `1px solid ${bd}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", flexShrink: 0 }}>
+                    {cfg.icon}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "12px", fontWeight: "600", color: t.text }}>{log.action}</div>
+                    <div style={{ fontSize: "10px", color: t.text3, marginTop: "1px" }}>{log.detail}</div>
+                  </div>
+                  <div style={{ fontSize: "10px", color: t.text2 }}>{log.user}</div>
+                  <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "9px", color: t.text3, textAlign: "right" }}>
+                    {log.createdAt?.toDate ? timeAgo(log.createdAt.toDate().toISOString()) : "—"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* ══════════════════════════════════════════════════
+          ONGLET 5 — PARAMÈTRES
+      ══════════════════════════════════════════════════ */}
+      {tab === "parametres" && (
+        <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
+
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🔔 Notifications email</div>
+            {[
+              { k: "connexion",    l: "Nouvelles connexions",       sub: "Alerte à chaque login"    },
+              { k: "modification", l: "Modifications indicateurs",  sub: "Changement de statut"     },
+              { k: "export",       l: "Exports PDF",                sub: "Après chaque export"      },
+              { k: "alerte",       l: "Alertes de sécurité",        sub: "Connexions échouées", colorKey: "red" },
+            ].map(n => (
+              <div key={n.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${t.border2}` }}>
+                <div>
+                  <div style={{ fontSize: "12px", fontWeight: "600", color: t.text }}>{n.l}</div>
+                  <div style={{ fontSize: "9px", color: t.text3 }}>{n.sub}</div>
+                </div>
+                <Toggle val={notifPrefs[n.k]} onChange={() => toggleNotif(n.k)} colorKey={n.colorKey || "accent"} t={t} />
+              </div>
+            ))}
+          </div>
+
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports & sauvegardes</div>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>Export Excel des indicateurs</div>
+                <div style={{ fontSize: "9px", color: t.text3 }}>Tableau de bord complet avec couleurs</div>
+              </div>
+              <button onClick={handleExportExcel} style={{ padding: "5px 11px", background: t.greenBg, border: `1px solid ${t.greenBd}`, color: t.green, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter XLS</button>
+            </div>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>Export JSON brut</div>
+                <div style={{ fontSize: "9px", color: t.text3 }}>Toutes les données Qualiopi</div>
+              </div>
+              <button onClick={handleExportJson} style={{ padding: "5px 11px", background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter JSON</button>
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>Sauvegarde complète</div>
+                <div style={{ fontSize: "9px", color: t.text3 }}>Archive ZIP</div>
+              </div>
+              <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: t.goldBg, border: `1px solid ${t.goldBd}`, color: t.gold, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter ZIP</button>
+            </div>
+          </div>
+
+          <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.red, marginBottom: "6px" }}>⚠ Zone dangereuse</div>
+            <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>Actions irréversibles — nécessitent confirmation</div>
+            {[
+              { l: "Réinitialiser les indicateurs", sub: "Remet à zéro la campagne active", k: "amber" },
+              { l: "Supprimer l'établissement",     sub: "Supprime toutes les données",     k: "red"   },
+            ].map(a => {
+              const { c, bg, bd } = sc(t, a.k);
+              return (
+                <div key={a.l} style={{ padding: "9px 11px", background: bg, border: `1px solid ${bd}`, borderRadius: "7px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontSize: "11px", fontWeight: "600", color: c }}>{a.l}</div>
+                    <div style={{ fontSize: "9px", color: t.text3 }}>{a.sub}</div>
+                  </div>
+                  <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: "transparent", border: `1px solid ${bd}`, color: c, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer", flexShrink: 0, marginLeft: "8px" }}>
+                    Exécuter
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  CompteTab (PROFIL UTILISATEUR)
+//  CompteTab (LE NOUVEAU PROFIL UTILISATEUR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CompteTab({
