@@ -9,7 +9,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const [panelMode, setPanelMode] = useState('profile'); 
   const [zoom, setZoom] = useState(0.75); 
   const [filtreRole, setFiltreRole] = useState(null); 
-  const [colorPickerRole, setColorPickerRole] = useState(null); // Gère l'ouverture du choix de couleur
+
+  // 🎯 NOUVEAU : Modale de configuration moderne
+  const [structModal, setStructModal] = useState(null);
 
   // --- SYSTEME DE LIAISON ---
   const [isLinkingMode, setIsLinkingMode] = useState(false);
@@ -29,7 +31,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   ];
 
   const isAdminOrSuper = userProfile?.role === "admin" || userProfile?.role === "superadmin";
-  const isSuperAdmin = userProfile?.role === "superadmin";
 
   const getUserCriteres = (person) => {
     if (!person) return []; 
@@ -128,6 +129,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     return () => { clearTimeout(timer); window.removeEventListener('resize', updatePositions); };
   }, [updatePositions, showArchived, editForm, isLinkingMode, zoom]);
 
+  // --- ACTIONS PANNEAU ---
   const handleArchiveUser = async () => {
     if (window.confirm(`Archiver ${selectedPerson.prenom} ${selectedPerson.nom} ?`)) {
       await handleUpdateUserDetail(selectedPerson.id, selectedPerson.type, { archived: true });
@@ -181,7 +183,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         phone: editForm.phone,
         jobTitles: editForm.jobTitles,
         roles: editForm.roles,
-        tags: editForm.tags, 
+        tags: editForm.tags,
         status: editForm.status
       });
     }
@@ -219,6 +221,37 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
     const match = String(num).match(/(\d+)$/);
     const n = match ? match[1] : String(num).replace(/\D/g, '');
     return `${critere}.${n}`;
+  };
+
+  // 🎯 GESTION DE LA MODALE DE CONFIGURATION (Ajout/Édition/Suppression + Couleurs)
+  const openStructModal = (type, action, oldVal = "") => {
+    let defaultColorIdx = 0;
+    if (type === 'role' && action === 'edit') {
+       const rc = getRoleColor(oldVal);
+       defaultColorIdx = rolePalette.findIndex(p => p.bg === rc.bg);
+       if(defaultColorIdx === -1) defaultColorIdx = 0;
+    }
+    setStructModal({ type, action, oldVal, newVal: oldVal, colorIdx: defaultColorIdx });
+  };
+
+  const submitStructModal = async () => {
+    const { type, action, oldVal, newVal, colorIdx } = structModal;
+
+    if (action === 'delete') {
+      await handleManageStructure(type, 'delete', oldVal);
+    } else {
+      if (!newVal || !newVal.trim()) return alert("Le nom ne peut pas être vide.");
+      const cleanVal = newVal.trim();
+
+      // Sauvegarde du nom
+      await handleManageStructure(type, action, oldVal, cleanVal);
+
+      // Si c'est un Pôle, on sauvegarde aussi la couleur sélectionnée
+      if (type === 'role' && colorIdx !== undefined && colorIdx !== -1) {
+        await handleManageStructure('roleColor', 'edit', cleanVal, colorIdx);
+      }
+    }
+    setStructModal(null);
   };
 
   const level1 = displayMembers.filter(m => m.orgLevel === 1);
@@ -361,7 +394,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         alignItems: "center",
         gap: "8px",
         zIndex: 2,
-        alignSelf: "flex-start",
+        alignSelf: "flex-start", 
       }}>
         {/* Header minimaliste */}
         <div style={{
@@ -387,11 +420,11 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
           </span>
         </div>
 
-        {/* Grille de cartes intelligente avec un GAP VERTICAL généreux pour les couloirs */}
+        {/* Grille de cartes intelligente avec espacement augmenté */}
         <div style={{
           display: "grid",
           gridTemplateColumns: useDoubleColumn ? "repeat(2, 96px)" : "1fr",
-          gap: useDoubleColumn ? "12px 24px" : "12px", // Espace augmenté entre les colonnes de formateurs
+          gap: useDoubleColumn ? "12px 24px" : "12px",
           justifyContent: "center"
         }}>
           {members.map(m => <CompactCard key={m.id} m={m} />)}
@@ -403,25 +436,81 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   return (
     <div className="animate-fade-in" style={{ display:"flex", gap:"24px", height:"100%" }}>
       
-      {/* ── MODAL : CONFIGURATION (SUPER ADMIN) ── */}
+      {/* ── MODAL : ÉDITION STRUCTURE (AJOUT / MODIF / SUPPR) ── */}
+      {structModal && (
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.6)", zIndex:10000, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(3px)" }}>
+          <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"28px", width:"420px", boxShadow:t.shadowLg }}>
+            
+            <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"26px", color:t.text, margin:"0 0 16px 0" }}>
+              {structModal.action === 'delete' ? "Confirmer la suppression" :
+               structModal.action === 'add' ? `Ajouter : ${structModal.type === 'role' ? 'Pôle' : structModal.type === 'jobTitle' ? 'Fonction' : 'Étiquette'}` :
+               `Modifier : ${structModal.oldVal}`}
+            </h3>
+
+            {structModal.action === 'delete' ? (
+               <p style={{ fontSize:"14px", color:t.text2, marginBottom:"24px", lineHeight:1.5 }}>
+                 Êtes-vous sûr de vouloir supprimer <strong>{structModal.oldVal}</strong> ? <br/><br/>
+                 Cette action est irréversible et impactera tous les membres qui y sont rattachés.
+               </p>
+            ) : (
+               <div style={{ display:"flex", flexDirection:"column", gap:"20px", marginBottom:"28px" }}>
+                 <div>
+                   <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px", display:"block" }}>Nom</label>
+                   <input type="text" value={structModal.newVal} onChange={e => setStructModal({...structModal, newVal: e.target.value})} placeholder="Saisir le nom..." style={{ width:"100%", padding:"12px 16px", borderRadius:"10px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontWeight:"600" }} autoFocus />
+                 </div>
+
+                 {/* SÉLECTEUR DE COULEUR SI C'EST UN PÔLE */}
+                 {structModal.type === 'role' && (
+                   <div>
+                     <label style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px", display:"block" }}>Couleur du Pôle</label>
+                     <div style={{ display:"flex", flexWrap:"wrap", gap:"10px", background:t.surface2, padding:"16px", borderRadius:"10px", border:`1px solid ${t.border}` }}>
+                       {rolePalette.map((pal, idx) => (
+                         <div 
+                           key={idx} 
+                           onClick={() => setStructModal({...structModal, colorIdx: idx})} 
+                           style={{ 
+                             width:"28px", height:"28px", borderRadius:"50%", background:pal.text, cursor:"pointer", 
+                             border: structModal.colorIdx === idx ? `3px solid ${t.bg}` : "none", 
+                             outline: structModal.colorIdx === idx ? `2px solid ${t.text}` : "none", 
+                             transition:"all 0.2s", transform: structModal.colorIdx === idx ? "scale(1.15)" : "scale(1)" 
+                           }} 
+                         />
+                       ))}
+                     </div>
+                   </div>
+                 )}
+               </div>
+            )}
+
+            <div style={{ display:"flex", justifyContent:"flex-end", gap:"12px" }}>
+              <button onClick={() => setStructModal(null)} style={{ padding:"10px 20px", borderRadius:"10px", border:"none", background:"transparent", color:t.text2, fontWeight:"700", cursor:"pointer", fontSize:"13px" }}>Annuler</button>
+              <button onClick={submitStructModal} style={{ padding:"10px 24px", borderRadius:"10px", border:"none", background:structModal.action === 'delete' ? t.red : t.accent, color:"white", fontWeight:"700", cursor:"pointer", fontSize:"13px", boxShadow:t.shadowSm }}>
+                {structModal.action === 'delete' ? "Supprimer" : "Enregistrer"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODAL : CONFIGURATION LISTE (SUPER ADMIN) ── */}
       {isSettingsOpen && (
-        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
+        <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9998, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
           <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", width:"900px", maxWidth:"90vw", boxShadow:t.shadowLg, display:"flex", flexDirection:"column", maxHeight:"80vh" }}>
             <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"24px" }}>
               <div>
                 <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"28px", color:t.text, margin:0 }}>Configuration de l'équipe</h3>
-                <div style={{ fontSize:"13px", color:t.text2 }}>Gérez les pôles, les fonctions (titres) et les étiquettes (missions transverses). Cliquez sur les pastilles de couleur pour les modifier.</div>
+                <div style={{ fontSize:"13px", color:t.text2 }}>Gérez les pôles, les fonctions (titres) et les étiquettes (missions transverses).</div>
               </div>
               <button onClick={()=>setIsSettingsOpen(false)} style={{ background:t.surface2, border:`1px solid ${t.border}`, borderRadius:"8px", padding:"8px", cursor:"pointer", color:t.text }}>✕</button>
             </div>
             
-            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"32px", overflowY:"auto", paddingBottom:"10px", paddingRight:"10px" }} className="scroll-container">
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr 1fr", gap:"32px", overflowY:"auto", paddingBottom:"10px" }} className="scroll-container">
               
-              {/* Colonne 1 : Pôles et Couleurs */}
+              {/* Colonne 1 : Pôles */}
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Pôles (Équipes)</div>
-                  <button onClick={() => { const v = prompt("Nouveau Pôle ?"); if(v) handleManageStructure('role', 'add', null, v); }} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
+                  <button onClick={() => openStructModal('role', 'add')} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
                   {orgRoles.map(r => {
@@ -429,34 +518,12 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     return (
                       <div key={r} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:rc.bg, border:`1px solid ${rc.bd}`, padding:"8px 12px", borderRadius:"8px" }}>
                         <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                          
-                          {/* SÉLECTEUR DE COULEUR INTERACTIF */}
-                          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
-                            <div
-                              onClick={() => setColorPickerRole(colorPickerRole === r ? null : r)}
-                              style={{ width: "14px", height: "14px", borderRadius: "50%", background: rc.text, cursor: "pointer", border: `2px solid ${t.surface}`, boxShadow: `0 0 0 1px ${rc.bd}` }}
-                              title="Changer la couleur du Pôle"
-                            />
-                            {colorPickerRole === r && (
-                              <div style={{ position: "absolute", top: "24px", left: 0, background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", padding: "8px", display: "flex", gap: "6px", flexWrap: "wrap", width: "120px", zIndex: 100, boxShadow: t.shadowLg }}>
-                                {rolePalette.map((pal, idx) => (
-                                  <div
-                                    key={idx}
-                                    onClick={() => { handleManageStructure('roleColor', 'edit', r, idx); setColorPickerRole(null); }}
-                                    style={{ width: "18px", height: "18px", borderRadius: "50%", background: pal.text, cursor: "pointer", border: rc.text === pal.text ? `2px solid ${t.text}` : "none", transition:"transform 0.1s" }}
-                                    onMouseOver={e=>e.currentTarget.style.transform="scale(1.2)"}
-                                    onMouseOut={e=>e.currentTarget.style.transform="scale(1)"}
-                                  />
-                                ))}
-                              </div>
-                            )}
-                          </div>
-
+                          <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:rc.text }}/>
                           <span style={{ fontSize:"13px", color:rc.text, fontWeight:"700" }}>{r}</span>
                         </div>
                         <div style={{ display:"flex", gap:"8px" }}>
-                          <button onClick={() => { const v = prompt("Renommer le pôle (Met à jour tous les membres) :", r); if(v && v!==r) handleManageStructure('role', 'edit', r, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
-                          <button onClick={() => { if(window.confirm(`Supprimer le pôle "${r}" pour tout le monde ?`)) handleManageStructure('role', 'delete', r); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
+                          <button onClick={() => openStructModal('role', 'edit', r)} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
+                          <button onClick={() => openStructModal('role', 'delete', r)} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
                         </div>
                       </div>
                     );
@@ -468,18 +535,18 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Fonctions (Titres)</div>
-                  <button onClick={() => { const v = prompt("Nouvelle Fonction ?"); if(v) handleManageStructure('jobTitle', 'add', null, v); }} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
+                  <button onClick={() => openStructModal('jobTitle', 'add')} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
                   {orgJobTitles.map(j => (
                     <div key={j} style={{ display:"flex", justifyContent:"space-between", alignItems:"center", background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 12px", borderRadius:"8px" }}>
                       <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
-                        <div style={{ width:"8px", height:"8px", borderRadius:"50%", background:t.text3 }}/>
+                        <div style={{ width:"10px", height:"10px", borderRadius:"50%", background:t.text3 }}/>
                         <span style={{ fontSize:"13px", color:t.text, fontWeight:"600" }}>{j}</span>
                       </div>
                       <div style={{ display:"flex", gap:"8px" }}>
-                        <button onClick={() => { const v = prompt("Renommer la fonction (Met à jour tous les membres) :", j); if(v && v!==j) handleManageStructure('jobTitle', 'edit', j, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
-                        <button onClick={() => { if(window.confirm(`Supprimer la fonction "${j}" pour tout le monde ?`)) handleManageStructure('jobTitle', 'delete', j); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
+                        <button onClick={() => openStructModal('jobTitle', 'edit', j)} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
+                        <button onClick={() => openStructModal('jobTitle', 'delete', j)} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
                       </div>
                     </div>
                   ))}
@@ -490,7 +557,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
               <div>
                 <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                   <div style={{ fontSize:"12px", fontWeight:"800", color:t.text, textTransform:"uppercase", letterSpacing:"1px" }}>Étiquettes (Missions)</div>
-                  <button onClick={() => { const v = prompt("Nouvelle Étiquette ?"); if(v) handleManageStructure('tag', 'add', null, v); }} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
+                  <button onClick={() => openStructModal('tag', 'add')} style={{ background:t.accentBg, border:`1px solid ${t.accentBd}`, color:t.accent, padding:"4px 10px", borderRadius:"6px", fontSize:"11px", fontWeight:"800", cursor:"pointer" }}>+ Ajouter</button>
                 </div>
                 <div style={{ display:"flex", flexDirection:"column", gap:"8px" }}>
                   {orgTags.map(tag => (
@@ -499,8 +566,8 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                         <span style={{ background:t.accentBg, color:t.accent, fontSize:"10px", fontWeight:"800", padding:"2px 6px", borderRadius:"4px", textTransform:"uppercase" }}>{tag}</span>
                       </div>
                       <div style={{ display:"flex", gap:"8px" }}>
-                        <button onClick={() => { const v = prompt("Renommer l'étiquette (Met à jour tous les membres) :", tag); if(v && v!==tag) handleManageStructure('tag', 'edit', tag, v); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
-                        <button onClick={() => { if(window.confirm(`Supprimer l'étiquette "${tag}" pour tout le monde ?`)) handleManageStructure('tag', 'delete', tag); }} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
+                        <button onClick={() => openStructModal('tag', 'edit', tag)} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>✏️</button>
+                        <button onClick={() => openStructModal('tag', 'delete', tag)} style={{ background:"transparent", border:"none", cursor:"pointer", fontSize:"14px" }}>🗑️</button>
                       </div>
                     </div>
                   ))}
@@ -704,11 +771,10 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       </div>
 
-      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Adapté au contenu) ── */}
+      {/* ── ZONE DROITE : PANNEAU LATÉRAL ── */}
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
-          {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             {panelMode === 'indicators' && selectedPerson ? (
                <div style={{ display:"flex", alignItems:"center", gap:"12px", width:"100%" }}>
@@ -822,7 +888,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                   </div>
                 </div>
 
-                {/* Affichage des Étiquettes en mode VUE */}
                 {!editForm.isEditing && editForm.tags && editForm.tags.length > 0 && (
                    <div style={{ marginTop:"8px" }}>
                      <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"12px" }}>Missions</div>
@@ -864,7 +929,6 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                       </div>
                     </div>
 
-                    {/* SELECTION DES ETIQUETTES EN MODE EDITION */}
                     <div>
                       <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"12px" }}>
                         <div style={{ fontSize:"11px", fontWeight:"800", color:t.text3, textTransform:"uppercase", letterSpacing:"1px" }}>Étiquettes (Missions transverses)</div>
