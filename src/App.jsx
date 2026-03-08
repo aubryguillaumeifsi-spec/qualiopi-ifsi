@@ -100,12 +100,36 @@ function MainApp() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
-  const [currentUid, setCurrentUid] = useState(null); // 🎯 NOUVEAU: Mémorise l'UID de l'utilisateur
+  const [currentUid, setCurrentUid] = useState(null); 
   const [userProfile, setUserProfile] = useState(null); 
+  
+  // 🎯 NOUVEAU : SIMULATEUR DE VUE SUPER ADMIN
+  const [viewAs, setViewAs] = useState("superadmin");
+
+  // 🧠 Cerveau du simulateur : Génère un faux profil basé sur le vrai, mais avec le rôle choisi
+  const effectiveProfile = useMemo(() => {
+    if (!userProfile) return null;
+    if (userProfile.role === "superadmin" && viewAs !== "superadmin") {
+      return { ...userProfile, role: viewAs }; // Simule le rôle
+    }
+    return userProfile;
+  }, [userProfile, viewAs]);
+
   const [selectedIfsi, setSelectedIfsi] = useState(null); 
   const [campaigns, setCampaigns] = useState(null);
   const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
+
+  // 🛡️ Sécurité du Simulateur : si on passe en mode utilisateur alors qu'on est sur une page Admin, on retourne à l'accueil
+  useEffect(() => {
+    if (viewAs === "user" && ["tour_controle", "equipe", "organigramme"].includes(activeTab)) {
+      setActiveTab("dashboard");
+    }
+    if (viewAs === "admin" && activeTab === "tour_controle") {
+      setActiveTab("dashboard");
+    }
+  }, [viewAs, activeTab]);
+
   const [filterStatut, setFilterStatut] = useState("tous");
   const [filterCritere, setFilterCritere] = useState("tous");
   const [searchTerm, setSearchTerm] = useState("");
@@ -132,7 +156,6 @@ function MainApp() {
     return () => unsub();
   }, []);
 
-  // 🎯 ÉCOUTE DE L'AUTHENTIFICATION
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
@@ -150,7 +173,6 @@ function MainApp() {
     return () => unsubscribe();
   }, []);
 
-  // 🎯 ÉCOUTE EN TEMPS RÉEL DU PROFIL DE L'UTILISATEUR (Pour que la carte en bas à gauche se mette à jour toute seule)
   useEffect(() => {
     if (!currentUid) return;
     const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
@@ -163,7 +185,6 @@ function MainApp() {
     return () => unsub();
   }, [currentUid]);
 
-  // 🎯 ÉCOUTE POUR LE SUPERADMIN
   useEffect(() => {
     if (userProfile?.role === "superadmin") {
       const unsub = onSnapshot(collection(db, "qualiopi"), (snap) => {
@@ -308,7 +329,7 @@ function MainApp() {
     };
   }, [criteres, filterStatut, filterCritere, searchTerm]);
 
-  const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || userProfile?.role === "superadmin"), [teamUsers, userProfile]);
+  const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || effectiveProfile?.role === "superadmin"), [teamUsers, effectiveProfile]);
   const handleSortTeam = (key) => { let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; setTeamSortConfig({ key, direction }); };
   
   const handleIfsiSwitch = async (e) => { 
@@ -554,7 +575,7 @@ function MainApp() {
     );
   };
 
-  // 🎯 CALCULS POUR L'AFFICHAGE DE LA CARTE DE LA BARRE LATÉRALE
+  // 🎯 DONNÉES DYNAMIQUES POUR LA CARTE UTILISATEUR
   const userInitials = (userProfile?.prenom || userProfile?.nom) 
     ? `${(userProfile.prenom || "")[0] || ""}${(userProfile.nom || "")[0] || ""}`.toUpperCase()
     : (auth.currentUser?.email?.charAt(0).toUpperCase() || "?");
@@ -567,7 +588,7 @@ function MainApp() {
   const userAvatarColor = userProfile?.avatarColor || t.accent;
 
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif", position: "relative" }}>
       <link href={GFONT} rel="stylesheet" />
       <style>{`
         html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: ${t.bg}; }
@@ -578,6 +599,11 @@ function MainApp() {
         main::-webkit-scrollbar-track { background: transparent; }
         main::-webkit-scrollbar-thumb { background: ${t.border}; border-radius: 4px; }
       `}</style>
+
+      {/* ✨ LE LISERÉ DORÉ PRESTIGE DU SUPER ADMIN */}
+      {userProfile?.role === "superadmin" && (
+        <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: "3px", background: "linear-gradient(90deg, #d4a030, #fbad14, #d4a030)", zIndex: 9999, boxShadow: "0 0 10px rgba(212,160,48,0.5)" }} />
+      )}
 
       {auditModal.show && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
@@ -620,25 +646,52 @@ function MainApp() {
       )}
 
       {/* 🧭 SIDEBAR GAUCHE */}
-      <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50 }}>
+      <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50, paddingTop: userProfile?.role === "superadmin" ? "10px" : "0" }}>
         
         <div onClick={() => setActiveTab('dashboard')} style={{ padding:"24px 20px 16px", display:"flex", alignItems:"center", gap:"14px", cursor:"pointer" }}>
-          <div style={{ width:"38px", height:"38px", border:`2px solid ${t.gold}`, borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", boxShadow:`0 0 10px ${t.goldBd}`, background:t.goldBg }}>
+          {/* ✨ LOGO GLOWING POUR SUPER ADMIN */}
+          <div style={{ width:"38px", height:"38px", border:`2px solid ${t.gold}`, borderRadius:"10px", display:"flex", alignItems:"center", justifyContent:"center", boxShadow: userProfile?.role === "superadmin" ? `0 0 15px ${t.goldBd}` : "none", background:t.goldBg }}>
             <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"22px", color:t.gold, fontStyle:"italic", lineHeight:1 }}>Q</span>
           </div>
           <div>
             <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.textNav, letterSpacing:"0.2px", lineHeight:1 }}>QualiForma</div>
-            <div style={{ fontSize:"9px", color:t.textNavSub, letterSpacing:"1px", textTransform:"uppercase", marginTop:"4px" }}>Pilotage Qualiopi</div>
+            {/* ✨ TEXTE SUR MESURE POUR SUPER ADMIN */}
+            <div style={{ fontSize:"9px", color: userProfile?.role === "superadmin" ? t.gold : t.textNavSub, letterSpacing:"1px", textTransform:"uppercase", marginTop:"4px", fontWeight: userProfile?.role === "superadmin" ? "800" : "500" }}>
+               {userProfile?.role === "superadmin" ? "Console SuperAdmin" : "Pilotage Qualiopi"}
+            </div>
           </div>
         </div>
 
-        <div style={{ padding:"0 20px 20px", fontSize:"12px", color:t.textNavSub, textTransform:"capitalize", fontWeight:"500", borderBottom:`1px solid ${t.borderNav}` }}>
+        <div style={{ padding:"0 20px 15px", fontSize:"12px", color:t.textNavSub, textTransform:"capitalize", fontWeight:"500", borderBottom: userProfile?.role !== "superadmin" ? `1px solid ${t.borderNav}` : "none" }}>
           {dateJourFormat}
         </div>
 
+        {/* 👁️ LE SIMULATEUR DE VUE EXCLUSIF AU SUPER ADMIN */}
+        {userProfile?.role === "superadmin" && (
+          <div style={{ padding: "0 20px 15px", borderBottom:`1px solid ${t.borderNav}` }}>
+            <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>👁️ Vue (Simulation)</div>
+            <select
+              value={viewAs}
+              onChange={(e) => setViewAs(e.target.value)}
+              style={{
+                width: "100%", padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
+                background: viewAs === "superadmin" ? "rgba(212,160,48,0.15)" : "rgba(255,255,255,0.05)",
+                border: viewAs === "superadmin" ? `1px solid ${t.goldBd}` : `1px solid rgba(255,255,255,0.1)`,
+                color: viewAs === "superadmin" ? t.gold : t.textNav,
+                fontSize: "12px", fontWeight: "700", outline: "none", transition: "all 0.2s"
+              }}
+            >
+              <option value="superadmin" style={{ color: "black" }}>👑 Super Admin</option>
+              <option value="admin" style={{ color: "black" }}>⚙️ Admin IFSI</option>
+              <option value="user" style={{ color: "black" }}>👤 Utilisateur</option>
+            </select>
+          </div>
+        )}
+
         <div style={{ padding:"20px" }}>
           <div style={{ fontSize:"10px", fontWeight:"700", color:t.textNavSub, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"10px" }}>Établissement</div>
-          {userProfile?.role === "superadmin" ? (
+          {/* L'accès au changement d'établissement est conditionné au rôle simulé ! */}
+          {effectiveProfile?.role === "superadmin" ? (
              <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding:"10px 12px", borderRadius:"8px", background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, color:t.textNav, fontSize:"13px", fontWeight:"600", outline:"none", cursor:"pointer" }}>
                {ifsiList.map(i => <option key={i.id} value={i.id} style={{ color:"black" }}>{i.name}</option>)}
                <option value="NEW" style={{ color:"black" }}>+ Nouvel établissement</option>
@@ -668,29 +721,30 @@ function MainApp() {
           </div>
         </div>
 
+        {/* 🎯 LA NAVIGATION EST BASÉE SUR LE RÔLE SIMULÉ (effectiveProfile) */}
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
           {menuBtn("dashboard", "Tableau de bord")}
           {menuBtn("criteres", "Indicateurs")}
-          {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme")}
+          {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme")}
           
           <div style={{ margin:"16px 12px", height:"1px", background:t.borderNav }}/>
           
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Outils</div>
           {menuBtn("livre_blanc", "Livre Blanc")}
-          {(userProfile?.role === "admin" || userProfile?.role === "superadmin") && menuBtn("equipe", "Administration")}
-          {userProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
+          {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("equipe", "Administration")}
+          {effectiveProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
         </div>
 
         {/* 🎯 LA CARTE DE LA BARRE LATÉRALE REFLÈTE EN DIRECT LE PROFIL DE L'UTILISATEUR */}
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
-          <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px" }}>
+          <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="translateX(4px)"} onMouseOut={e=>e.currentTarget.style.transform="translateX(0)"}>
             <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: userAvatarColor, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:"14px", fontWeight:"800", flexShrink:0, boxShadow:`0 2px 8px ${userAvatarColor}60` }}>
               {userInitials}
             </div>
             <div style={{ overflow: "hidden" }}>
               <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{userNameDisplay}</div>
-              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow:"hidden" }}>{userJobDisplay}</div>
+              <div style={{ fontSize: "11px", color: t.textNavSub, marginTop:"2px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow:"hidden" }}>{userJobDisplay}</div>
             </div>
           </div>
         </div>
@@ -712,15 +766,16 @@ function MainApp() {
         </div>
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
-          {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
+          {/* 🎯 TOUS LES COMPOSANTS REÇOIVENT LE "effectiveProfile" QUI SIMULE LE RÔLE */}
+          {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={effectiveProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} handleHardDeleteMember={handleHardDeleteMember} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={effectiveProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} handleHardDeleteMember={handleHardDeleteMember} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
           
-          {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
+          {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
           
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} t={t} />}
         </div>
