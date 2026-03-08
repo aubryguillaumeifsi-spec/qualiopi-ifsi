@@ -100,6 +100,7 @@ function MainApp() {
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
+  const [currentUid, setCurrentUid] = useState(null); // 🎯 NOUVEAU: Mémorise l'UID de l'utilisateur
   const [userProfile, setUserProfile] = useState(null); 
   const [selectedIfsi, setSelectedIfsi] = useState(null); 
   const [campaigns, setCampaigns] = useState(null);
@@ -131,30 +132,47 @@ function MainApp() {
     return () => unsub();
   }, []);
 
+  // 🎯 ÉCOUTE DE L'AUTHENTIFICATION
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsLoggedIn(true);
+        setCurrentUid(user.uid);
         if (!user.emailVerified) { setActiveTab("validation_requise"); } 
         else { setActiveTab("dashboard"); }
-        
-        const userSnap = await getDoc(doc(db, "users", user.uid));
-        if (userSnap.exists()) {
-          const profile = userSnap.data();
-          setUserProfile({ id: userSnap.id, ...profile });
-          setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
-          if (profile.role === "superadmin") {
-            onSnapshot(collection(db, "qualiopi"), (snap) => {
-              const data = {}; snap.forEach(d => { data[d.id] = d.data(); });
-              setAllQualiopiData(data);
-            });
-          }
-        }
-      } else { setIsLoggedIn(false); }
+      } else { 
+        setIsLoggedIn(false); 
+        setCurrentUid(null);
+        setUserProfile(null);
+      }
       setAuthChecked(true);
     });
     return () => unsubscribe();
   }, []);
+
+  // 🎯 ÉCOUTE EN TEMPS RÉEL DU PROFIL DE L'UTILISATEUR (Pour que la carte en bas à gauche se mette à jour toute seule)
+  useEffect(() => {
+    if (!currentUid) return;
+    const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
+      if (snap.exists()) {
+        const profile = snap.data();
+        setUserProfile({ id: snap.id, ...profile });
+        setSelectedIfsi(prev => prev ? prev : (profile.etablissementId || "demo_ifps_cham"));
+      }
+    });
+    return () => unsub();
+  }, [currentUid]);
+
+  // 🎯 ÉCOUTE POUR LE SUPERADMIN
+  useEffect(() => {
+    if (userProfile?.role === "superadmin") {
+      const unsub = onSnapshot(collection(db, "qualiopi"), (snap) => {
+        const data = {}; snap.forEach(d => { data[d.id] = d.data(); });
+        setAllQualiopiData(data);
+      });
+      return () => unsub();
+    }
+  }, [userProfile?.role]);
 
   useEffect(() => {
     let unsub = null;
@@ -190,6 +208,7 @@ function MainApp() {
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
+  
   const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
   
   const handleSaveEtab = async (fields) => {
@@ -535,6 +554,18 @@ function MainApp() {
     );
   };
 
+  // 🎯 CALCULS POUR L'AFFICHAGE DE LA CARTE DE LA BARRE LATÉRALE
+  const userInitials = (userProfile?.prenom || userProfile?.nom) 
+    ? `${(userProfile.prenom || "")[0] || ""}${(userProfile.nom || "")[0] || ""}`.toUpperCase()
+    : (auth.currentUser?.email?.charAt(0).toUpperCase() || "?");
+
+  const userNameDisplay = (userProfile?.prenom || userProfile?.nom)
+    ? `${userProfile.prenom || ""} ${userProfile.nom || ""}`.trim() 
+    : auth.currentUser?.email?.split('@')[0];
+
+  const userJobDisplay = userProfile?.jobTitles?.[0] || "Mon profil ⚙️";
+  const userAvatarColor = userProfile?.avatarColor || t.accent;
+
   return (
     <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif" }}>
       <link href={GFONT} rel="stylesheet" />
@@ -651,14 +682,15 @@ function MainApp() {
           {userProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
         </div>
 
+        {/* 🎯 LA CARTE DE LA BARRE LATÉRALE REFLÈTE EN DIRECT LE PROFIL DE L'UTILISATEUR */}
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
           <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px" }}>
-            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background:t.accentBg, border:`1px solid ${t.accentBd}`, display:"flex", alignItems:"center", justifyContent:"center", color:t.accent, fontSize:"14px", fontWeight:"800", flexShrink:0 }}>
-              {auth.currentUser?.email?.charAt(0).toUpperCase()}
+            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: userAvatarColor, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:"14px", fontWeight:"800", flexShrink:0, boxShadow:`0 2px 8px ${userAvatarColor}60` }}>
+              {userInitials}
             </div>
             <div style={{ overflow: "hidden" }}>
-              <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{auth.currentUser?.email?.split('@')[0]}</div>
-              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px" }}>Mon profil ⚙️</div>
+              <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{userNameDisplay}</div>
+              <div style={{ fontSize: "11px", color: t.textNavSub, textTransform: "capitalize", marginTop:"2px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow:"hidden" }}>{userJobDisplay}</div>
             </div>
           </div>
         </div>
@@ -688,10 +720,8 @@ function MainApp() {
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
           
-          {/* 🎯 ONGLET EQUIPE AVEC CRITERES PASSÉS EN PROP */}
           {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
           
-          {/* 🎯 NOUVEAU : Transmission de orgJobTitles et rolePalette pour le Profil utilisateur */}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} t={t} />}
         </div>
       </main>
