@@ -140,7 +140,7 @@ export function EquipeTab({
   isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode
 }) {
 
-  const [tab, setTab]                 = useState("parametres"); // Ouvert par défaut sur paramètres pour te montrer
+  const [tab, setTab]                 = useState("membres");
   const [roleFilter, setRoleFilter]   = useState("tous");
   const [statusFilter, setStatusFilter] = useState("tous");
   const [showInvite, setShowInvite]   = useState(false);
@@ -1119,30 +1119,7 @@ export function EquipeTab({
           </div>
 
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🎨 Affichage</div>
-            {[
-              { l: "Thème sombre",   sub: "Interface Midnight Authority", val: isDarkMode,      set: () => setIsDarkMode(v => !v)      },
-              { l: "Mode daltonien", sub: "Remplace rouge/vert",          val: isColorblindMode, set: () => setIsColorblindMode(v => !v) },
-            ].map(p => (
-              <div key={p.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${t.border2}` }}>
-                <div>
-                  <div style={{ fontSize: "12px", fontWeight: "600", color: t.text, marginBottom: "4px" }}>{p.l}</div>
-                  <div style={{ fontSize: "12px", color: t.text2 }}>{p.sub}</div>
-                </div>
-                <Toggle val={p.val} onChange={p.set} t={t} />
-              </div>
-            ))}
-            <div style={{ paddingTop: "10px" }}>
-              <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "6px" }}>Langue</label>
-              <select style={{ width: "100%", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none" }}>
-                <option>Français</option>
-                <option>English</option>
-              </select>
-            </div>
-          </div>
-
-          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports & sauvegardes</div>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports qualitatifs</div>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
               <div>
@@ -1159,36 +1136,7 @@ export function EquipeTab({
               </div>
               <button onClick={handleExportJson} style={{ padding: "5px 11px", background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter JSON</button>
             </div>
-
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
-              <div>
-                <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>Sauvegarde complète</div>
-                <div style={{ fontSize: "9px", color: t.text3 }}>Archive ZIP</div>
-              </div>
-              <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: t.goldBg, border: `1px solid ${t.goldBd}`, color: t.gold, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter ZIP</button>
-            </div>
-          </div>
-
-          <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.red, marginBottom: "6px" }}>⚠ Zone dangereuse</div>
-            <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>Actions irréversibles — nécessitent confirmation</div>
-            {[
-              { l: "Réinitialiser les indicateurs", sub: "Remet à zéro la campagne active", k: "amber" },
-              { l: "Supprimer l'établissement",     sub: "Supprime toutes les données",     k: "red"   },
-            ].map(a => {
-              const { c, bg, bd } = sc(t, a.k);
-              return (
-                <div key={a.l} style={{ padding: "9px 11px", background: bg, border: `1px solid ${bd}`, borderRadius: "7px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: "11px", fontWeight: "600", color: c }}>{a.l}</div>
-                    <div style={{ fontSize: "9px", color: t.text3 }}>{a.sub}</div>
-                  </div>
-                  <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: "transparent", border: `1px solid ${bd}`, color: c, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer", flexShrink: 0, marginLeft: "8px" }}>
-                    Exécuter
-                  </button>
-                </div>
-              );
-            })}
+            
           </div>
         </div>
       )}
@@ -1197,16 +1145,41 @@ export function EquipeTab({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  CompteTab (Inchangé)
+//  CompteTab (LE NOUVEAU PROFIL UTILISATEUR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CompteTab({
-  auth: firebaseAuth, userProfile,
+  auth: firebaseAuth, userProfile, orgJobTitles, rolePalette,
   pwdUpdate, setPwdUpdate, handleChangePassword,
   isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode,
   t,
 }) {
+  const [tab, setTab] = useState("profil");
+  const [shortcutsEnabled, setShortcutsEnabled] = useState(true);
 
+  // ── Onglet PROFIL ──
+  const [profilForm, setProfilForm] = useState({
+    prenom: userProfile?.prenom || "",
+    nom: userProfile?.nom || "",
+    phone: userProfile?.phone || "",
+    jobTitle: (userProfile?.jobTitles && userProfile.jobTitles[0]) || "",
+    avatarColor: userProfile?.avatarColor || (rolePalette ? rolePalette[0].text : t.accent)
+  });
+  const [profilSaving, setProfilSaving] = useState(false);
+
+  const saveProfil = async () => {
+    setProfilSaving(true);
+    await setDoc(doc(db, "users", firebaseAuth.currentUser.uid), {
+      prenom: profilForm.prenom,
+      nom: profilForm.nom,
+      phone: profilForm.phone,
+      jobTitles: profilForm.jobTitle ? [profilForm.jobTitle] : [],
+      avatarColor: profilForm.avatarColor
+    }, { merge: true });
+    setProfilSaving(false);
+  };
+
+  // ── Onglet SÉCURITÉ ──
   const [pwdCurrent, setPwdCurrent] = useState("");
   const [pwdNew, setPwdNew]         = useState("");
   const [pwdConfirm, setPwdConfirm] = useState("");
@@ -1252,140 +1225,265 @@ export function CompteTab({
     setLoading(false);
   };
 
+  // ── Onglet ACTIVITÉ ──
+  const [userLogs, setUserLogs] = useState([]);
+  useEffect(() => {
+    if (!userProfile?.etablissementId || !firebaseAuth.currentUser?.email) return;
+    const q = query(collection(db, "etablissements", userProfile.etablissementId, "logs"), orderBy("createdAt", "desc"), limit(20));
+    const unsub = onSnapshot(q, (snap) => {
+      const allLogs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      setUserLogs(allLogs.filter(l => l.user === firebaseAuth.currentUser.email));
+    });
+    return () => unsub();
+  }, [userProfile?.etablissementId]);
+
+  const TABS = [
+    { id: "profil",          label: "Profil",          icon: "👤" },
+    { id: "securite",        label: "Sécurité",        icon: "🔒" },
+    { id: "preferences",     label: "Préférences",     icon: "🎨" },
+    { id: "activite",        label: "Activité",        icon: "📈" },
+    { id: "confidentialite", label: "Confidentialité", icon: "🛡️" },
+  ];
+
+  const initials = `${(profilForm.prenom || firebaseAuth.currentUser?.email || "?")[0]}${(profilForm.nom || "")[0] || ""}`.toUpperCase();
+  const avatarColor = profilForm.avatarColor || t.accent;
+
   return (
     <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "20px", maxWidth: "800px", margin: "0 auto", paddingBottom: "40px" }}>
-
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "28px 32px", display: "flex", alignItems: "center", gap: "24px", boxShadow: t.shadowSm }}>
-        <div style={{ width: "72px", height: "72px", borderRadius: "18px", background: `linear-gradient(135deg, ${t.accent}, ${t.accentBd ? "#7c3aed" : t.accent})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: "800", color: "white", flexShrink: 0 }}>
-          {firebaseAuth.currentUser?.email?.charAt(0).toUpperCase()}
+      
+      {/* HEADER HERO */}
+      <div style={{ background: `linear-gradient(135deg, ${avatarColor}20, ${t.surface})`, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "32px", display: "flex", alignItems: "center", gap: "24px", boxShadow: t.shadowSm }}>
+        <div style={{ width: "80px", height: "80px", borderRadius: "20px", background: avatarColor, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "28px", fontWeight: "800", color: "white", flexShrink: 0, boxShadow: `0 8px 24px ${avatarColor}60` }}>
+          {initials}
         </div>
         <div>
-          <h2 style={{ fontFamily: "'Instrument Serif',serif", fontSize: "28px", color: t.text, margin: "0 0 6px 0" }}>
-            Mon compte
+          <h2 style={{ fontFamily: "'Instrument Serif',serif", fontSize: "32px", color: t.text, margin: "0 0 6px 0" }}>
+            {profilForm.prenom || profilForm.nom ? `${profilForm.prenom} ${profilForm.nom}` : "Mon Compte"}
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
-            <span style={{ fontSize: "14px", color: t.text2, fontWeight: "500" }}>{firebaseAuth.currentUser?.email}</span>
-            <span style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, fontSize: "10px", fontWeight: "800", padding: "3px 9px", borderRadius: "6px", textTransform: "capitalize" }}>
+            <span style={{ fontSize: "14px", color: t.text2, fontWeight: "500" }}>{profilForm.jobTitle || "Membre de l'équipe"}</span>
+            <span style={{ color:t.border }}>|</span>
+            <span style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, fontSize: "10px", fontWeight: "800", padding: "3px 9px", borderRadius: "6px", textTransform: "uppercase" }}>
               {userProfile?.role || "Utilisateur"}
             </span>
           </div>
         </div>
       </div>
 
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
-        <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-          <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>🎨 Apparence & Accessibilité</span>
-        </div>
-        <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
-          {[
-            { l: "Thème sombre (Midnight)",sub: "Protège les yeux, réduit la fatigue visuelle.", val: isDarkMode,      set: () => setIsDarkMode(v => !v)      },
-            { l: "Mode Daltonien",          sub: "Remplace le rouge/vert par des couleurs à fort contraste.", val: isColorblindMode, set: () => setIsColorblindMode(v => !v) },
-          ].map(p => (
-            <div key={p.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "16px", borderBottom: `1px solid ${t.border2}` }}>
-              <div>
-                <div style={{ fontSize: "14px", fontWeight: "700", color: t.text, marginBottom: "4px" }}>{p.l}</div>
-                <div style={{ fontSize: "12px", color: t.text2 }}>{p.sub}</div>
-              </div>
-              <Toggle val={p.val} onChange={p.set} t={t} />
-            </div>
-          ))}
-        </div>
+      {/* BARRE D'ONGLETS */}
+      <div style={{ display: "flex", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "4px", gap: "2px", boxShadow: t.shadowSm }}>
+        {TABS.map(tb => {
+          const active = tab === tb.id;
+          return (
+            <button
+              key={tb.id} onClick={() => setTab(tb.id)}
+              style={{
+                flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: "8px",
+                padding: "10px 8px", borderRadius: "8px", border: "none",
+                background: active ? t.surface2 : "transparent",
+                color: active ? t.text : t.text2,
+                fontSize: "12px", fontWeight: active ? "700" : "500",
+                cursor: "pointer", transition: "all 0.15s",
+              }}
+            >
+              <span style={{ opacity: active ? 1 : 0.5 }}>{tb.icon}</span>
+              {tb.label}
+            </button>
+          );
+        })}
       </div>
 
-      <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
-        <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-          <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>🔒 Sécurité du compte</span>
-        </div>
-        <div style={{ padding: "24px" }}>
-          <div style={{ fontSize: "12px", color: t.text2, marginBottom: "18px" }}>La réauthentification avec votre mot de passe actuel est requise.</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px", maxWidth: "480px" }}>
-
-            <div>
-              <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Mot de passe actuel</label>
-              <input
-                type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)}
-                placeholder="••••••••"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit" }}
-              />
+      {/* ── CONTENU DES ONGLETS ── */}
+      
+      {/* 1. PROFIL */}
+      {tab === "profil" && (
+        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "24px", boxShadow: t.shadowSm }}>
+            <h3 style={{ fontSize: "14px", fontWeight: "800", color: t.text, marginBottom: "20px" }}>Informations personnelles</h3>
+            
+            <div style={{ display:"grid", gridTemplateColumns:"1fr 1fr", gap:"16px", marginBottom:"20px" }}>
+              <Field label="Prénom" value={profilForm.prenom} onChange={e => setProfilForm({...profilForm, prenom: e.target.value})} t={t} />
+              <Field label="Nom" value={profilForm.nom} onChange={e => setProfilForm({...profilForm, nom: e.target.value})} t={t} />
+              <Field label="Email professionnel (Identifiant)" value={firebaseAuth.currentUser?.email} readOnly={true} t={t} hint="L'email ne peut pas être modifié." />
+              <Field label="Téléphone professionnel" value={profilForm.phone} onChange={e => setProfilForm({...profilForm, phone: e.target.value})} type="tel" t={t} />
+              
+              <div style={{ gridColumn: "1/-1" }}>
+                <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Poste / Fonction</label>
+                <select value={profilForm.jobTitle} onChange={e => setProfilForm({...profilForm, jobTitle: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}>
+                  <option value="">Sélectionner une fonction...</option>
+                  {(orgJobTitles || DEFAULT_JOB_TITLES).map(jt => <option key={jt} value={jt}>{jt}</option>)}
+                </select>
+              </div>
             </div>
 
-            <div>
-              <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Nouveau mot de passe</label>
-              <div style={{ position: "relative" }}>
-                <input
-                  type={showPwd ? "text" : "password"} value={pwdNew} onChange={e => setPwdNew(e.target.value)}
-                  placeholder="Minimum 6 caractères"
-                  style={{ width: "100%", padding: "10px 38px 10px 14px", borderRadius: "8px", border: `1px solid ${pwdNew && pwdStrength >= 3 ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }}
-                />
-                <button onClick={() => setShowPwd(v => !v)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: t.text3, fontSize: "14px" }}>
-                  {showPwd ? "🙈" : "👁"}
+            <hr style={{ border:0, borderTop:`1px solid ${t.border}`, margin:"20px 0" }}/>
+            
+            <h3 style={{ fontSize: "14px", fontWeight: "800", color: t.text, marginBottom: "12px" }}>Couleur de l'avatar</h3>
+            <div style={{ fontSize:"11px", color:t.text2, marginBottom:"16px" }}>Choisissez la couleur qui vous représentera dans l'application (commentaires, historique...).</div>
+            
+            <div style={{ display:"flex", flexWrap:"wrap", gap:"12px" }}>
+               {(rolePalette || ROLE_PALETTE).map((pal, idx) => (
+                 <div 
+                   key={idx} 
+                   onClick={() => setProfilForm({...profilForm, avatarColor: pal.text})} 
+                   style={{ 
+                     width:"32px", height:"32px", borderRadius:"50%", background:pal.text, cursor:"pointer", 
+                     border: profilForm.avatarColor === pal.text ? `4px solid ${t.bg}` : "none", 
+                     outline: profilForm.avatarColor === pal.text ? `2px solid ${t.text}` : "none", 
+                     transition:"all 0.2s", transform: profilForm.avatarColor === pal.text ? "scale(1.1)" : "scale(1)" 
+                   }} 
+                 />
+               ))}
+            </div>
+
+            <div style={{ display: "flex", justifyContent: "flex-end", marginTop:"32px" }}>
+               <button onClick={saveProfil} disabled={profilSaving} style={{ padding: "10px 24px", background: t.accent, border: "none", borderRadius: "8px", color: "white", fontSize: "12px", fontWeight: "700", cursor: profilSaving ? "not-allowed" : "pointer", boxShadow: `0 4px 12px ${t.accentBd}` }}>
+                 {profilSaving ? "Enregistrement..." : "💾 Enregistrer le profil"}
+               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 2. SÉCURITÉ */}
+      {tab === "securite" && (
+        <div className="animate-fade-in">
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "24px", boxShadow: t.shadowSm }}>
+            <h3 style={{ fontSize: "14px", fontWeight: "800", color: t.text, marginBottom: "8px" }}>Changer mon mot de passe</h3>
+            <div style={{ fontSize: "12px", color: t.text2, marginBottom: "24px" }}>La réauthentification avec votre mot de passe actuel est requise.</div>
+            
+            <div style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "480px" }}>
+              <div>
+                <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Mot de passe actuel</label>
+                <input type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} placeholder="••••••••" style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit" }} />
+              </div>
+              <div>
+                <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Nouveau mot de passe</label>
+                <div style={{ position: "relative" }}>
+                  <input type={showPwd ? "text" : "password"} value={pwdNew} onChange={e => setPwdNew(e.target.value)} placeholder="Minimum 6 caractères" style={{ width: "100%", padding: "10px 38px 10px 14px", borderRadius: "8px", border: `1px solid ${pwdNew && pwdStrength >= 3 ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
+                  <button onClick={() => setShowPwd(v => !v)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: t.text3, fontSize: "14px" }}>{showPwd ? "🙈" : "👁"}</button>
+                </div>
+                {pwdNew && (
+                  <div style={{ marginTop: "6px" }}>
+                    <div style={{ display: "flex", gap: "3px", marginBottom: "3px" }}>
+                      {[1, 2, 3, 4, 5].map(i => <div key={i} style={{ flex: 1, height: "3px", borderRadius: "2px", background: i <= pwdStrength ? strengthColors[pwdStrength] : t.border, transition: "background 0.2s" }} />)}
+                    </div>
+                    <span style={{ fontSize: "9px", fontWeight: "700", color: strengthColors[pwdStrength] }}>{strengthLabels[pwdStrength]}</span>
+                  </div>
+                )}
+              </div>
+              <div>
+                <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Confirmer le nouveau mot de passe</label>
+                <input type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} placeholder="Répéter" style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${pwdConfirm && pwdNew !== pwdConfirm ? t.redBd : pwdConfirm && pwdNew === pwdConfirm ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
+                {pwdConfirm && pwdNew !== pwdConfirm && <div style={{ fontSize: "10px", color: t.red, marginTop: "3px" }}>Les mots de passe ne correspondent pas.</div>}
+                {pwdConfirm && pwdNew === pwdConfirm && <div style={{ fontSize: "10px", color: t.green, marginTop: "3px" }}>✓ Identiques.</div>}
+              </div>
+              <button onClick={changePwd} disabled={loading} style={{ padding: "11px 22px", background: pwdSuccess ? t.greenBg : t.accent, border: `1px solid ${pwdSuccess ? t.greenBd : t.accentBd}`, borderRadius: "8px", color: pwdSuccess ? t.green : "white", fontSize: "13px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", boxShadow: pwdSuccess ? "none" : `0 4px 12px ${t.accentBd}`, transition: "all 0.2s", alignSelf: "flex-start", marginTop:"8px" }}>
+                {loading ? "Mise à jour…" : pwdSuccess ? "✓ Mot de passe modifié !" : "Mettre à jour"}
+              </button>
+              {pwdError && <div style={{ color: t.red, fontSize: "12px", fontWeight: "600", padding: "10px 14px", background: t.redBg, borderRadius: "8px", border: `1px solid ${t.redBd}`, marginTop:"8px" }}>{pwdError}</div>}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 3. PRÉFÉRENCES */}
+      {tab === "preferences" && (
+        <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
+            <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
+              <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>Apparence & Ergonomie</span>
+            </div>
+            <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
+              {[
+                { l: "Thème sombre (Midnight)", sub: "Protège les yeux, réduit la fatigue visuelle.", val: isDarkMode, set: () => setIsDarkMode(v => !v) },
+                { l: "Mode Daltonien", sub: "Remplace le rouge/vert par des couleurs à fort contraste.", val: isColorblindMode, set: () => setIsColorblindMode(v => !v) },
+                { l: "Raccourcis clavier pro", sub: "Activez la navigation rapide (Ctrl+K, Echapp...).", val: shortcutsEnabled, set: () => setShortcutsEnabled(v => !v), color:"green" }
+              ].map(p => (
+                <div key={p.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", paddingBottom: "16px", borderBottom: `1px solid ${t.border2}` }}>
+                  <div>
+                    <div style={{ fontSize: "14px", fontWeight: "700", color: t.text, marginBottom: "4px" }}>{p.l}</div>
+                    <div style={{ fontSize: "12px", color: t.text2 }}>{p.sub}</div>
+                  </div>
+                  <Toggle val={p.val} onChange={p.set} colorKey={p.color || "accent"} t={t} />
+                </div>
+              ))}
+              
+              <div style={{ paddingTop: "8px" }}>
+                <label style={{ fontSize: "10px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "8px" }}>Langue de l'interface</label>
+                <select style={{ width: "100%", maxWidth:"300px", padding: "10px 14px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "13px", color: t.text, outline: "none", cursor:"pointer" }}>
+                  <option>Français</option>
+                  <option>English</option>
+                </select>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 4. ACTIVITÉ */}
+      {tab === "activite" && (
+        <div className="animate-fade-in">
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
+            <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}`, display:"flex", justifyContent:"space-between", alignItems:"center" }}>
+              <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>Mes dernières actions</span>
+              <span style={{ fontSize: "10px", color: t.text3 }}>{userLogs.length} événements récents</span>
+            </div>
+
+            {userLogs.length === 0 ? (
+              <div style={{ padding: "40px", textAlign: "center", color: t.text3, fontSize: "12px", fontStyle: "italic" }}>Aucun événement enregistré.</div>
+            ) : userLogs.map((log, i) => {
+              const cfg = LOG_CFG[log.type] || LOG_CFG.admin;
+              const { c, bg, bd } = sc(t, cfg.colorKey);
+              return (
+                <div key={log.id} style={{ display: "grid", gridTemplateColumns: "32px 1fr 120px", gap: "16px", padding: "16px 24px", borderBottom: i < userLogs.length - 1 ? `1px solid ${t.border2}` : "none", alignItems: "center", transition: "background 0.1s" }} onMouseOver={e => e.currentTarget.style.background = t.surface2} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
+                  <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: bg, border: `1px solid ${bd}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>
+                    {cfg.icon}
+                  </div>
+                  <div>
+                    <div style={{ fontSize: "13px", fontWeight: "700", color: t.text }}>{log.action}</div>
+                    <div style={{ fontSize: "11px", color: t.text2, marginTop: "2px" }}>{log.detail}</div>
+                  </div>
+                  <div style={{ fontFamily: "'DM Mono',monospace", fontSize: "10px", color: t.text3, textAlign: "right" }}>
+                    {log.createdAt?.toDate ? timeAgo(log.createdAt.toDate().toISOString()) : "—"}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+
+      {/* 5. CONFIDENTIALITÉ */}
+      {tab === "confidentialite" && (
+        <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
+          
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "24px", boxShadow: t.shadowSm }}>
+            <h3 style={{ fontSize: "14px", fontWeight: "800", color: t.text, marginBottom: "8px" }}>Exporter mes données</h3>
+            <div style={{ fontSize: "12px", color: t.text2, marginBottom: "16px" }}>Télécharger une copie complète de vos informations personnelles au format JSON.</div>
+            <button onClick={() => alert("Export RGPD en cours…")} style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "10px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
+              📥 Télécharger mes données
+            </button>
+          </div>
+
+          <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
+            <div style={{ padding: "24px" }}>
+              <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: t.red, marginBottom: "6px" }}>⚠️ Zone dangereuse</div>
+              <div style={{ fontSize: "12px", color: t.text2, marginBottom: "20px" }}>Ces actions sont définitives et ne peuvent pas être annulées.</div>
+              
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "10px" }}>
+                <div>
+                  <div style={{ fontSize: "13px", fontWeight: "700", color: t.red, marginBottom: "3px" }}>Désactiver mon compte</div>
+                  <div style={{ fontSize: "11px", color: t.red, opacity: 0.75 }}>Votre accès sera suspendu immédiatement, contactez l'administrateur.</div>
+                </div>
+                <button onClick={() => alert("Contactez votre Super Admin pour procéder à la désactivation.")} style={{ background: t.red, border: "none", color: "white", padding: "10px 20px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.redBd}` }}>
+                  Désactiver
                 </button>
               </div>
-              {pwdNew && (
-                <div style={{ marginTop: "6px" }}>
-                  <div style={{ display: "flex", gap: "3px", marginBottom: "3px" }}>
-                    {[1, 2, 3, 4, 5].map(i => (
-                      <div key={i} style={{ flex: 1, height: "3px", borderRadius: "2px", background: i <= pwdStrength ? strengthColors[pwdStrength] : t.border, transition: "background 0.2s" }} />
-                    ))}
-                  </div>
-                  <span style={{ fontSize: "9px", fontWeight: "700", color: strengthColors[pwdStrength] }}>{strengthLabels[pwdStrength]}</span>
-                </div>
-              )}
-            </div>
-
-            <div>
-              <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Confirmer le nouveau mot de passe</label>
-              <input
-                type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)}
-                placeholder="Répéter"
-                style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${pwdConfirm && pwdNew !== pwdConfirm ? t.redBd : pwdConfirm && pwdNew === pwdConfirm ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }}
-              />
-              {pwdConfirm && pwdNew !== pwdConfirm && <div style={{ fontSize: "10px", color: t.red, marginTop: "3px" }}>Les mots de passe ne correspondent pas.</div>}
-              {pwdConfirm && pwdNew === pwdConfirm && <div style={{ fontSize: "10px", color: t.green, marginTop: "3px" }}>✓ Identiques.</div>}
-            </div>
-
-            <button
-              onClick={changePwd} disabled={loading}
-              style={{ padding: "11px 22px", background: pwdSuccess ? t.greenBg : t.accent, border: `1px solid ${pwdSuccess ? t.greenBd : t.accentBd}`, borderRadius: "8px", color: pwdSuccess ? t.green : "white", fontSize: "13px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", boxShadow: pwdSuccess ? "none" : `0 4px 12px ${t.accentBd}`, transition: "all 0.2s", alignSelf: "flex-start" }}
-            >
-              {loading ? "Mise à jour…" : pwdSuccess ? "✓ Mot de passe modifié !" : "Mettre à jour"}
-            </button>
-
-            {pwdError && (
-              <div style={{ color: t.red, fontSize: "12px", fontWeight: "600", padding: "10px 14px", background: t.redBg, borderRadius: "8px", border: `1px solid ${t.redBd}` }}>
-                {pwdError}
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
-        <div style={{ padding: "24px 32px" }}>
-          <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: t.red, marginBottom: "6px" }}>⚠️ Zone dangereuse</div>
-          <div style={{ fontSize: "12px", color: t.text2, marginBottom: "20px" }}>Ces actions sont définitives et ne peuvent pas être annulées.</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "10px" }}>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: t.text, marginBottom: "3px" }}>Exporter mes données</div>
-                <div style={{ fontSize: "11px", color: t.text3 }}>Télécharger toutes mes données au format JSON</div>
-              </div>
-              <button onClick={() => alert("Export en cours…")} style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, padding: "9px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
-                Exporter
-              </button>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "10px" }}>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: t.red, marginBottom: "3px" }}>Désactiver mon compte</div>
-                <div style={{ fontSize: "11px", color: t.red, opacity: 0.75 }}>Votre accès sera suspendu immédiatement</div>
-              </div>
-              <button onClick={() => alert("Contactez votre Super Admin.")} style={{ background: t.red, border: "none", color: "white", padding: "9px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.redBd}` }}>
-                Désactiver
-              </button>
             </div>
           </div>
         </div>
-      </div>
+      )}
 
     </div>
   );
