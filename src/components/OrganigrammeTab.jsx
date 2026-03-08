@@ -8,7 +8,7 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
   const [isSettingsOpen, setIsSettingsOpen] = useState(false); 
   const [panelMode, setPanelMode] = useState('profile'); 
   const [zoom, setZoom] = useState(0.75); 
-  const [filtreRole, setFiltreRole] = useState(null); // 🎯 CORRECTION ICI : La variable est bien déclarée !
+  const [filtreRole, setFiltreRole] = useState(null); 
 
   // --- SYSTEME DE LIAISON ---
   const [isLinkingMode, setIsLinkingMode] = useState(false);
@@ -638,9 +638,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     <div style={{ fontSize: "10px", fontWeight: "800", color: t.text3, letterSpacing: "2px", textTransform: "uppercase", opacity:0.6 }}>Niveau 1 — Direction</div>
                     <div 
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 1)}
-                      style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"200px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
+                      style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"40px", minWidth:"200px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
-                      {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser ici</div>}
+                      {level1.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 1 – Direction)</div>}
                       {Object.entries(groupMembersByJob(level1)).map(([job, members]) => (
                          <JobGroupBox key={job} jobTitle={job} members={members} />
                       ))}
@@ -652,9 +652,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     <div style={{ fontSize: "10px", fontWeight: "800", color: t.text3, letterSpacing: "2px", textTransform: "uppercase", opacity:0.6 }}>Niveau 2 — Responsables</div>
                     <div 
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 2)}
-                      style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"400px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
+                      style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"40px", minWidth:"400px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
-                      {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser ici</div>}
+                      {level2.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 2 – Responsables)</div>}
                       {Object.entries(groupMembersByJob(level2)).map(([job, members]) => (
                          <JobGroupBox key={job} jobTitle={job} members={members} />
                       ))}
@@ -666,9 +666,9 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
                     <div style={{ fontSize: "10px", fontWeight: "800", color: t.text3, letterSpacing: "2px", textTransform: "uppercase", opacity:0.6 }}>Niveau 3 — Équipes</div>
                     <div 
                       onDragOver={handleDragOver} onDrop={(e) => handleDropOnLevel(e, 3)}
-                      style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"16px", minWidth:"600px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
+                      style={{ display:"flex", flexWrap:"wrap", justifyContent:"center", alignItems:"flex-start", gap:"40px", minWidth:"600px", minHeight:"80px", border: isAdminOrSuper && !isLinkingMode ? `2px dashed ${t.border}` : "2px dashed transparent", borderRadius:"16px", padding:"10px", transition:"background 0.2s" }}
                     >
-                      {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.5, width:"100%" }}>Glisser ici</div>}
+                      {level3.length === 0 && isAdminOrSuper && !isLinkingMode && <div style={{ display:"flex", alignItems:"center", justifyContent:"center", color:t.text3, fontSize:"12px", fontWeight:"800", textTransform:"uppercase", letterSpacing:"1px", opacity:0.4, width:"100%", border:`2px dashed ${t.border}`, borderRadius:"12px", padding:"24px" }}>Glisser un membre ici (Niveau 3 – Équipes)</div>}
                       {Object.entries(groupMembersByJob(level3)).map(([job, members]) => (
                          <JobGroupBox key={job} jobTitle={job} members={members} />
                       ))}
@@ -682,10 +682,11 @@ export default function OrganigrammeTab({ currentIfsiName, orgRoles, orgJobTitle
         </div>
       </div>
 
-      {/* ── ZONE DROITE : PANNEAU LATÉRAL ── */}
+      {/* ── ZONE DROITE : PANNEAU LATÉRAL (Adapté au contenu) ── */}
       {editForm && (
         <div className="animate-fade-in" style={{ width:"380px", background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", display:"flex", flexDirection:"column", boxShadow:t.shadow, flexShrink:0, overflow:"hidden", height:"max-content", maxHeight:"100%" }}>
           
+          {/* HEADER DU PANNEAU */}
           <div style={{ padding:"24px 20px", display:"flex", justifyContent:"space-between", alignItems:"flex-start", background:t.surface2, borderBottom:`1px solid ${t.border}` }}>
             {panelMode === 'indicators' && selectedPerson ? (
                <div style={{ display:"flex", alignItems:"center", gap:"12px", width:"100%" }}>
