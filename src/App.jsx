@@ -10,7 +10,6 @@ import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
-// 🎯 IMPORT DE STORAGE (Pour la médiathèque)
 import { db, auth, storage, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -142,7 +141,7 @@ function MainApp() {
         const userSnap = await getDoc(doc(db, "users", user.uid));
         if (userSnap.exists()) {
           const profile = userSnap.data();
-          setUserProfile(profile);
+          setUserProfile({ id: userSnap.id, ...profile });
           setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
           if (profile.role === "superadmin") {
             onSnapshot(collection(db, "qualiopi"), (snap) => {
@@ -191,10 +190,8 @@ function MainApp() {
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
-  
   const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
   
-  // 🎯 FONCTION POUR SAUVEGARDER L'ETABLISSEMENT (Onglet Administration)
   const handleSaveEtab = async (fields) => {
     if (!selectedIfsi) return;
     await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true });
@@ -364,7 +361,6 @@ function MainApp() {
     }
   };
 
-  // 🎯 CORRECTION CRUCIALE : CALCUL DES INDEX POUR LA MODALE DES INDICATEURS
   const currentIndex = modalCritere ? filtered.findIndex(c => c.id === modalCritere.id) : -1;
   const hasPrev = currentIndex > 0;
   const hasNext = currentIndex !== -1 && currentIndex < filtered.length - 1;
@@ -405,7 +401,6 @@ function MainApp() {
     }
   };
 
-  // 🎯 FONCTION DE SUPPRESSION DÉFINITIVE D'UN MEMBRE DANS L'ORGANIGRAMME
   const handleHardDeleteMember = async (memberId, type) => {
     if (type === 'account') {
       await deleteDoc(doc(db, "users", memberId));
@@ -576,7 +571,6 @@ function MainApp() {
         </div>
       )}
 
-      {/* 🎯 MODALE DES INDICATEURS */}
       {modalCritere && (
         <DetailModal 
           critere={modalCritere} 
@@ -625,7 +619,6 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -698,7 +691,8 @@ function MainApp() {
           {/* 🎯 ONGLET EQUIPE AVEC CRITERES PASSÉS EN PROP */}
           {activeTab === "equipe" && <EquipeTab userProfile={userProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
           
-          {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} t={t} />}
+          {/* 🎯 NOUVEAU : Transmission de orgJobTitles et rolePalette pour le Profil utilisateur */}
+          {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} t={t} />}
         </div>
       </main>
     </div>
