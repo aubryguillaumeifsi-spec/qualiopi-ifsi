@@ -5,7 +5,7 @@ import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 
 import { db, auth, storage } from "../firebase";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  HELPERS
+//  HELPERS & CONSTANTES
 // ─────────────────────────────────────────────────────────────────────────────
 
 const sc = (t, k) => ({ c: t[k], bg: t[k + "Bg"], bd: t[k + "Bd"] });
@@ -32,15 +32,22 @@ const LOG_CFG = {
   upload:  { icon: "📎", colorKey: "teal"    },
 };
 
-const DOC_CATS = ["Qualité", "Communication", "Pédagogie", "RH", "Partenariats", "Autre"];
+const DOC_CATS = ["Qualité", "Communication", "Pédagogie", "RH", "Partenariats", "Indicateur", "Autre"];
 const CAT_COLORS = {
   "Qualité":       { c: "#4f80f0", bg: "rgba(79,128,240,0.1)"  },
   "Communication": { c: "#a78bfa", bg: "rgba(167,139,250,0.1)" },
   "Pédagogie":     { c: "#2dd4bf", bg: "rgba(45,212,191,0.1)"  },
   "RH":            { c: "#f0a030", bg: "rgba(240,160,48,0.1)"  },
   "Partenariats":  { c: "#f07070", bg: "rgba(240,112,112,0.1)" },
+  "Indicateur":    { c: "#10b981", bg: "rgba(16,185,129,0.1)"  }, // Vert pour les preuves Qualiopi
   "Autre":         { c: "#a0a0b0", bg: "rgba(160,160,176,0.1)" },
 };
+
+const STANDARD_DOCS = [
+  "Livret d'accueil", "Règlement intérieur", "Plan de formation", 
+  "Plaquette IFSI", "Rapport d'activité", "Bilan pédagogique", 
+  "Organigramme", "Projet pédagogique"
+];
 
 function timeAgo(isoString) {
   if (!isoString) return "—";
@@ -130,11 +137,11 @@ export function EquipeTab({
   userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser,
   selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm,
   sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t,
-  ifsiData, handleSaveEtab,
+  ifsiData, handleSaveEtab, criteres, // 🎯 CRITERES RÉCUPÉRÉS ICI
   isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode,
 }) {
 
-  const [tab, setTab]                 = useState("etablissement"); // Ouvert par défaut sur Établissement pour tester
+  const [tab, setTab]                 = useState("mediatheque");
   const [roleFilter, setRoleFilter]   = useState("tous");
   const [statusFilter, setStatusFilter] = useState("tous");
   const [showInvite, setShowInvite]   = useState(false);
@@ -147,7 +154,6 @@ export function EquipeTab({
   const [etabSaving, setEtabSaving] = useState(false);
   const [etabSaved, setEtabSaved]  = useState(false);
 
-  // Initialisation dynamique des données
   useEffect(() => {
     if (ifsiData && !etabForm) {
       setEtabForm({
@@ -158,9 +164,9 @@ export function EquipeTab({
         tel:        ifsiData.tel         || "",
         email:      ifsiData.email       || "",
         directrice: ifsiData.directrice  || "",
-        dateCertif: ifsiData.dateCertif  || "", // Date initiale Qualiopi
-        dateAudit:  ifsiData.dateAudit   || "", // Date de l'audit
-        agrements:  ifsiData.agrements   || [ // Agréments par défaut si vide
+        dateCertif: ifsiData.dateCertif  || "",
+        dateAudit:  ifsiData.dateAudit   || "",
+        agrements:  ifsiData.agrements   || [
           { l: "DREETS AuRA",          v: "Agrément actif",    k: "green" },
           { l: "ARS — Autorisation",   v: "150 places",        k: "green" },
           { l: "Ministère Santé",      v: "IFAS · 35 places",  k: "green" },
@@ -203,20 +209,65 @@ export function EquipeTab({
   const [docCatFilter, setDocCatFilter] = useState("tous");
   const [docSearch, setDocSearch]       = useState("");
   const [uploadProgress, setUploadProgress] = useState(null); 
-  const [uploadCat, setUploadCat]       = useState("Qualité");
-  const fileInputRef                    = useRef();
+  
+  // 🎯 NOUVEAU : Modales pour Upload et Édition
+  const [uploadModal, setUploadModal]   = useState(null);
+  const [editDocModal, setEditDocModal] = useState(null);
+  
+  const fileInputRef = useRef();
+
+  // 🎯 FUSION : Récupération automatique des preuves depuis les indicateurs
+  const allMergedDocs = useMemo(() => {
+    const baseDocs = [...documents];
+    const preuveDocs = [];
+
+    if (criteres) {
+      criteres.forEach(crit => {
+        if (crit.preuves && Array.isArray(crit.preuves)) {
+          crit.preuves.forEach((p, idx) => {
+            preuveDocs.push({
+              id: `preuve_${crit.id}_${idx}`,
+              name: p.nom || p.name || `Preuve Indicateur ${crit.num}`,
+              cat: "Indicateur",
+              size: "Preuve",
+              date: p.date || crit.dateModif || "—",
+              author: p.auteur || p.author || "Système",
+              downloadURL: p.url || p.downloadURL || p.lien,
+              isPreuve: true, // Flag spécial pour empêcher la suppression d'ici
+              indicNum: crit.num
+            });
+          });
+        }
+      });
+    }
+    return [...baseDocs, ...preuveDocs].sort((a, b) => new Date(b.date) - new Date(a.date));
+  }, [documents, criteres]);
 
   const filteredDocs = useMemo(() =>
-    documents.filter(d => {
+    allMergedDocs.filter(d => {
       if (docCatFilter !== "tous" && d.cat !== docCatFilter) return false;
       if (docSearch && !d.name.toLowerCase().includes(docSearch.toLowerCase())) return false;
       return true;
     }),
-    [documents, docCatFilter, docSearch]
+    [allMergedDocs, docCatFilter, docSearch]
   );
 
-  const handleFileUpload = async (file) => {
-    if (!file || !selectedIfsi) return;
+  // ÉTAPE 1 : Sélection du fichier ouvre la modale
+  const handleFileSelect = (file) => {
+    if (!file) return;
+    setUploadModal({
+      file: file,
+      name: file.name.replace(/\.[^/.]+$/, ""), // Nom sans extension
+      cat: "Qualité"
+    });
+  };
+
+  // ÉTAPE 2 : Validation de la modale lance l'upload
+  const confirmUpload = async () => {
+    if (!uploadModal || !selectedIfsi) return;
+    const { file, name, cat } = uploadModal;
+    setUploadModal(null);
+
     const path = `ifsi/${selectedIfsi}/documents/${Date.now()}_${file.name}`;
     const storageRef = ref(storage, path);
     const task = uploadBytesResumable(storageRef, file);
@@ -228,11 +279,9 @@ export function EquipeTab({
         const url = await getDownloadURL(task.snapshot.ref);
         const newDoc = {
           id:          `d_${Date.now()}`,
-          name:        file.name.replace(/\.[^/.]+$/, ""),
-          cat:         uploadCat,
-          size:        file.size > 1048576
-                         ? `${(file.size / 1048576).toFixed(1)} Mo`
-                         : `${Math.round(file.size / 1024)} Ko`,
+          name:        name.trim() || file.name,
+          cat:         cat,
+          size:        file.size > 1048576 ? `${(file.size / 1048576).toFixed(1)} Mo` : `${Math.round(file.size / 1024)} Ko`,
           date:        new Date().toISOString().slice(0, 10),
           author:      auth.currentUser?.email || "—",
           tags:        [],
@@ -242,17 +291,26 @@ export function EquipeTab({
         };
         const updated = [...documents, newDoc];
         await setDoc(doc(db, "etablissements", selectedIfsi), { documents: updated }, { merge: true });
-        await writeLog(selectedIfsi, "Document déposé", file.name, "upload");
+        await writeLog(selectedIfsi, "Document déposé", newDoc.name, "upload");
         setUploadProgress(null);
       }
     );
   };
 
+  // 🎯 NOUVEAU : Sauvegarde du renommage
+  const confirmEditDoc = async () => {
+    if (!editDocModal || !editDocModal.name.trim()) return alert("Le nom du document est requis.");
+    const updated = documents.map(d => d.id === editDocModal.id ? { ...d, name: editDocModal.name.trim(), cat: editDocModal.cat } : d);
+    await setDoc(doc(db, "etablissements", selectedIfsi), { documents: updated }, { merge: true });
+    await writeLog(selectedIfsi, "Document modifié", editDocModal.name, "admin");
+    setEditDocModal(null);
+  };
+
   const handleDeleteDoc = async (docMeta) => {
+    if (docMeta.isPreuve) return alert("Les preuves doivent être supprimées directement depuis l'indicateur Qualiopi correspondant.");
     if (!window.confirm(`Supprimer "${docMeta.name}" ?`)) return;
-    try {
-      await deleteObject(ref(storage, docMeta.storagePath));
-    } catch (_) { }
+    
+    try { await deleteObject(ref(storage, docMeta.storagePath)); } catch (_) { }
     const updated = documents.filter(d => d.id !== docMeta.id);
     await setDoc(doc(db, "etablissements", selectedIfsi), { documents: updated }, { merge: true });
     await writeLog(selectedIfsi, "Document supprimé", docMeta.name, "admin");
@@ -269,11 +327,7 @@ export function EquipeTab({
 
   useEffect(() => {
     if (!selectedIfsi) return;
-    const q = query(
-      collection(db, "etablissements", selectedIfsi, "logs"),
-      orderBy("createdAt", "desc"),
-      limit(30)
-    );
+    const q = query(collection(db, "etablissements", selectedIfsi, "logs"), orderBy("createdAt", "desc"), limit(30));
     const unsub = onSnapshot(q, (snap) => {
       setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
     });
@@ -282,10 +336,7 @@ export function EquipeTab({
 
   // ── Paramètres / Notifications ─────────────────────
   const [notifPrefs, setNotifPrefs] = useState({
-    connexion:    true,
-    modification: true,
-    export:       false,
-    alerte:       true,
+    connexion: true, modification: true, export: false, alerte: true,
   });
 
   useEffect(() => {
@@ -333,7 +384,6 @@ export function EquipeTab({
     setConfirmDel(null);
   };
 
-  // ── Tabs config ────────────────────────────────────
   const TABS = [
     { id: "membres",      label: "Membres",         icon: "👥", badge: stats.invites || null, bc: "purple"  },
     { id: "etablissement",label: "Établissement",   icon: "🏛",  badge: null                                },
@@ -345,7 +395,6 @@ export function EquipeTab({
   return (
     <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-      {/* ── ANIMATIONS INTEGREES ── */}
       <style>{`
         @keyframes slideDown { from { opacity:0; transform:translateY(-10px); } to { opacity:1; transform:translateY(0); } }
         .animate-slide-down { animation: slideDown 0.2s ease-out forwards; }
@@ -353,31 +402,95 @@ export function EquipeTab({
 
       {/* ── MODALE CONFIRMATION SUPPRESSION ─────────────── */}
       {confirmDel && (
-        <div style={{
-          position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)",
-          zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center",
-        }}>
-          <div style={{
-            background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "14px",
-            padding: "28px 30px", width: "380px", boxShadow: t.shadow,
-          }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "22px", color: t.red, marginBottom: "8px" }}>
-              Révoquer l'accès
-            </div>
-            <div style={{ fontSize: "12px", color: t.text2, lineHeight: "1.65", marginBottom: "22px" }}>
-              Voulez-vous vraiment supprimer l'accès de&nbsp;
-              <strong style={{ color: t.text }}>{confirmDel.email}</strong>&nbsp;?
-              Cette action est irréversible.
-            </div>
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="animate-slide-down" style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "14px", padding: "28px 30px", width: "380px", boxShadow: t.shadow }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "22px", color: t.red, marginBottom: "8px" }}>Révoquer l'accès</div>
+            <div style={{ fontSize: "12px", color: t.text2, lineHeight: "1.65", marginBottom: "22px" }}>Voulez-vous vraiment supprimer l'accès de <strong style={{ color: t.text }}>{confirmDel.email}</strong> ? Cette action est irréversible.</div>
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <button
-                onClick={() => setConfirmDel(null)}
-                style={{ padding: "9px 18px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "7px", color: t.text2, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
-              >Annuler</button>
-              <button
-                onClick={doDeleteUser} disabled={deleting}
-                style={{ padding: "9px 18px", background: t.red, border: "none", borderRadius: "7px", color: "white", fontSize: "12px", fontWeight: "700", cursor: "pointer", opacity: deleting ? 0.6 : 1 }}
-              >{deleting ? "Suppression…" : "Supprimer"}</button>
+              <button onClick={() => setConfirmDel(null)} style={{ padding: "9px 18px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "7px", color: t.text2, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}>Annuler</button>
+              <button onClick={doDeleteUser} disabled={deleting} style={{ padding: "9px 18px", background: t.red, border: "none", borderRadius: "7px", color: "white", fontSize: "12px", fontWeight: "700", cursor: "pointer", opacity: deleting ? 0.6 : 1 }}>{deleting ? "Suppression…" : "Supprimer"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE UPLOAD & CATÉGORISATION ─────────────── */}
+      {uploadModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="animate-slide-down" style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "32px", width: "500px", boxShadow: t.shadowLg }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "26px", color: t.text, marginBottom: "16px" }}>Détails du document</div>
+            
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Nom du document</label>
+              <input 
+                type="text" value={uploadModal.name} onChange={e => setUploadModal({ ...uploadModal, name: e.target.value })}
+                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px" }}
+                autoFocus
+              />
+              
+              {/* SUGGESTIONS DE DOCUMENTS TYPES */}
+              <div style={{ marginTop: "12px" }}>
+                <div style={{ fontSize: "10px", color: t.text3, marginBottom: "6px" }}>Suggestions de documents types :</div>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
+                  {STANDARD_DOCS.map(docName => (
+                    <span 
+                      key={docName} onClick={() => setUploadModal({ ...uploadModal, name: docName })}
+                      style={{ background: t.surface3, color: t.text2, fontSize: "10px", fontWeight: "600", padding: "4px 10px", borderRadius: "20px", cursor: "pointer", transition: "all 0.2s" }}
+                      onMouseOver={e=>e.currentTarget.style.background=t.accentBg} onMouseOut={e=>e.currentTarget.style.background=t.surface3}
+                    >
+                      {docName}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div style={{ marginBottom: "32px" }}>
+              <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Catégorie</label>
+              <select 
+                value={uploadModal.cat} onChange={e => setUploadModal({ ...uploadModal, cat: e.target.value })}
+                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px", cursor: "pointer" }}
+              >
+                {DOC_CATS.filter(c => c !== "Indicateur").map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button onClick={() => setUploadModal(null)} style={{ padding: "10px 20px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "8px", color: t.text2, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Annuler</button>
+              <button onClick={confirmUpload} style={{ padding: "10px 24px", background: t.accent, border: "none", borderRadius: "8px", color: "white", fontSize: "13px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.accentBd}` }}>Valider et Uploader</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── MODALE ÉDITION DOCUMENT (Renommer) ─────────────── */}
+      {editDocModal && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div className="animate-slide-down" style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "32px", width: "420px", boxShadow: t.shadowLg }}>
+            <h3 style={{ fontFamily: "'Instrument Serif',serif", fontSize: "26px", color: t.text, margin: "0 0 20px 0" }}>Modifier le document</h3>
+            
+            <div style={{ marginBottom: "20px" }}>
+              <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Nom</label>
+              <input 
+                type="text" value={editDocModal.name} onChange={e => setEditDocModal({ ...editDocModal, name: e.target.value })}
+                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px" }}
+                autoFocus
+              />
+            </div>
+
+            <div style={{ marginBottom: "32px" }}>
+              <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Catégorie</label>
+              <select 
+                value={editDocModal.cat} onChange={e => setEditDocModal({ ...editDocModal, cat: e.target.value })}
+                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px", cursor: "pointer" }}
+              >
+                {DOC_CATS.filter(c => c !== "Indicateur").map(c => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button onClick={() => setEditDocModal(null)} style={{ padding: "10px 20px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "8px", color: t.text2, fontSize: "13px", fontWeight: "600", cursor: "pointer" }}>Annuler</button>
+              <button onClick={confirmEditDoc} style={{ padding: "10px 24px", background: t.accent, border: "none", borderRadius: "8px", color: "white", fontSize: "13px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.accentBd}` }}>Enregistrer</button>
             </div>
           </div>
         </div>
@@ -657,7 +770,7 @@ export function EquipeTab({
       )}
 
       {/* ══════════════════════════════════════════════════
-          ONGLET 2 — ÉTABLISSEMENT (NOUVEAU - INTERACTIF)
+          ONGLET 2 — ÉTABLISSEMENT 
       ══════════════════════════════════════════════════ */}
       {tab === "etablissement" && (
         <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "20px", alignItems: "start" }}>
@@ -681,7 +794,6 @@ export function EquipeTab({
             {etabForm ? (
               <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "24px" }}>
                 
-                {/* BLOC 1 : INFORMATIONS GÉNÉRALES */}
                 <div>
                   <div style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Informations générales</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
@@ -701,7 +813,6 @@ export function EquipeTab({
 
                 <hr style={{ border:0, borderTop:`1px dashed ${t.border}` }} />
 
-                {/* BLOC 2 : QUALIOPI */}
                 <div>
                   <div style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Qualiopi</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
@@ -718,7 +829,6 @@ export function EquipeTab({
 
                 <hr style={{ border:0, borderTop:`1px dashed ${t.border}` }} />
 
-                {/* BLOC 3 : AGRÉMENTS (ÉDITEUR DYNAMIQUE) */}
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                     <span style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px" }}>
@@ -775,9 +885,7 @@ export function EquipeTab({
             )}
           </div>
 
-          {/* Colonne droite : Aperçu Qualiopi + agréments */}
           <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            
             <div style={{ background: t.goldBg, border: `1px solid ${t.goldBd}`, borderRadius: "12px", padding: "20px", boxShadow: `0 4px 16px ${t.goldBd}` }}>
               <div style={{ fontSize: "10px", fontWeight: "800", color: t.gold, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Certification Qualiopi</div>
               <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "18px", color: t.text, marginBottom: "4px" }}>{etabForm?.certif || "Non renseigné"}</div>
@@ -810,58 +918,63 @@ export function EquipeTab({
                 })
               )}
             </div>
-
           </div>
         </div>
       )}
 
       {/* ══════════════════════════════════════════════════
-          ONGLET 3 — MÉDIATHÈQUE
+          ONGLET 3 — MÉDIATHÈQUE (MIS À JOUR)
       ══════════════════════════════════════════════════ */}
       {tab === "mediatheque" && (
-        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
+        <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+          {/* 🎯 RAPPEL RGPD */}
+          <div style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, borderRadius: "10px", padding: "14px 18px", display: "flex", gap: "12px", alignItems: "center" }}>
+            <span style={{ fontSize: "20px" }}>🛡️</span>
+            <div>
+              <div style={{ fontSize: "12px", fontWeight: "800", color: t.accent, marginBottom: "2px" }}>Rappel de Confidentialité & RGPD</div>
+              <div style={{ fontSize: "11px", color: t.text2, lineHeight: "1.4" }}>
+                Cet espace est partagé avec toute l'équipe. Veillez à ne déposer <strong>aucune donnée personnelle sensible, médicale ou non anonymisée</strong> (dossiers de patients, notes nominatives d'étudiants, etc.).
+              </div>
+            </div>
+          </div>
 
           {/* Filtres + bouton déposer */}
           <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
             <input
               value={docSearch} onChange={e => setDocSearch(e.target.value)}
               placeholder="Rechercher un document…"
-              style={{ width: "220px", padding: "6px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
+              style={{ width: "220px", padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
             />
-            <div style={{ display: "flex", gap: "4px" }}>
+            <div style={{ display: "flex", gap: "6px" }}>
               {["tous", ...DOC_CATS].map(c => {
                 const cc = CAT_COLORS[c];
                 return (
                   <button key={c} onClick={() => setDocCatFilter(c)} style={{
-                    padding: "5px 10px", borderRadius: "6px", cursor: "pointer",
+                    padding: "6px 12px", borderRadius: "6px", cursor: "pointer",
                     border: `1px solid ${docCatFilter === c ? (cc ? cc.c + "60" : t.accentBd) : t.border}`,
-                    background: docCatFilter === c ? (cc ? cc.bg : t.accentBg) : "transparent",
-                    color: docCatFilter === c ? (cc ? cc.c : t.accent) : t.text2,
-                    fontSize: "10px", fontWeight: "700", transition: "all 0.12s",
+                    background: docCatFilter === c ? (cc ? cc.bg : t.surface) : "transparent",
+                    color: docCatFilter === c ? (cc ? cc.c : t.text2) : t.text2,
+                    fontSize: "11px", fontWeight: "700", transition: "all 0.12s",
                   }}>{c === "tous" ? "Tout" : c}</button>
                 );
               })}
             </div>
 
-            {/* Sélecteur catégorie avant upload */}
-            <div style={{ marginLeft: "auto", display: "flex", gap: "6px", alignItems: "center" }}>
-              <select value={uploadCat} onChange={e => setUploadCat(e.target.value)}
-                style={{ padding: "5px 9px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text2, cursor: "pointer" }}>
-                {DOC_CATS.map(c => <option key={c}>{c}</option>)}
-              </select>
+            <div style={{ marginLeft: "auto" }}>
               <button
                 onClick={() => fileInputRef.current?.click()}
-                style={{ padding: "6px 13px", background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, borderRadius: "7px", fontSize: "11px", fontWeight: "700", cursor: "pointer" }}
-              >+ Déposer</button>
+                style={{ padding: "8px 16px", background: t.accent, color: "white", border: "none", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.accentBd}` }}
+              >+ Déposer un document</button>
               <input ref={fileInputRef} type="file" hidden accept=".pdf,.docx,.xlsx,.pptx,.jpg,.png"
-                onChange={e => { if (e.target.files[0]) handleFileUpload(e.target.files[0]); e.target.value = ""; }} />
+                onChange={e => { if (e.target.files[0]) handleFileSelect(e.target.files[0]); e.target.value = ""; }} />
             </div>
           </div>
 
           {/* Barre de progression upload */}
           {uploadProgress !== null && (
             <div style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, borderRadius: "8px", padding: "10px 14px" }}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: t.accent, marginBottom: "6px" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: t.accent, marginBottom: "6px", fontWeight:"700" }}>
                 <span>Envoi en cours…</span><span>{uploadProgress}%</span>
               </div>
               <div style={{ height: "4px", background: t.border, borderRadius: "2px", overflow: "hidden" }}>
@@ -870,56 +983,62 @@ export function EquipeTab({
             </div>
           )}
 
-          {/* Zone drag-and-drop visuelle */}
-          <div
-            style={{ background: t.surface2, border: `2px dashed ${t.border}`, borderRadius: "10px", padding: "16px", textAlign: "center", cursor: "pointer", transition: "all 0.15s" }}
-            onDragOver={e => { e.preventDefault(); e.currentTarget.style.borderColor = t.accentBd; }}
-            onDragLeave={e => e.currentTarget.style.borderColor = t.border}
-            onDrop={e => { e.preventDefault(); e.currentTarget.style.borderColor = t.border; const f = e.dataTransfer.files[0]; if (f) handleFileUpload(f); }}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            <span style={{ fontSize: "20px" }}>📂</span>
-            <div style={{ fontSize: "11px", fontWeight: "600", color: t.text2, marginTop: "5px" }}>Glisser-déposer ou cliquer pour déposer</div>
-            <div style={{ fontSize: "9px", color: t.text3, marginTop: "2px" }}>PDF, DOCX, XLSX, PPTX — 20 Mo max</div>
-          </div>
-
           {/* Grille documents */}
           {filteredDocs.length === 0 ? (
-            <div style={{ textAlign: "center", color: t.text3, fontSize: "12px", padding: "30px", fontStyle: "italic" }}>Aucun document déposé.</div>
+            <div style={{ textAlign: "center", color: t.text3, fontSize: "13px", padding: "40px", background:t.surface, borderRadius:"12px", border:`1px dashed ${t.border}` }}>
+              Aucun document ne correspond à vos filtres.
+            </div>
           ) : (
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "10px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "12px" }}>
               {filteredDocs.map(docMeta => {
                 const cc = CAT_COLORS[docMeta.cat] || CAT_COLORS["Autre"];
                 return (
                   <div key={docMeta.id}
-                    style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "10px", padding: "13px 14px", boxShadow: t.shadowSm, transition: "all 0.15s" }}
+                    style={{ background: t.surface, border: `1px solid ${docMeta.isPreuve ? cc.c+"40" : t.border}`, borderRadius: "12px", padding: "16px", boxShadow: t.shadowSm, transition: "all 0.15s", position:"relative", overflow:"hidden" }}
                     onMouseOver={e => { e.currentTarget.style.transform = "translateY(-2px)"; e.currentTarget.style.boxShadow = t.shadow; }}
                     onMouseOut={e => { e.currentTarget.style.transform = "translateY(0)"; e.currentTarget.style.boxShadow = t.shadowSm; }}
                   >
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "8px" }}>
-                      <span style={{ background: cc.bg, color: cc.c, border: `1px solid ${cc.c}30`, fontSize: "8px", fontWeight: "800", padding: "2px 6px", borderRadius: "4px" }}>{docMeta.cat}</span>
-                      {docMeta.validated
-                        ? <span style={{ background: t.greenBg, border: `1px solid ${t.greenBd}`, color: t.green, fontSize: "8px", fontWeight: "800", padding: "2px 6px", borderRadius: "4px" }}>✓ Validé</span>
-                        : <span style={{ background: t.amberBg, border: `1px solid ${t.amberBd}`, color: t.amber, fontSize: "8px", fontWeight: "800", padding: "2px 6px", borderRadius: "4px" }}>En attente</span>
-                      }
+                    {docMeta.isPreuve && <div style={{ position:"absolute", top:0, left:0, width:"4px", height:"100%", background:cc.c }} />}
+
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "10px" }}>
+                      <span style={{ background: cc.bg, color: cc.c, border: `1px solid ${cc.c}30`, fontSize: "9px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>{docMeta.cat}</span>
+                      
+                      {docMeta.isPreuve ? (
+                        <span style={{ fontSize:"9px", fontWeight:"700", color:t.text3 }}>Indicateur {docMeta.indicNum}</span>
+                      ) : (
+                        docMeta.validated
+                          ? <span style={{ background: t.greenBg, border: `1px solid ${t.greenBd}`, color: t.green, fontSize: "9px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>✓ Validé</span>
+                          : <span style={{ background: t.amberBg, border: `1px solid ${t.amberBd}`, color: t.amber, fontSize: "9px", fontWeight: "800", padding: "3px 8px", borderRadius: "6px" }}>En attente</span>
+                      )}
                     </div>
-                    <div style={{ fontSize: "12px", fontWeight: "600", color: t.text, lineHeight: "1.35", marginBottom: "5px" }}>{docMeta.name}</div>
-                    <div style={{ fontSize: "9px", color: t.text3, marginBottom: "8px" }}>{docMeta.author} · {docMeta.size} · {docMeta.date}</div>
-                    <div style={{ display: "flex", gap: "5px" }}>
+                    
+                    <div style={{ fontSize: "13px", fontWeight: "700", color: t.text, lineHeight: "1.4", marginBottom: "6px", wordBreak:"break-word" }}>{docMeta.name}</div>
+                    <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>{docMeta.author} · {docMeta.size} · {formatMonthYear(docMeta.date)}</div>
+                    
+                    <div style={{ display: "flex", gap: "6px" }}>
                       <a href={docMeta.downloadURL} target="_blank" rel="noreferrer"
-                        style={{ flex: 1, padding: "5px", background: t.accentBg, border: `1px solid ${t.accentBd}`, borderRadius: "5px", color: t.accent, fontSize: "9px", fontWeight: "700", cursor: "pointer", textAlign: "center", textDecoration: "none" }}>
+                        style={{ flex: 1, padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text, fontSize: "11px", fontWeight: "700", cursor: "pointer", textAlign: "center", textDecoration: "none", transition:"all 0.2s" }}
+                        onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
+                      >
                         👁 Ouvrir
                       </a>
-                      {!docMeta.validated && (
-                        <button onClick={() => handleValidateDoc(docMeta)}
-                          style={{ flex: 1, padding: "5px", background: t.greenBg, border: `1px solid ${t.greenBd}`, borderRadius: "5px", color: t.green, fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>
-                          ✓ Valider
-                        </button>
+
+                      {!docMeta.isPreuve && (
+                        <>
+                          <button onClick={() => setEditDocModal(docMeta)} title="Renommer / Modifier"
+                            style={{ width: "32px", padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text2, fontSize: "12px", cursor: "pointer", transition:"all 0.2s" }}
+                            onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
+                          >
+                            ✏️
+                          </button>
+                          <button onClick={() => handleDeleteDoc(docMeta)} title="Supprimer"
+                            style={{ width: "32px", padding: "7px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", color: t.red, fontSize: "11px", cursor: "pointer", transition:"all 0.2s" }}
+                            onMouseOver={e=>{e.currentTarget.style.background=t.red; e.currentTarget.style.color="white";}} onMouseOut={e=>{e.currentTarget.style.background=t.redBg; e.currentTarget.style.color=t.red;}}
+                          >
+                            ✕
+                          </button>
+                        </>
                       )}
-                      <button onClick={() => handleDeleteDoc(docMeta)}
-                        style={{ width: "28px", padding: "5px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "5px", color: t.red, fontSize: "9px", cursor: "pointer" }}>
-                        ✕
-                      </button>
                     </div>
                   </div>
                 );
@@ -934,7 +1053,6 @@ export function EquipeTab({
       ══════════════════════════════════════════════════ */}
       {tab === "journal" && (
         <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-          {/* Alerte connexions échouées */}
           {logs.some(l => l.type === "alert") && (
             <div style={{ background: t.redBg, border: `1px solid ${t.redBd}`, borderLeft: `3px solid ${t.red}`, borderRadius: "8px", padding: "10px 14px", display: "flex", alignItems: "center", gap: "10px" }}>
               <span style={{ fontSize: "14px" }}>⚠️</span>
@@ -986,7 +1104,6 @@ export function EquipeTab({
       {tab === "parametres" && (
         <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
 
-          {/* Notifications */}
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
             <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🔔 Notifications email</div>
             {[
@@ -1005,7 +1122,6 @@ export function EquipeTab({
             ))}
           </div>
 
-          {/* Affichage */}
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
             <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🎨 Affichage</div>
             {[
@@ -1029,7 +1145,6 @@ export function EquipeTab({
             </div>
           </div>
 
-          {/* Exports */}
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
             <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports & sauvegardes</div>
             {[
@@ -1050,7 +1165,6 @@ export function EquipeTab({
             })}
           </div>
 
-          {/* Zone danger */}
           <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
             <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.red, marginBottom: "6px" }}>⚠ Zone dangereuse</div>
             <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>Actions irréversibles — nécessitent confirmation</div>
@@ -1079,7 +1193,7 @@ export function EquipeTab({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  CompteTab
+//  CompteTab (Inchangé)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CompteTab({
@@ -1137,7 +1251,6 @@ export function CompteTab({
   return (
     <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "20px", maxWidth: "800px", margin: "0 auto", paddingBottom: "40px" }}>
 
-      {/* Header profil */}
       <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "28px 32px", display: "flex", alignItems: "center", gap: "24px", boxShadow: t.shadowSm }}>
         <div style={{ width: "72px", height: "72px", borderRadius: "18px", background: `linear-gradient(135deg, ${t.accent}, ${t.accentBd ? "#7c3aed" : t.accent})`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px", fontWeight: "800", color: "white", flexShrink: 0 }}>
           {firebaseAuth.currentUser?.email?.charAt(0).toUpperCase()}
@@ -1155,7 +1268,6 @@ export function CompteTab({
         </div>
       </div>
 
-      {/* Apparence */}
       <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
         <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
           <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>🎨 Apparence & Accessibilité</span>
@@ -1176,7 +1288,6 @@ export function CompteTab({
         </div>
       </div>
 
-      {/* Sécurité */}
       <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
         <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
           <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>🔒 Sécurité du compte</span>
@@ -1245,7 +1356,6 @@ export function CompteTab({
         </div>
       </div>
 
-      {/* Zone danger */}
       <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
         <div style={{ padding: "24px 32px" }}>
           <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: t.red, marginBottom: "6px" }}>⚠️ Zone dangereuse</div>
