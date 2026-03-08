@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect, useRef, useCallback } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { collection, onSnapshot, addDoc, deleteDoc, doc, setDoc, serverTimestamp, query, orderBy, limit } from "firebase/firestore";
 import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { updatePassword, reauthenticateWithCredential, EmailAuthProvider } from "firebase/auth";
@@ -39,7 +39,7 @@ const CAT_COLORS = {
   "Pédagogie":     { c: "#2dd4bf", bg: "rgba(45,212,191,0.1)"  },
   "RH":            { c: "#f0a030", bg: "rgba(240,160,48,0.1)"  },
   "Partenariats":  { c: "#f07070", bg: "rgba(240,112,112,0.1)" },
-  "Indicateur":    { c: "#10b981", bg: "rgba(16,185,129,0.1)"  }, // Vert pour les preuves Qualiopi
+  "Indicateur":    { c: "#10b981", bg: "rgba(16,185,129,0.1)"  },
   "Autre":         { c: "#a0a0b0", bg: "rgba(160,160,176,0.1)" },
 };
 
@@ -87,7 +87,6 @@ function Toggle({ val, onChange, colorKey = "accent", t }) {
   return (
     <div
       onClick={onChange}
-      role="switch" aria-checked={val}
       style={{
         width: "36px", height: "20px", borderRadius: "10px", flexShrink: 0,
         background: val ? c : t.surface3,
@@ -130,18 +129,18 @@ function Field({ label, value, onChange, type = "text", placeholder = "", hint =
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  EquipeTab
+//  EquipeTab (Administration Globale)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function EquipeTab({
   userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser,
   selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm,
   sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t,
-  ifsiData, handleSaveEtab, criteres, // 🎯 CRITERES RÉCUPÉRÉS ICI
-  isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode,
+  ifsiData, handleSaveEtab, criteres, 
+  isDarkMode, setIsDarkMode
 }) {
 
-  const [tab, setTab]                 = useState("mediatheque");
+  const [tab, setTab]                 = useState("parametres"); // Ouvert par défaut sur paramètres pour te montrer
   const [roleFilter, setRoleFilter]   = useState("tous");
   const [statusFilter, setStatusFilter] = useState("tous");
   const [showInvite, setShowInvite]   = useState(false);
@@ -209,14 +208,10 @@ export function EquipeTab({
   const [docCatFilter, setDocCatFilter] = useState("tous");
   const [docSearch, setDocSearch]       = useState("");
   const [uploadProgress, setUploadProgress] = useState(null); 
-  
-  // 🎯 NOUVEAU : Modales pour Upload et Édition
   const [uploadModal, setUploadModal]   = useState(null);
   const [editDocModal, setEditDocModal] = useState(null);
-  
   const fileInputRef = useRef();
 
-  // 🎯 FUSION : Récupération automatique des preuves depuis les indicateurs
   const allMergedDocs = useMemo(() => {
     const baseDocs = [...documents];
     const preuveDocs = [];
@@ -233,7 +228,7 @@ export function EquipeTab({
               date: p.date || crit.dateModif || "—",
               author: p.auteur || p.author || "Système",
               downloadURL: p.url || p.downloadURL || p.lien,
-              isPreuve: true, // Flag spécial pour empêcher la suppression d'ici
+              isPreuve: true,
               indicNum: crit.num
             });
           });
@@ -252,17 +247,11 @@ export function EquipeTab({
     [allMergedDocs, docCatFilter, docSearch]
   );
 
-  // ÉTAPE 1 : Sélection du fichier ouvre la modale
   const handleFileSelect = (file) => {
     if (!file) return;
-    setUploadModal({
-      file: file,
-      name: file.name.replace(/\.[^/.]+$/, ""), // Nom sans extension
-      cat: "Qualité"
-    });
+    setUploadModal({ file: file, name: file.name.replace(/\.[^/.]+$/, ""), cat: "Qualité" });
   };
 
-  // ÉTAPE 2 : Validation de la modale lance l'upload
   const confirmUpload = async () => {
     if (!uploadModal || !selectedIfsi) return;
     const { file, name, cat } = uploadModal;
@@ -297,7 +286,6 @@ export function EquipeTab({
     );
   };
 
-  // 🎯 NOUVEAU : Sauvegarde du renommage
   const confirmEditDoc = async () => {
     if (!editDocModal || !editDocModal.name.trim()) return alert("Le nom du document est requis.");
     const updated = documents.map(d => d.id === editDocModal.id ? { ...d, name: editDocModal.name.trim(), cat: editDocModal.cat } : d);
@@ -307,9 +295,8 @@ export function EquipeTab({
   };
 
   const handleDeleteDoc = async (docMeta) => {
-    if (docMeta.isPreuve) return alert("Les preuves doivent être supprimées directement depuis l'indicateur Qualiopi correspondant.");
+    if (docMeta.isPreuve) return alert("Les preuves doivent être supprimées depuis l'indicateur Qualiopi correspondant.");
     if (!window.confirm(`Supprimer "${docMeta.name}" ?`)) return;
-    
     try { await deleteObject(ref(storage, docMeta.storagePath)); } catch (_) { }
     const updated = documents.filter(d => d.id !== docMeta.id);
     await setDoc(doc(db, "etablissements", selectedIfsi), { documents: updated }, { merge: true });
@@ -324,29 +311,102 @@ export function EquipeTab({
 
   // ── Journal ────────────────────────────────────────
   const [logs, setLogs] = useState([]);
-
   useEffect(() => {
     if (!selectedIfsi) return;
     const q = query(collection(db, "etablissements", selectedIfsi, "logs"), orderBy("createdAt", "desc"), limit(30));
-    const unsub = onSnapshot(q, (snap) => {
-      setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-    });
+    const unsub = onSnapshot(q, (snap) => setLogs(snap.docs.map(d => ({ id: d.id, ...d.data() }))));
     return () => unsub();
   }, [selectedIfsi]);
 
-  // ── Paramètres / Notifications ─────────────────────
-  const [notifPrefs, setNotifPrefs] = useState({
-    connexion: true, modification: true, export: false, alerte: true,
-  });
-
-  useEffect(() => {
-    if (ifsiData?.notifPrefs) setNotifPrefs(ifsiData.notifPrefs);
-  }, [ifsiData?.notifPrefs]);
+  // ── EXPORTS & PARAMÈTRES ───────────────────────────
+  const [notifPrefs, setNotifPrefs] = useState({ connexion: true, modification: true, alerte: true });
+  useEffect(() => { if (ifsiData?.notifPrefs) setNotifPrefs(ifsiData.notifPrefs); }, [ifsiData?.notifPrefs]);
 
   const toggleNotif = async (key) => {
     const updated = { ...notifPrefs, [key]: !notifPrefs[key] };
     setNotifPrefs(updated);
     await setDoc(doc(db, "etablissements", selectedIfsi), { notifPrefs: updated }, { merge: true });
+  };
+
+  // 🎯 EXPORT JSON
+  const handleExportJson = () => {
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(criteres, null, 2));
+    const dlAnchorElem = document.createElement('a');
+    dlAnchorElem.setAttribute("href", dataStr);
+    dlAnchorElem.setAttribute("download", `Qualiopi_Export_${new Date().toISOString().slice(0,10)}.json`);
+    dlAnchorElem.click();
+  };
+
+  // 🎯 SUPERBE EXPORT EXCEL (HTML to XLS)
+  const handleExportExcel = () => {
+    if (!criteres || criteres.length === 0) return alert("Aucun indicateur disponible à l'export.");
+
+    const sortedCriteres = [...criteres].sort((a,b) => (a.critere === b.critere ? a.num - b.num : a.critere - b.critere));
+
+    // Construction d'une page HTML stylisée compréhensible par Excel
+    const htmlContent = `
+      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
+      <head>
+        <meta charset="utf-8" />
+        <style>
+          table { border-collapse: collapse; font-family: 'Segoe UI', Arial, sans-serif; width: 100%; }
+          th { background-color: #0f172a; color: #ffffff; font-weight: bold; text-align: left; padding: 12px; border: 1px solid #cbd5e1; font-size: 14px; }
+          td { padding: 10px; border: 1px solid #cbd5e1; vertical-align: top; font-size: 13px; color: #1e293b; }
+          .bg-conforme { background-color: #d1fae5; color: #065f46; font-weight: bold; text-align: center; }
+          .bg-encours { background-color: #fef3c7; color: #92400e; font-weight: bold; text-align: center; }
+          .bg-nonconforme { background-color: #fee2e2; color: #991b1b; font-weight: bold; text-align: center; }
+          .bg-nonconcerne { background-color: #f1f5f9; color: #475569; font-weight: bold; text-align: center; }
+          .titre { font-size: 14px; font-weight: bold; color: #0f172a; }
+        </style>
+      </head>
+      <body>
+        <h2 style="color: #0f172a; font-family: 'Segoe UI', Arial, sans-serif;">Tableau de suivi Qualiopi</h2>
+        <p style="color: #64748b; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 20px;">Export généré le : ${new Date().toLocaleDateString('fr-FR')}</p>
+        <table>
+          <thead>
+            <tr>
+              <th style="width: 80px; text-align:center;">Numéro</th>
+              <th style="width: 130px; text-align:center;">Statut</th>
+              <th style="width: 500px;">Intitulé de l'indicateur</th>
+              <th style="width: 250px;">Responsables</th>
+              <th style="width: 120px; text-align:center;">Échéance</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${sortedCriteres.map(c => {
+              const statutClass = c.statut === "conforme" ? "bg-conforme" : c.statut === "en-cours" ? "bg-encours" : c.statut === "non-conforme" ? "bg-nonconforme" : "bg-nonconcerne";
+              const statutLabel = c.statut === "conforme" ? "Conforme" : c.statut === "en-cours" ? "En cours" : c.statut === "non-conforme" ? "Non conforme" : c.statut === "non-concerne" ? "Non concerné" : "Non évalué";
+              
+              const escapeHtml = (text) => (text||"").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+              const titre = escapeHtml(c.titre);
+              const resp = escapeHtml(Array.isArray(c.responsables) ? c.responsables.join(", ") : (c.responsables || ""));
+
+              return `
+                <tr>
+                  <td style="text-align: center; font-weight: bold; font-size: 14px;">${c.critere}.${c.num}</td>
+                  <td class="${statutClass}">${statutLabel}</td>
+                  <td><div class="titre">${titre}</div></td>
+                  <td>${resp}</td>
+                  <td style="text-align: center;">${escapeHtml(c.delai)}</td>
+                </tr>
+              `;
+            }).join('')}
+          </tbody>
+        </table>
+      </body>
+      </html>
+    `;
+
+    const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Suivi_Qualiopi_${new Date().toISOString().slice(0,10)}.xls`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    writeLog(selectedIfsi, "Export Excel généré", "Téléchargement base indicateurs", "export");
   };
 
   // ── KPIs membres ───────────────────────────────────
@@ -428,9 +488,8 @@ export function EquipeTab({
                 autoFocus
               />
               
-              {/* SUGGESTIONS DE DOCUMENTS TYPES */}
               <div style={{ marginTop: "12px" }}>
-                <div style={{ fontSize: "10px", color: t.text3, marginBottom: "6px" }}>Suggestions de documents types :</div>
+                <div style={{ fontSize: "10px", color: t.text3, marginBottom: "6px" }}>Suggestions :</div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                   {STANDARD_DOCS.map(docName => (
                     <span 
@@ -463,7 +522,7 @@ export function EquipeTab({
         </div>
       )}
 
-      {/* ── MODALE ÉDITION DOCUMENT (Renommer) ─────────────── */}
+      {/* ── MODALE ÉDITION DOCUMENT ─────────────── */}
       {editDocModal && (
         <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.7)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
           <div className="animate-slide-down" style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "32px", width: "420px", boxShadow: t.shadowLg }}>
@@ -559,7 +618,6 @@ export function EquipeTab({
       {tab === "membres" && (
         <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
 
-          {/* Formulaire invitation (ANIMÉ) */}
           {showInvite && userProfile?.role === "superadmin" && (
             <div className="animate-slide-down" style={{ background: t.surface, border: `1px dashed ${t.accentBd}`, borderLeft: `3px solid ${t.accent}`, borderRadius: "12px", padding: "20px 22px", boxShadow: t.shadowSm }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
@@ -606,7 +664,6 @@ export function EquipeTab({
             </div>
           )}
 
-          {/* KPI */}
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "10px" }}>
             {[
               { v: stats.total,   l: "Total",          k: "accent"  },
@@ -625,21 +682,13 @@ export function EquipeTab({
             })}
           </div>
 
-          {/* Tableau */}
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
-
-            {/* Filtres */}
             <div style={{ padding: "12px 18px", borderBottom: `1px solid ${t.border}`, display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap", background: t.surface2 }}>
               <input
                 value={teamSearchTerm} onChange={e => setTeamSearchTerm(e.target.value)}
                 placeholder="Nom, email…"
-                style={{
-                  width: "200px", padding: "6px 10px", background: t.surface,
-                  border: `1px solid ${t.border}`, borderRadius: "7px",
-                  fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit",
-                }}
+                style={{ width: "200px", padding: "6px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
               />
-              {/* Filtre rôle */}
               <div style={{ display: "flex", gap: "4px" }}>
                 {["tous", "admin", "user"].map(r => {
                   const rSc = r !== "tous" ? sc(t, ROLE_CFG[r]?.colorKey || "green") : null;
@@ -650,13 +699,10 @@ export function EquipeTab({
                       background: roleFilter === r ? (rSc?.bg || t.accentBg) : "transparent",
                       color: roleFilter === r ? (rSc?.c || t.accent) : t.text2,
                       fontSize: "10px", fontWeight: "700", transition: "all 0.12s",
-                    }}>
-                      {r === "tous" ? "Tous" : ROLE_CFG[r]?.label}
-                    </button>
+                    }}>{r === "tous" ? "Tous" : ROLE_CFG[r]?.label}</button>
                   );
                 })}
               </div>
-              {/* Filtre statut */}
               <div style={{ display: "flex", gap: "4px" }}>
                 {["tous", "ACTIF", "INACTIF"].map(s => {
                   const sSc = s !== "tous" ? sc(t, STATUS_CFG[s]?.colorKey || "green") : null;
@@ -667,9 +713,7 @@ export function EquipeTab({
                       background: statusFilter === s ? sSc?.bg : "transparent",
                       color: statusFilter === s ? sSc?.c : t.text2,
                       fontSize: "10px", fontWeight: "700", transition: "all 0.12s",
-                    }}>
-                      {s === "tous" ? "Tous statuts" : STATUS_CFG[s]?.label}
-                    </button>
+                    }}>{s === "tous" ? "Tous statuts" : STATUS_CFG[s]?.label}</button>
                   );
                 })}
               </div>
@@ -678,19 +722,15 @@ export function EquipeTab({
               </span>
             </div>
 
-            {/* En-tête colonnes */}
             <div style={{ display: "grid", gridTemplateColumns: "2fr 100px 90px 140px 110px", padding: "8px 18px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
               {["Membre", "Rôle", "Statut", "Dernière connexion", "Actions"].map(h => (
                 <span key={h} style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", textAlign: h==="Actions"?"right":"left" }}>{h}</span>
               ))}
             </div>
 
-            {/* Lignes */}
             <div style={{ maxHeight: "400px", overflowY: "auto" }}>
               {filteredUsers.length === 0 ? (
-                <div style={{ padding: "40px", textAlign: "center", color: t.text3, fontSize: "13px", fontStyle: "italic" }}>
-                  Aucun utilisateur trouvé.
-                </div>
+                <div style={{ padding: "40px", textAlign: "center", color: t.text3, fontSize: "13px", fontStyle: "italic" }}>Aucun utilisateur trouvé.</div>
               ) : filteredUsers.map(u => {
                 const rCfg  = ROLE_CFG[u.role]   || ROLE_CFG.user;
                 const sCfg  = STATUS_CFG[u.status] || STATUS_CFG.ACTIF;
@@ -700,65 +740,27 @@ export function EquipeTab({
                 const lastLogin = u.lastLoginAt ? timeAgo(u.lastLoginAt) : "Jamais";
 
                 return (
-                  <div
-                    key={u.id}
-                    style={{ display: "grid", gridTemplateColumns: "2fr 100px 90px 140px 110px", padding: "11px 18px", borderBottom: `1px solid ${t.border2}`, alignItems: "center", transition: "background 0.1s" }}
-                    onMouseOver={e => e.currentTarget.style.background = t.surface2}
-                    onMouseOut={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    {/* Avatar + email */}
+                  <div key={u.id} style={{ display: "grid", gridTemplateColumns: "2fr 100px 90px 140px 110px", padding: "11px 18px", borderBottom: `1px solid ${t.border2}`, alignItems: "center", transition: "background 0.1s" }} onMouseOver={e => e.currentTarget.style.background = t.surface2} onMouseOut={e => e.currentTarget.style.background = "transparent"}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                      <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: `${rSc.c}20`, border: `1px solid ${rSc.bd}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: rSc.c, flexShrink: 0 }}>
-                        {init}
-                      </div>
+                      <div style={{ width: "32px", height: "32px", borderRadius: "8px", background: `${rSc.c}20`, border: `1px solid ${rSc.bd}`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "11px", fontWeight: "800", color: rSc.c, flexShrink: 0 }}>{init}</div>
                       <div>
                         <div style={{ fontSize: "12px", fontWeight: "600", color: t.text }}>{u.email}</div>
                         {u.etablissementId && u.etablissementId !== selectedIfsi && (
-                          <div style={{ fontSize: "9px", color: t.text3 }}>
-                            {ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId}
-                          </div>
+                          <div style={{ fontSize: "9px", color: t.text3 }}>{ifsiList.find(i => i.id === u.etablissementId)?.name || u.etablissementId}</div>
                         )}
                       </div>
                     </div>
-
-                    {/* Rôle */}
-                    <span style={{ background: rSc.bg, border: `1px solid ${rSc.bd}`, color: rSc.c, fontSize: "9px", fontWeight: "800", padding: "2px 8px", borderRadius: "20px", width: "fit-content" }}>
-                      {rCfg.icon} {rCfg.label}
-                    </span>
-
-                    {/* Statut */}
+                    <span style={{ background: rSc.bg, border: `1px solid ${rSc.bd}`, color: rSc.c, fontSize: "9px", fontWeight: "800", padding: "2px 8px", borderRadius: "20px", width: "fit-content" }}>{rCfg.icon} {rCfg.label}</span>
                     <div style={{ display: "flex", alignItems: "center", gap: "5px" }}>
                       <div style={{ width: "6px", height: "6px", borderRadius: "50%", background: sSc.c, boxShadow: u.status === "ACTIF" ? `0 0 6px ${sSc.c}` : "none" }} />
                       <span style={{ fontSize: "10px", fontWeight: "600", color: sSc.c }}>{sCfg.label}</span>
                     </div>
-
-                    {/* Dernière connexion */}
-                    <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "10px", color: t.text3 }}>
-                      {lastLogin}
-                    </span>
-
-                    {/* Actions */}
+                    <span style={{ fontFamily: "'DM Mono',monospace", fontSize: "10px", color: t.text3 }}>{lastLogin}</span>
                     <div style={{ display: "flex", gap: "5px", justifyContent: "flex-end" }}>
-                      <button
-                        onClick={() => handleSendResetEmail(u.email)}
-                        title="Réinitialiser le mot de passe"
-                        style={{ width: "26px", height: "26px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.text2, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}
-                        onMouseOver={e => { e.currentTarget.style.borderColor = t.accentBd; e.currentTarget.style.color = t.accent; }}
-                        onMouseOut={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}
-                      >🔑</button>
-                      <button
-                        onClick={() => handleToggleStatus(u)}
-                        title={u.status === "ACTIF" ? "Suspendre le compte" : "Réactiver le compte"}
-                        style={{ width: "26px", height: "26px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.text2, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}
-                        onMouseOver={e => { e.currentTarget.style.borderColor = t.amberBd; e.currentTarget.style.color = t.amber; }}
-                        onMouseOut={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}
-                      >{u.status === "ACTIF" ? "⏸️" : "▶️"}</button>
+                      <button onClick={() => handleSendResetEmail(u.email)} title="Réinitialiser le mot de passe" style={{ width: "26px", height: "26px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.text2, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }} onMouseOver={e => { e.currentTarget.style.borderColor = t.accentBd; e.currentTarget.style.color = t.accent; }} onMouseOut={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}>🔑</button>
+                      <button onClick={() => handleToggleStatus(u)} title={u.status === "ACTIF" ? "Suspendre le compte" : "Réactiver le compte"} style={{ width: "26px", height: "26px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.text2, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }} onMouseOver={e => { e.currentTarget.style.borderColor = t.amberBd; e.currentTarget.style.color = t.amber; }} onMouseOut={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}>{u.status === "ACTIF" ? "⏸️" : "▶️"}</button>
                       {userProfile?.role === "superadmin" && (
-                        <button
-                          onClick={() => setConfirmDel(u)}
-                          title="Supprimer l'accès"
-                          style={{ width: "26px", height: "26px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.red, display: "flex", alignItems: "center", justifyContent: "center" }}
-                        >✕</button>
+                        <button onClick={() => setConfirmDel(u)} title="Supprimer l'accès" style={{ width: "26px", height: "26px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.red, display: "flex", alignItems: "center", justifyContent: "center" }}>✕</button>
                       )}
                     </div>
                   </div>
@@ -775,7 +777,6 @@ export function EquipeTab({
       {tab === "etablissement" && (
         <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "20px", alignItems: "start" }}>
 
-          {/* Formulaire identité & Agréments */}
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
             <div style={{ padding: "13px 18px", borderBottom: `1px solid ${t.border}`, background: t.surface2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontFamily: "'Instrument Serif',serif", fontSize: "16px", color: t.text }}>Identité & Configurations</span>
@@ -923,12 +924,11 @@ export function EquipeTab({
       )}
 
       {/* ══════════════════════════════════════════════════
-          ONGLET 3 — MÉDIATHÈQUE (MIS À JOUR)
+          ONGLET 3 — MÉDIATHÈQUE 
       ══════════════════════════════════════════════════ */}
       {tab === "mediatheque" && (
         <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-          {/* 🎯 RAPPEL RGPD */}
           <div style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, borderRadius: "10px", padding: "14px 18px", display: "flex", gap: "12px", alignItems: "center" }}>
             <span style={{ fontSize: "20px" }}>🛡️</span>
             <div>
@@ -939,14 +939,13 @@ export function EquipeTab({
             </div>
           </div>
 
-          {/* Filtres + bouton déposer */}
           <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
             <input
               value={docSearch} onChange={e => setDocSearch(e.target.value)}
               placeholder="Rechercher un document…"
               style={{ width: "220px", padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
             />
-            <div style={{ display: "flex", gap: "6px" }}>
+            <div style={{ display: "flex", gap: "6px", flexWrap:"wrap" }}>
               {["tous", ...DOC_CATS].map(c => {
                 const cc = CAT_COLORS[c];
                 return (
@@ -971,7 +970,6 @@ export function EquipeTab({
             </div>
           </div>
 
-          {/* Barre de progression upload */}
           {uploadProgress !== null && (
             <div style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, borderRadius: "8px", padding: "10px 14px" }}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "11px", color: t.accent, marginBottom: "6px", fontWeight:"700" }}>
@@ -983,10 +981,9 @@ export function EquipeTab({
             </div>
           )}
 
-          {/* Grille documents */}
           {filteredDocs.length === 0 ? (
             <div style={{ textAlign: "center", color: t.text3, fontSize: "13px", padding: "40px", background:t.surface, borderRadius:"12px", border:`1px dashed ${t.border}` }}>
-              Aucun document ne correspond à vos filtres.
+              Aucun document ne correspond à vos critères.
             </div>
           ) : (
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill,minmax(280px,1fr))", gap: "12px" }}>
@@ -1105,28 +1102,9 @@ export function EquipeTab({
         <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
 
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🔔 Notifications email</div>
-            {[
-              { k: "connexion",    l: "Nouvelles connexions",       sub: "Alerte à chaque login"    },
-              { k: "modification", l: "Modifications indicateurs",  sub: "Changement de statut"     },
-              { k: "export",       l: "Exports PDF",                sub: "Après chaque export"      },
-              { k: "alerte",       l: "Alertes de sécurité",        sub: "Connexions échouées", colorKey: "red" },
-            ].map(n => (
-              <div key={n.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${t.border2}` }}>
-                <div>
-                  <div style={{ fontSize: "12px", fontWeight: "600", color: t.text }}>{n.l}</div>
-                  <div style={{ fontSize: "9px", color: t.text3 }}>{n.sub}</div>
-                </div>
-                <Toggle val={notifPrefs[n.k]} onChange={() => toggleNotif(n.k)} colorKey={n.colorKey || "accent"} t={t} />
-              </div>
-            ))}
-          </div>
-
-          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🎨 Affichage</div>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🎨 Affichage (Local)</div>
             {[
               { l: "Thème sombre",   sub: "Interface Midnight Authority", val: isDarkMode,      set: () => setIsDarkMode(v => !v)      },
-              { l: "Mode daltonien", sub: "Remplace rouge/vert",          val: isColorblindMode, set: () => setIsColorblindMode(v => !v) },
             ].map(p => (
               <div key={p.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${t.border2}` }}>
                 <div>
@@ -1136,55 +1114,27 @@ export function EquipeTab({
                 <Toggle val={p.val} onChange={p.set} t={t} />
               </div>
             ))}
-            <div style={{ paddingTop: "10px" }}>
-              <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "6px" }}>Langue</label>
-              <select style={{ width: "100%", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none" }}>
-                <option>Français</option>
-                <option>English</option>
-              </select>
-            </div>
           </div>
 
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports & sauvegardes</div>
-            {[
-              { l: "Export JSON complet",     sub: "Toutes les données Qualiopi", k: "accent" },
-              { l: "Export Excel indicateurs",sub: "Tableau de suivi",            k: "green"  },
-              { l: "Sauvegarde complète",     sub: "Archive ZIP",                 k: "gold"   },
-            ].map(e => {
-              const { c, bg, bd } = sc(t, e.k);
-              return (
-                <div key={e.l} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
-                  <div>
-                    <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>{e.l}</div>
-                    <div style={{ fontSize: "9px", color: t.text3 }}>{e.sub}</div>
-                  </div>
-                  <button style={{ padding: "5px 11px", background: bg, border: `1px solid ${bd}`, color: c, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter</button>
-                </div>
-              );
-            })}
-          </div>
-
-          <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.red, marginBottom: "6px" }}>⚠ Zone dangereuse</div>
-            <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>Actions irréversibles — nécessitent confirmation</div>
-            {[
-              { l: "Réinitialiser les indicateurs", sub: "Remet à zéro la campagne active", k: "amber" },
-              { l: "Supprimer l'établissement",     sub: "Supprime toutes les données",     k: "red"   },
-            ].map(a => {
-              const { c, bg, bd } = sc(t, a.k);
-              return (
-                <div key={a.l} style={{ padding: "9px 11px", background: bg, border: `1px solid ${bd}`, borderRadius: "7px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: "11px", fontWeight: "600", color: c }}>{a.l}</div>
-                    <div style={{ fontSize: "9px", color: t.text3 }}>{a.sub}</div>
-                  </div>
-                  <button style={{ padding: "5px 11px", background: "transparent", border: `1px solid ${bd}`, color: c, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer", flexShrink: 0, marginLeft: "8px" }}>
-                    Exécuter
-                  </button>
-                </div>
-              );
-            })}
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports qualitatifs</div>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>Export Excel des indicateurs</div>
+                <div style={{ fontSize: "9px", color: t.text3 }}>Tableau de bord complet avec couleurs</div>
+              </div>
+              <button onClick={handleExportExcel} style={{ padding: "5px 11px", background: t.greenBg, border: `1px solid ${t.greenBd}`, color: t.green, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter XLS</button>
+            </div>
+            
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
+              <div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>Export JSON brut</div>
+                <div style={{ fontSize: "9px", color: t.text3 }}>Toutes les données Qualiopi</div>
+              </div>
+              <button onClick={handleExportJson} style={{ padding: "5px 11px", background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter JSON</button>
+            </div>
+            
           </div>
         </div>
       )}
@@ -1193,7 +1143,7 @@ export function EquipeTab({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  CompteTab (Inchangé)
+//  CompteTab
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CompteTab({
@@ -1352,33 +1302,6 @@ export function CompteTab({
                 {pwdError}
               </div>
             )}
-          </div>
-        </div>
-      </div>
-
-      <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
-        <div style={{ padding: "24px 32px" }}>
-          <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: t.red, marginBottom: "6px" }}>⚠️ Zone dangereuse</div>
-          <div style={{ fontSize: "12px", color: t.text2, marginBottom: "20px" }}>Ces actions sont définitives et ne peuvent pas être annulées.</div>
-          <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "10px" }}>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: t.text, marginBottom: "3px" }}>Exporter mes données</div>
-                <div style={{ fontSize: "11px", color: t.text3 }}>Télécharger toutes mes données au format JSON</div>
-              </div>
-              <button onClick={() => alert("Export en cours…")} style={{ background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, padding: "9px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer" }}>
-                Exporter
-              </button>
-            </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "10px" }}>
-              <div>
-                <div style={{ fontSize: "13px", fontWeight: "700", color: t.red, marginBottom: "3px" }}>Désactiver mon compte</div>
-                <div style={{ fontSize: "11px", color: t.red, opacity: 0.75 }}>Votre accès sera suspendu immédiatement</div>
-              </div>
-              <button onClick={() => alert("Contactez votre Super Admin.")} style={{ background: t.red, border: "none", color: "white", padding: "9px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.redBd}` }}>
-                Désactiver
-              </button>
-            </div>
           </div>
         </div>
       </div>
