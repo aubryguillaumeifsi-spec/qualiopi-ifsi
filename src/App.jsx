@@ -45,7 +45,6 @@ function buildTokens(dark) {
 
 const DEFAULT_ROLES = ["Direction", "Formation", "Secrétariat", "Documentaliste", "Qualité"];
 const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Formateur IFSI", "Formateur IFAS", "Secrétaire", "TICE", "Documentaliste", "Ingénieur pédagogique"];
-// 🎯 NOUVEAU : Les étiquettes (missions transverses)
 const DEFAULT_TAGS = ["Référent Laïcité", "Référent ABS", "Référent Simulation", "Référent Qualité", "AFGSU"];
 
 const ROLE_PALETTE = [ 
@@ -207,11 +206,16 @@ function MainApp() {
     setIsCreatingUser(false);
   };
 
+  const orgRoleColors = useMemo(() => ifsiData?.roleColors || {}, [ifsiData]);
+
   const getRoleColor = useCallback((roleName) => { 
     if (!roleName) return ROLE_PALETTE[0];
-    const idx = (ifsiData?.roles || []).indexOf(roleName); 
+    let idx = orgRoleColors[roleName];
+    if (idx === undefined) {
+      idx = (ifsiData?.roles || []).indexOf(roleName); 
+    }
     return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[5]; 
-  }, [ifsiData, t]);
+  }, [ifsiData, orgRoleColors, t]);
 
   const currentCampaign = useMemo(() => campaigns?.find(c => c.id === activeCampaignId) || campaigns?.[0], [campaigns, activeCampaignId]);
   const criteres = useMemo(() => currentCampaign?.liste || [], [currentCampaign]);
@@ -220,7 +224,7 @@ function MainApp() {
   
   const orgRoles = useMemo(() => ifsiData?.roles || DEFAULT_ROLES, [ifsiData]);
   const orgJobTitles = useMemo(() => ifsiData?.jobTitles || DEFAULT_JOB_TITLES, [ifsiData]); 
-  const orgTags = useMemo(() => ifsiData?.tags || DEFAULT_TAGS, [ifsiData]); // NOUVEAU
+  const orgTags = useMemo(() => ifsiData?.tags || DEFAULT_TAGS, [ifsiData]); 
   const orgConnections = useMemo(() => ifsiData?.orgConnections || [], [ifsiData]);
   
   const manualUsers = useMemo(() => ifsiData?.manualUsers || [], [ifsiData]);
@@ -234,7 +238,7 @@ function MainApp() {
       name: u.name || (u.email ? u.email.split('@')[0] : "Utilisateur"), 
       roles: u.orgRoles || [], 
       jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
-      tags: Array.isArray(u.tags) ? u.tags : [], // NOUVEAU
+      tags: Array.isArray(u.tags) ? u.tags : [], 
       orgLevel: u.orgLevel || null,
       type: 'account', 
       email: u.email,
@@ -251,7 +255,7 @@ function MainApp() {
         name: u.name || "Membre", 
         roles: u.roles || [], 
         jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
-        tags: Array.isArray(u.tags) ? u.tags : [], // NOUVEAU
+        tags: Array.isArray(u.tags) ? u.tags : [], 
         orgLevel: u.orgLevel || null,
         type: 'manual',
         email: u.email || "",
@@ -287,7 +291,7 @@ function MainApp() {
       const nom = prompt("Nom de l'établissement :"); 
       if (nom?.trim()) { 
         const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); 
-        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, jobTitles: DEFAULT_JOB_TITLES, tags: DEFAULT_TAGS, archived: false }); 
+        await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, jobTitles: DEFAULT_JOB_TITLES, tags: DEFAULT_TAGS, roleColors: {}, archived: false }); 
         setSelectedIfsi(id); 
       } else {
         setSelectedIfsi(null); setTimeout(() => setSelectedIfsi(selectedIfsi), 0);
@@ -409,11 +413,19 @@ function MainApp() {
     if(!snap.exists()) return;
     const data = snap.data();
     
+    if (type === 'roleColor') {
+       const newRoleColors = { ...(data.roleColors || {}) };
+       newRoleColors[oldVal] = newVal; // oldVal is roleName, newVal is color index
+       await setDoc(docRef, { roleColors: newRoleColors }, { merge: true });
+       return;
+    }
+
     let arr = type === 'role' ? (data.roles || DEFAULT_ROLES) : 
               type === 'jobTitle' ? (data.jobTitles || DEFAULT_JOB_TITLES) : 
               (data.tags || DEFAULT_TAGS);
               
     let mUsers = data.manualUsers || [];
+    let updates = { manualUsers: mUsers };
 
     if (action === 'add') {
         if (!newVal || arr.includes(newVal)) return;
@@ -421,7 +433,16 @@ function MainApp() {
     } else if (action === 'edit') {
         if (!newVal || arr.includes(newVal)) return;
         arr = arr.map(x => x === oldVal ? newVal : x);
-        if (type === 'role') mUsers = mUsers.map(u => ({...u, roles: (u.roles||[]).map(r => r === oldVal ? newVal : r)}));
+        
+        if (type === 'role') {
+            mUsers = mUsers.map(u => ({...u, roles: (u.roles||[]).map(r => r === oldVal ? newVal : r)}));
+            const newRoleColors = { ...(data.roleColors || {}) };
+            if (newRoleColors[oldVal] !== undefined) {
+               newRoleColors[newVal] = newRoleColors[oldVal];
+               delete newRoleColors[oldVal];
+               updates.roleColors = newRoleColors;
+            }
+        }
         else if (type === 'jobTitle') mUsers = mUsers.map(u => ({...u, jobTitles: (u.jobTitles||[]).map(j => j === oldVal ? newVal : j)}));
         else if (type === 'tag') mUsers = mUsers.map(u => ({...u, tags: (u.tags||[]).map(t => t === oldVal ? newVal : t)}));
         
@@ -455,7 +476,6 @@ function MainApp() {
         });
     }
 
-    const updates = { manualUsers: mUsers };
     if (type === 'role') updates.roles = arr;
     else if (type === 'jobTitle') updates.jobTitles = arr;
     else if (type === 'tag') updates.tags = arr;
@@ -570,7 +590,7 @@ function MainApp() {
           )}
         </div>
 
-        {/* Prochain audit avec date bien lisible dans tous les modes */}
+        {/* Prochain audit */}
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
@@ -635,7 +655,8 @@ function MainApp() {
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={userProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           
-          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
+          {/* ROLE_PALETTE passed here for configuration tool */}
+          {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={userProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} t={t} />}
