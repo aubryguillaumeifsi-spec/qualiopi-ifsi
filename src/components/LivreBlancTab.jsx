@@ -315,7 +315,7 @@ function PageSommaire({ criteres, ifsiName, ifsiData, auditDate, mode, stats, on
   );
 }
 
-// ── PAGE 3 : ORGANIGRAMME ────────────────────────────────────────────────────
+// ── PAGE 3 : ORGANIGRAMME (COMPACT ET FLUIDE) ────────────────────────────────
 function PageOrganigramme({ ifsiName, ifsiData, auditDate, allIfsiMembers, getRoleColor, pageNum, mode }) {
   const members = (allIfsiMembers || []).filter(m => !m.archived && m.status === "ACTIF");
   
@@ -339,18 +339,19 @@ function PageOrganigramme({ ifsiName, ifsiData, auditDate, allIfsiMembers, getRo
 
     return (
       <div style={{ 
-        width: "110px", background: "white", border: `1px solid ${rc.bd}`, borderTop: `3px solid ${rc.text}`, 
-        borderRadius: "6px", padding: "10px 8px", display: "flex", flexDirection: "column", 
-        alignItems: "center", gap: "6px", boxShadow: "0 1px 3px rgba(0,0,0,0.05)" 
+        width: "94px", background: "white", border: `1px solid ${rc.bd}`, borderTop: `3px solid ${rc.text}`, 
+        borderRadius: "6px", padding: "8px 6px", display: "flex", flexDirection: "column", 
+        alignItems: "center", gap: "4px", boxShadow: "0 1px 2px rgba(0,0,0,0.05)",
+        boxSizing: "border-box"
       }}>
-        <div style={{ width: "26px", height: "26px", borderRadius: "4px", background: rc.bg, color: rc.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "10px", fontWeight: "800" }}>
+        <div style={{ width: "22px", height: "22px", borderRadius: "4px", background: rc.bg, color: rc.text, display: "flex", alignItems: "center", justifyContent: "center", fontSize: "9px", fontWeight: "800" }}>
           {initials}
         </div>
         <div style={{ width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
-          <div style={{ fontSize: "10px", fontWeight: "700", color: "#1a1410", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}>
+          <div style={{ fontSize: "9px", fontWeight: "700", color: "#1a1410", textAlign: "center", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%" }}>
             {m.prenom}
           </div>
-          <div style={{ fontSize: "9px", fontWeight: "800", color: "#9a8f88", textAlign: "center", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", marginTop: "2px" }}>
+          <div style={{ fontSize: "8px", fontWeight: "800", color: "#9a8f88", textAlign: "center", textTransform: "uppercase", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", width: "100%", marginTop: "1px" }}>
             {m.nom}
           </div>
         </div>
@@ -360,15 +361,15 @@ function PageOrganigramme({ ifsiName, ifsiData, auditDate, allIfsiMembers, getRo
 
   const PrintGroup = ({ jobTitle, members }) => {
     return (
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "8px" }}>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "6px" }}>
         <div style={{ 
-          fontSize: "8.5px", fontWeight: "800", color: "#9a8f88", textTransform: "uppercase", 
-          letterSpacing: "0.5px", background: "white", padding: "4px 10px", borderRadius: "4px", 
-          border: "1px solid #e2ddd8" 
+          fontSize: "8px", fontWeight: "800", color: "#9a8f88", textTransform: "uppercase", 
+          letterSpacing: "0.5px", background: "white", padding: "3px 8px", borderRadius: "4px", 
+          border: "1px solid #e2ddd8", textAlign: "center"
         }}>
           {jobTitle}
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "10px" }}>
+        <div style={{ display: "flex", flexWrap: "wrap", justifyContent: "center", gap: "6px", maxWidth: "100%" }}>
           {members.map(m => <PrintCard key={m.id} m={m} />)}
         </div>
       </div>
@@ -382,40 +383,40 @@ function PageOrganigramme({ ifsiName, ifsiData, auditDate, allIfsiMembers, getRo
       <div style={{ marginLeft: "8px", flex: 1, display: "flex", flexDirection: "column" }}>
         <DocHeader ifsiName={ifsiName} certif={ifsiData?.certif} auditDate={auditDate} />
         
-        <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: "#1a1410", marginBottom: "30px" }}>
+        <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: "#1a1410", marginBottom: "20px" }}>
           Organigramme Fonctionnel
         </div>
 
-        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "36px", alignItems: "center" }}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "20px", alignItems: "center", width: "100%" }}>
           
           {level1.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", width: "100%" }}>
-              <div style={{ fontSize: "10px", fontWeight: "800", color: "#1e3a6e", textTransform: "uppercase", letterSpacing: "2px", borderBottom: "1px solid #e2ddd8", paddingBottom: "6px", width: "100%", textAlign: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", width: "100%" }}>
+              <div style={{ fontSize: "9px", fontWeight: "800", color: "#1e3a6e", textTransform: "uppercase", letterSpacing: "2px", borderBottom: "1px solid #e2ddd8", paddingBottom: "4px", width: "100%", textAlign: "center" }}>
                 Niveau 1 — Direction
               </div>
-              <div style={{ display: "flex", justifyContent: "center", gap: "24px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", width: "100%" }}>
                 {Object.entries(groupMembersByJob(level1)).map(([job, mbrs]) => <PrintGroup key={job} jobTitle={job} members={mbrs} />)}
               </div>
             </div>
           )}
 
           {level2.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", width: "100%" }}>
-              <div style={{ fontSize: "10px", fontWeight: "800", color: "#1e3a6e", textTransform: "uppercase", letterSpacing: "2px", borderBottom: "1px solid #e2ddd8", paddingBottom: "6px", width: "100%", textAlign: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", width: "100%" }}>
+              <div style={{ fontSize: "9px", fontWeight: "800", color: "#1e3a6e", textTransform: "uppercase", letterSpacing: "2px", borderBottom: "1px solid #e2ddd8", paddingBottom: "4px", width: "100%", textAlign: "center" }}>
                 Niveau 2 — Encadrement & Responsables
               </div>
-              <div style={{ display: "flex", justifyContent: "center", gap: "24px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", width: "100%" }}>
                 {Object.entries(groupMembersByJob(level2)).map(([job, mbrs]) => <PrintGroup key={job} jobTitle={job} members={mbrs} />)}
               </div>
             </div>
           )}
 
           {level3.length > 0 && (
-            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "14px", width: "100%" }}>
-              <div style={{ fontSize: "10px", fontWeight: "800", color: "#1e3a6e", textTransform: "uppercase", letterSpacing: "2px", borderBottom: "1px solid #e2ddd8", paddingBottom: "6px", width: "100%", textAlign: "center" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "10px", width: "100%" }}>
+              <div style={{ fontSize: "9px", fontWeight: "800", color: "#1e3a6e", textTransform: "uppercase", letterSpacing: "2px", borderBottom: "1px solid #e2ddd8", paddingBottom: "4px", width: "100%", textAlign: "center" }}>
                 Niveau 3 — Équipes Pédagogiques & Administratives
               </div>
-              <div style={{ display: "flex", justifyContent: "center", gap: "24px", flexWrap: "wrap" }}>
+              <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", gap: "12px", flexWrap: "wrap", width: "100%" }}>
                 {Object.entries(groupMembersByJob(level3)).map(([job, mbrs]) => <PrintGroup key={job} jobTitle={job} members={mbrs} />)}
               </div>
             </div>
