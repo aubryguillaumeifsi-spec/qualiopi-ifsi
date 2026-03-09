@@ -1143,28 +1143,6 @@ export function EquipeTab({
               <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: t.goldBg, border: `1px solid ${t.goldBd}`, color: t.gold, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>Exporter ZIP</button>
             </div>
           </div>
-
-          <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.red, marginBottom: "6px" }}>⚠ Zone dangereuse</div>
-            <div style={{ fontSize: "10px", color: t.text3, marginBottom: "12px" }}>Actions irréversibles — nécessitent confirmation</div>
-            {[
-              { l: "Réinitialiser les indicateurs", sub: "Remet à zéro la campagne active", k: "amber" },
-              { l: "Supprimer l'établissement",     sub: "Supprime toutes les données",     k: "red"   },
-            ].map(a => {
-              const { c, bg, bd } = sc(t, a.k);
-              return (
-                <div key={a.l} style={{ padding: "9px 11px", background: bg, border: `1px solid ${bd}`, borderRadius: "7px", marginBottom: "8px", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <div>
-                    <div style={{ fontSize: "11px", fontWeight: "600", color: c }}>{a.l}</div>
-                    <div style={{ fontSize: "9px", color: t.text3 }}>{a.sub}</div>
-                  </div>
-                  <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: "transparent", border: `1px solid ${bd}`, color: c, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer", flexShrink: 0, marginLeft: "8px" }}>
-                    Exécuter
-                  </button>
-                </div>
-              );
-            })}
-          </div>
         </div>
       )}
     </div>
@@ -1498,7 +1476,7 @@ export function CompteTab({
         <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
             <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-              <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>Apparence & Accessibilité</span>
+              <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>Apparence & Ergonomie</span>
             </div>
             <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
               {[
