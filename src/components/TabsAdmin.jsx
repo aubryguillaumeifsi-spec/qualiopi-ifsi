@@ -114,7 +114,8 @@ function Field({ label, value, onChange, type = "text", placeholder = "", hint =
         type={type} value={value} onChange={onChange} placeholder={placeholder}
         readOnly={readOnly}
         style={{
-          width: "100%", padding: "9px 12px", fontFamily: "inherit",
+          width: "100%", boxSizing: "border-box", // 🎯 CORRECTION CHEVAUCHEMENT
+          padding: "9px 12px", fontFamily: "inherit",
           background: readOnly ? t.surface2 : t.surface,
           border: `1px solid ${focus ? t.accent : t.border}`,
           borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none",
@@ -323,7 +324,7 @@ export function EquipeTab({
     await setDoc(doc(db, "etablissements", selectedIfsi), { notifPrefs: updated }, { merge: true });
   };
 
-  // EXPORT JSON
+  // 🎯 EXPORT JSON
   const handleExportJson = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(criteres, null, 2));
     const dlAnchorElem = document.createElement('a');
@@ -332,7 +333,7 @@ export function EquipeTab({
     dlAnchorElem.click();
   };
 
-  // EXPORT EXCEL
+  // 🎯 SUPERBE EXPORT EXCEL (HTML to XLS)
   const handleExportExcel = () => {
     if (!criteres || criteres.length === 0) return alert("Aucun indicateur disponible à l'export.");
 
@@ -478,7 +479,7 @@ export function EquipeTab({
               <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Nom du document</label>
               <input 
                 type="text" value={uploadModal.name} onChange={e => setUploadModal({ ...uploadModal, name: e.target.value })}
-                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px" }}
+                style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px" }}
                 autoFocus
               />
               
@@ -502,7 +503,7 @@ export function EquipeTab({
               <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Catégorie</label>
               <select 
                 value={uploadModal.cat} onChange={e => setUploadModal({ ...uploadModal, cat: e.target.value })}
-                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px", cursor: "pointer" }}
+                style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px", cursor: "pointer" }}
               >
                 {DOC_CATS.filter(c => c !== "Indicateur").map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -526,7 +527,7 @@ export function EquipeTab({
               <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Nom</label>
               <input 
                 type="text" value={editDocModal.name} onChange={e => setEditDocModal({ ...editDocModal, name: e.target.value })}
-                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px" }}
+                style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px" }}
                 autoFocus
               />
             </div>
@@ -535,7 +536,7 @@ export function EquipeTab({
               <label style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px", display: "block" }}>Catégorie</label>
               <select 
                 value={editDocModal.cat} onChange={e => setEditDocModal({ ...editDocModal, cat: e.target.value })}
-                style={{ width: "100%", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px", cursor: "pointer" }}
+                style={{ width: "100%", boxSizing: "border-box", padding: "12px 16px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "14px", cursor: "pointer" }}
               >
                 {DOC_CATS.filter(c => c !== "Indicateur").map(c => <option key={c} value={c}>{c}</option>)}
               </select>
@@ -627,7 +628,7 @@ export function EquipeTab({
                   <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Rôle</label>
                   <select
                     value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })}
-                    style={{ width: "100%", padding: "9px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}
                   >
                     <option value="user">Éditeur</option>
                     <option value="admin">Administrateur</option>
@@ -637,7 +638,7 @@ export function EquipeTab({
                   <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Établissement</label>
                   <select
                     value={newMember.ifsi || selectedIfsi} onChange={e => setNewMember({ ...newMember, ifsi: e.target.value })}
-                    style={{ width: "100%", padding: "9px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}
+                    style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}
                   >
                     {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
                   </select>
@@ -681,7 +682,7 @@ export function EquipeTab({
               <input
                 value={teamSearchTerm} onChange={e => setTeamSearchTerm(e.target.value)}
                 placeholder="Nom, email…"
-                style={{ width: "200px", padding: "6px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
+                style={{ width: "200px", padding: "6px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit", boxSizing:"border-box" }}
               />
               <div style={{ display: "flex", gap: "4px" }}>
                 {["tous", "admin", "user"].map(r => {
@@ -840,14 +841,14 @@ export function EquipeTab({
                       <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                         <input value={ag.l} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].l = e.target.value; updateEtabField("agrements", newAg); }}
                           placeholder="Nom (ex: ARS)"
-                          style={{ flex: 1, padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
+                          style={{ flex: 1, boxSizing: "border-box", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
                         />
                         <input value={ag.v} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].v = e.target.value; updateEtabField("agrements", newAg); }}
                           placeholder="Valeur (ex: 150 places)"
-                          style={{ flex: 1, padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
+                          style={{ flex: 1, boxSizing: "border-box", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
                         />
                         <select value={ag.k} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].k = e.target.value; updateEtabField("agrements", newAg); }}
-                          style={{ width: "95px", padding: "8px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none", cursor:"pointer" }}
+                          style={{ width: "95px", boxSizing: "border-box", padding: "8px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none", cursor:"pointer" }}
                         >
                           <option value="green">Succès</option>
                           <option value="amber">Alerte</option>
@@ -937,7 +938,7 @@ export function EquipeTab({
             <input
               value={docSearch} onChange={e => setDocSearch(e.target.value)}
               placeholder="Rechercher un document…"
-              style={{ width: "220px", padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
+              style={{ width: "220px", boxSizing: "border-box", padding: "8px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
             />
             <div style={{ display: "flex", gap: "6px", flexWrap:"wrap" }}>
               {["tous", ...DOC_CATS].map(c => {
@@ -1114,7 +1115,7 @@ export function EquipeTab({
           </div>
 
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports & sauvegardes</div>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>📤 Exports qualitatifs</div>
             
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
               <div>
@@ -1169,7 +1170,7 @@ export function EquipeTab({
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  CompteTab (LE NOUVEAU PROFIL UTILISATEUR)
+//  CompteTab (PROFIL UTILISATEUR)
 // ─────────────────────────────────────────────────────────────────────────────
 
 export function CompteTab({
@@ -1263,6 +1264,79 @@ export function CompteTab({
     return () => unsub();
   }, [userProfile?.etablissementId]);
 
+  // 🎯 EXPORT PDF RGPD
+  const handleExportRGPD = () => {
+    const printWindow = window.open('', '_blank');
+    const html = `
+      <html>
+        <head>
+          <title>Export de données personnelles (RGPD)</title>
+          <style>
+            body { font-family: 'Segoe UI', Arial, sans-serif; color: #333; line-height: 1.6; padding: 40px; max-width: 800px; margin: 0 auto; }
+            h1 { color: #1e3a8a; border-bottom: 2px solid #cbd5e1; padding-bottom: 10px; font-size: 24px; }
+            h2 { color: #334155; margin-top: 30px; font-size: 18px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 15px; font-size: 14px; }
+            th, td { border: 1px solid #cbd5e1; padding: 10px 15px; text-align: left; }
+            th { background-color: #f8fafc; width: 35%; color: #475569; }
+            .footer { margin-top: 50px; font-size: 11px; color: #64748b; text-align: center; border-top: 1px solid #e2e8f0; padding-top: 15px; }
+          </style>
+        </head>
+        <body>
+          <h1>Rapport d'exportation des données personnelles</h1>
+          <p style="font-size: 14px; color: #475569;">
+            Conformément au Règlement Général sur la Protection des Données (RGPD), ce document contient l'intégralité des données personnelles rattachées à votre compte utilisateur sur la plateforme QualiForma.
+          </p>
+
+          <h2>1. Informations d'identification</h2>
+          <table>
+            <tr><th>Prénom</th><td>${userProfile?.prenom || "Non renseigné"}</td></tr>
+            <tr><th>Nom</th><td>${userProfile?.nom || "Non renseigné"}</td></tr>
+            <tr><th>Email (Identifiant de connexion)</th><td>${firebaseAuth.currentUser?.email || "Non renseigné"}</td></tr>
+            <tr><th>Téléphone professionnel</th><td>${userProfile?.phone || "Non renseigné"}</td></tr>
+          </table>
+
+          <h2>2. Informations professionnelles & Système</h2>
+          <table>
+            <tr><th>Établissement rattaché (ID)</th><td>${userProfile?.etablissementId || "Aucun"}</td></tr>
+            <tr><th>Rôle système (Droits d'accès)</th><td>${userProfile?.role || "Utilisateur"}</td></tr>
+            <tr><th>Poste / Fonction déclarée</th><td>${userProfile?.jobTitles?.[0] || "Non renseigné"}</td></tr>
+            <tr><th>Identifiant unique (UID)</th><td style="font-family: monospace; font-size: 12px;">${firebaseAuth.currentUser?.uid || "N/A"}</td></tr>
+          </table>
+
+          <h2>3. Historique d'activité (Dernières actions)</h2>
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 25%;">Date & Heure</th>
+                <th style="width: 30%;">Action</th>
+                <th style="width: 45%;">Détails enregistrés</th>
+              </tr>
+            </thead>
+            <tbody>
+            ${userLogs.length > 0 ? userLogs.map(log => `
+              <tr>
+                <td>${log.createdAt?.toDate ? new Date(log.createdAt.toDate()).toLocaleString('fr-FR') : "—"}</td>
+                <td><strong>${log.action}</strong></td>
+                <td>${log.detail}</td>
+              </tr>
+            `).join('') : '<tr><td colspan="3" style="text-align:center; font-style:italic; color: #64748b;">Aucune activité récente enregistrée dans le journal.</td></tr>'}
+            </tbody>
+          </table>
+
+          <div class="footer">
+            Document généré automatiquement le ${new Date().toLocaleString('fr-FR')} par le système QualiForma.<br/>
+            Pour toute demande de rectification ou de suppression définitive, veuillez contacter votre Administrateur IFSI.
+          </div>
+          <script>
+            window.onload = function() { window.print(); window.close(); }
+          </script>
+        </body>
+      </html>
+    `;
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const TABS = [
     { id: "profil",          label: "Profil",          icon: "👤" },
     { id: "securite",        label: "Sécurité",        icon: "🔒" },
@@ -1335,7 +1409,7 @@ export function CompteTab({
               
               <div style={{ gridColumn: "1/-1" }}>
                 <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Poste / Fonction</label>
-                <select value={profilForm.jobTitle} onChange={e => setProfilForm({...profilForm, jobTitle: e.target.value})} style={{ width: "100%", padding: "9px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}>
+                <select value={profilForm.jobTitle} onChange={e => setProfilForm({...profilForm, jobTitle: e.target.value})} style={{ width: "100%", boxSizing: "border-box", padding: "9px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}>
                   <option value="">Sélectionner une fonction...</option>
                   {(orgJobTitles || DEFAULT_JOB_TITLES).map(jt => <option key={jt} value={jt}>{jt}</option>)}
                 </select>
@@ -1385,12 +1459,12 @@ export function CompteTab({
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", maxWidth: "480px" }}>
               <div>
                 <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Mot de passe actuel</label>
-                <input type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} placeholder="••••••••" style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit" }} />
+                <input type="password" value={pwdCurrent} onChange={e => setPwdCurrent(e.target.value)} placeholder="••••••••" style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit" }} />
               </div>
               <div>
                 <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Nouveau mot de passe</label>
                 <div style={{ position: "relative" }}>
-                  <input type={showPwd ? "text" : "password"} value={pwdNew} onChange={e => setPwdNew(e.target.value)} placeholder="Minimum 6 caractères" style={{ width: "100%", padding: "10px 38px 10px 14px", borderRadius: "8px", border: `1px solid ${pwdNew && pwdStrength >= 3 ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
+                  <input type={showPwd ? "text" : "password"} value={pwdNew} onChange={e => setPwdNew(e.target.value)} placeholder="Minimum 6 caractères" style={{ width: "100%", boxSizing: "border-box", padding: "10px 38px 10px 14px", borderRadius: "8px", border: `1px solid ${pwdNew && pwdStrength >= 3 ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
                   <button onClick={() => setShowPwd(v => !v)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: t.text3, fontSize: "14px" }}>{showPwd ? "🙈" : "👁"}</button>
                 </div>
                 {pwdNew && (
@@ -1404,7 +1478,7 @@ export function CompteTab({
               </div>
               <div>
                 <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>Confirmer le nouveau mot de passe</label>
-                <input type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} placeholder="Répéter" style={{ width: "100%", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${pwdConfirm && pwdNew !== pwdConfirm ? t.redBd : pwdConfirm && pwdNew === pwdConfirm ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
+                <input type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} placeholder="Répéter" style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${pwdConfirm && pwdNew !== pwdConfirm ? t.redBd : pwdConfirm && pwdNew === pwdConfirm ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
                 {pwdConfirm && pwdNew !== pwdConfirm && <div style={{ fontSize: "10px", color: t.red, marginTop: "3px" }}>Les mots de passe ne correspondent pas.</div>}
                 {pwdConfirm && pwdNew === pwdConfirm && <div style={{ fontSize: "10px", color: t.green, marginTop: "3px" }}>✓ Identiques.</div>}
               </div>
@@ -1440,7 +1514,7 @@ export function CompteTab({
               
               <div style={{ paddingTop: "8px" }}>
                 <label style={{ fontSize: "10px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "8px" }}>Langue de l'interface</label>
-                <select style={{ width: "100%", maxWidth:"300px", padding: "10px 14px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "13px", color: t.text, outline: "none", cursor:"pointer" }}>
+                <select style={{ width: "100%", maxWidth:"300px", boxSizing: "border-box", padding: "10px 14px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "13px", color: t.text, outline: "none", cursor:"pointer" }}>
                   <option>Français</option>
                   <option>English</option>
                 </select>
@@ -1489,8 +1563,8 @@ export function CompteTab({
           
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", padding: "24px", boxShadow: t.shadowSm }}>
             <h3 style={{ fontSize: "14px", fontWeight: "800", color: t.text, marginBottom: "8px" }}>Exporter mes données</h3>
-            <div style={{ fontSize: "12px", color: t.text2, marginBottom: "16px" }}>Télécharger une copie complète de vos informations personnelles au format JSON.</div>
-            <button onClick={() => alert("Export RGPD en cours…")} style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "10px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
+            <div style={{ fontSize: "12px", color: t.text2, marginBottom: "16px" }}>Télécharger une copie complète de vos informations personnelles au format PDF.</div>
+            <button onClick={handleExportRGPD} style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "10px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>
               📥 Télécharger mes données
             </button>
           </div>
