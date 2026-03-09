@@ -167,9 +167,9 @@ export function EquipeTab({
         dateCertif: ifsiData.dateCertif  || "",
         dateAudit:  ifsiData.dateAudit   || "",
         agrements:  ifsiData.agrements   || [
-          { l: "Accréditation effectif IFSI",          v: "150 places", k: "green" },
-          { l: "Accréditation effectif IFAS Septembre",v: "35 places",  k: "green" },
-          { l: "Accréditation effectif IFAS Février",  v: "35 places",  k: "green" },
+          { l: "Accréditation place IFSI 1ere année",  v: "150 places", k: "green" },
+          { l: "Accréditation place IFAS Septembre",   v: "35 places",  k: "green" },
+          { l: "Accréditation place IFAS Février",     v: "35 places",  k: "green" },
         ]
       });
     }
