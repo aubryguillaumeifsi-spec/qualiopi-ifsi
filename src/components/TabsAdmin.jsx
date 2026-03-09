@@ -114,7 +114,7 @@ function Field({ label, value, onChange, type = "text", placeholder = "", hint =
         type={type} value={value} onChange={onChange} placeholder={placeholder}
         readOnly={readOnly}
         style={{
-          width: "100%", boxSizing: "border-box", // 🎯 CORRECTION CHEVAUCHEMENT
+          width: "100%", boxSizing: "border-box",
           padding: "9px 12px", fontFamily: "inherit",
           background: readOnly ? t.surface2 : t.surface,
           border: `1px solid ${focus ? t.accent : t.border}`,
@@ -142,7 +142,6 @@ export function EquipeTab({
 
   const [tab, setTab] = useState("membres");
   
-  // -- Modales et filtres
   const [roleFilter, setRoleFilter]   = useState("tous");
   const [statusFilter, setStatusFilter] = useState("tous");
   const [showInvite, setShowInvite]   = useState(false);
@@ -168,10 +167,9 @@ export function EquipeTab({
         dateCertif: ifsiData.dateCertif  || "",
         dateAudit:  ifsiData.dateAudit   || "",
         agrements:  ifsiData.agrements   || [
-          { l: "DREETS AuRA",          v: "Agrément actif",    k: "green" },
-          { l: "ARS — Autorisation",   v: "150 places",        k: "green" },
-          { l: "Ministère Santé",      v: "IFAS · 35 places",  k: "green" },
-          { l: "HAS — Simulation",     v: "⚠ À renouveler",   k: "amber" },
+          { l: "Accréditation effectif IFSI",          v: "150 places", k: "green" },
+          { l: "Accréditation effectif IFAS Septembre",v: "35 places",  k: "green" },
+          { l: "Accréditation effectif IFAS Février",  v: "35 places",  k: "green" },
         ]
       });
     }
@@ -305,6 +303,12 @@ export function EquipeTab({
     await writeLog(selectedIfsi, "Document supprimé", docMeta.name, "admin");
   };
 
+  const handleValidateDoc = async (docMeta) => {
+    const updated = documents.map(d => d.id === docMeta.id ? { ...d, validated: true } : d);
+    await setDoc(doc(db, "etablissements", selectedIfsi), { documents: updated }, { merge: true });
+    await writeLog(selectedIfsi, "Document validé", docMeta.name, "admin");
+  };
+
   // ── Journal ────────────────────────────────────────
   const [logs, setLogs] = useState([]);
   useEffect(() => {
@@ -315,7 +319,7 @@ export function EquipeTab({
   }, [selectedIfsi]);
 
   // ── EXPORTS & PARAMÈTRES ───────────────────────────
-  const [notifPrefs, setNotifPrefs] = useState({ connexion: true, modification: true, alerte: true });
+  const [notifPrefs, setNotifPrefs] = useState({ connexion: true, alerte: true });
   useEffect(() => { if (ifsiData?.notifPrefs) setNotifPrefs(ifsiData.notifPrefs); }, [ifsiData?.notifPrefs]);
 
   const toggleNotif = async (key) => {
@@ -324,7 +328,7 @@ export function EquipeTab({
     await setDoc(doc(db, "etablissements", selectedIfsi), { notifPrefs: updated }, { merge: true });
   };
 
-  // 🎯 EXPORT JSON
+  // EXPORT JSON
   const handleExportJson = () => {
     const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(criteres, null, 2));
     const dlAnchorElem = document.createElement('a');
@@ -333,7 +337,7 @@ export function EquipeTab({
     dlAnchorElem.click();
   };
 
-  // 🎯 SUPERBE EXPORT EXCEL (HTML to XLS)
+  // EXPORT EXCEL
   const handleExportExcel = () => {
     if (!criteres || criteres.length === 0) return alert("Aucun indicateur disponible à l'export.");
 
@@ -682,7 +686,7 @@ export function EquipeTab({
               <input
                 value={teamSearchTerm} onChange={e => setTeamSearchTerm(e.target.value)}
                 placeholder="Nom, email…"
-                style={{ width: "200px", padding: "6px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit", boxSizing:"border-box" }}
+                style={{ width: "200px", boxSizing: "border-box", padding: "6px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "7px", fontSize: "12px", color: t.text, outline: "none", fontFamily: "inherit" }}
               />
               <div style={{ display: "flex", gap: "4px" }}>
                 {["tous", "admin", "user"].map(r => {
@@ -840,7 +844,7 @@ export function EquipeTab({
                     {etabForm.agrements.map((ag, i) => (
                       <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
                         <input value={ag.l} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].l = e.target.value; updateEtabField("agrements", newAg); }}
-                          placeholder="Nom (ex: ARS)"
+                          placeholder="Nom (ex: Accréditation IFSI)"
                           style={{ flex: 1, boxSizing: "border-box", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
                         />
                         <input value={ag.v} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].v = e.target.value; updateEtabField("agrements", newAg); }}
@@ -1009,7 +1013,7 @@ export function EquipeTab({
                     
                     <div style={{ display: "flex", gap: "6px" }}>
                       <a href={docMeta.downloadURL} target="_blank" rel="noreferrer"
-                        style={{ flex: 1, padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text, fontSize: "11px", fontWeight: "700", cursor: "pointer", textAlign: "center", textDecoration: "none", transition:"all 0.2s" }}
+                        style={{ flex: 1, boxSizing: "border-box", padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text, fontSize: "11px", fontWeight: "700", cursor: "pointer", textAlign: "center", textDecoration: "none", transition:"all 0.2s" }}
                         onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
                       >
                         👁 Ouvrir
@@ -1018,13 +1022,13 @@ export function EquipeTab({
                       {!docMeta.isPreuve && (
                         <>
                           <button onClick={() => setEditDocModal(docMeta)} title="Renommer / Modifier"
-                            style={{ width: "32px", padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text2, fontSize: "12px", cursor: "pointer", transition:"all 0.2s" }}
+                            style={{ width: "32px", boxSizing: "border-box", padding: "7px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text2, fontSize: "12px", cursor: "pointer", transition:"all 0.2s" }}
                             onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}
                           >
                             ✏️
                           </button>
                           <button onClick={() => handleDeleteDoc(docMeta)} title="Supprimer"
-                            style={{ width: "32px", padding: "7px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", color: t.red, fontSize: "11px", cursor: "pointer", transition:"all 0.2s" }}
+                            style={{ width: "32px", boxSizing: "border-box", padding: "7px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", color: t.red, fontSize: "11px", cursor: "pointer", transition:"all 0.2s" }}
                             onMouseOver={e=>{e.currentTarget.style.background=t.red; e.currentTarget.style.color="white";}} onMouseOut={e=>{e.currentTarget.style.background=t.redBg; e.currentTarget.style.color=t.red;}}
                           >
                             ✕
@@ -1091,23 +1095,21 @@ export function EquipeTab({
       )}
 
       {/* ══════════════════════════════════════════════════
-          ONGLET 5 — PARAMÈTRES
+          ONGLET 5 — PARAMÈTRES (ÉPURÉ)
       ══════════════════════════════════════════════════ */}
       {tab === "parametres" && (
         <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "14px" }}>
 
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px 18px", boxShadow: t.shadowSm }}>
-            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🔔 Notifications email</div>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "15px", color: t.text, marginBottom: "12px" }}>🔔 Sécurité & Notifications</div>
             {[
-              { k: "connexion",    l: "Nouvelles connexions",       sub: "Alerte à chaque login"    },
-              { k: "modification", l: "Modifications indicateurs",  sub: "Changement de statut"     },
-              { k: "export",       l: "Exports PDF",                sub: "Après chaque export"      },
-              { k: "alerte",       l: "Alertes de sécurité",        sub: "Connexions échouées", colorKey: "red" },
+              { k: "connexion", l: "Nouvelles connexions", sub: "Email d'information si connexion depuis un nouveau lieu" },
+              { k: "alerte",    l: "Alertes de sécurité",  sub: "Alerte email après 3 tentatives échouées", colorKey: "red" },
             ].map(n => (
               <div key={n.k} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: `1px solid ${t.border2}` }}>
                 <div>
                   <div style={{ fontSize: "12px", fontWeight: "600", color: t.text }}>{n.l}</div>
-                  <div style={{ fontSize: "9px", color: t.text3 }}>{n.sub}</div>
+                  <div style={{ fontSize: "9px", color: t.text3, paddingRight:"20px" }}>{n.sub}</div>
                 </div>
                 <Toggle val={notifPrefs[n.k]} onChange={() => toggleNotif(n.k)} colorKey={n.colorKey || "accent"} t={t} />
               </div>
@@ -1264,7 +1266,7 @@ export function CompteTab({
     return () => unsub();
   }, [userProfile?.etablissementId]);
 
-  // 🎯 EXPORT PDF RGPD
+  // 🎯 EXPORT PDF RGPD (Natif, stylisé pour l'impression du navigateur)
   const handleExportRGPD = () => {
     const printWindow = window.open('', '_blank');
     const html = `
@@ -1496,7 +1498,7 @@ export function CompteTab({
         <div className="animate-fade-in" style={{ display:"flex", flexDirection:"column", gap:"16px" }}>
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
             <div style={{ padding: "16px 24px", background: t.surface2, borderBottom: `1px solid ${t.border}` }}>
-              <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>Apparence & Ergonomie</span>
+              <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>Apparence & Accessibilité</span>
             </div>
             <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "16px" }}>
               {[
