@@ -6,12 +6,13 @@ import DashboardTab from "./components/DashboardTab";
 import TourControleTab from "./components/TourControleTab";
 import OrganigrammeTab from "./components/OrganigrammeTab";
 
+// 🎯 IMPORT SÉPARÉ DU LIVRE BLANC
 import { CriteresTab } from "./components/TabsQualiopi";
 import LivreBlancTab from "./components/LivreBlancTab";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail, sendEmailVerification } from "firebase/auth";
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, storage, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -86,7 +87,7 @@ function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme_dark") !== "false");
   const [isColorblindMode, setIsColorblindMode] = useState(() => localStorage.getItem("theme_colorblind") === "true");
   
-  // 🎯 NOUVEAU : GESTION DE LA LANGUE
+  // 🎯 GESTION DE LA LANGUE
   const [language, setLanguage] = useState(() => localStorage.getItem("app_lang") || "fr");
 
   useEffect(() => { localStorage.setItem("theme_dark", isDarkMode); }, [isDarkMode]);
@@ -115,7 +116,9 @@ function MainApp() {
   const [currentUid, setCurrentUid] = useState(null); 
   const [userProfile, setUserProfile] = useState(null); 
   
+  // 🎯 SIMULATEUR DE VUE SUPER ADMIN
   const [viewAs, setViewAs] = useState("superadmin");
+
   const effectiveProfile = useMemo(() => {
     if (!userProfile) return null;
     if (userProfile.role === "superadmin" && viewAs !== "superadmin") {
@@ -129,6 +132,7 @@ function MainApp() {
   const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
 
+  // 🛡️ Sécurité du Simulateur
   useEffect(() => {
     if (viewAs === "user" && ["tour_controle", "equipe", "organigramme"].includes(activeTab)) {
       setActiveTab("dashboard");
@@ -151,7 +155,9 @@ function MainApp() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
+  const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
+
   const [auditModal, setAuditModal] = useState({ show: false, name: "", date: "" });
 
   useEffect(() => {
@@ -773,9 +779,10 @@ function MainApp() {
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={effectiveProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} handleHardDeleteMember={handleHardDeleteMember} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
+          
+          {/* 🎯 LIVRE BLANC */}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
           
-          {/* TRADUCTION PASSÉE AUX TABS ADMIN */}
           {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} t={t} />}
         </div>
