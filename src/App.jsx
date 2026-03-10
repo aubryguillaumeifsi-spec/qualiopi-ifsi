@@ -17,7 +17,8 @@ import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
 const GFONT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Albert+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap";
 
-function buildTokens(dark) {
+// 🎯 GESTION INTELLIGENTE DES COULEURS (Mode Sombre & Mode Daltonien)
+function buildTokens(dark, cb) {
   return dark ? {
     bg:"#0b111a", surface:"#151c2a", surface2:"#1a2235", surface3:"#1e2840",
     border:"#1f2d42", border2:"#192438", borderNav:"rgba(255,255,255,0.07)",
@@ -26,9 +27,16 @@ function buildTokens(dark) {
     textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.5)",
     accent:"#4f82f5", accentBg:"rgba(79,130,245,0.12)", accentBd:"rgba(79,130,245,0.28)",
     gold:"#d4a030", goldBg:"rgba(212,160,48,0.12)", goldBd:"rgba(212,160,48,0.3)",
-    green:"#2cc880", greenBg:"rgba(44,200,128,0.1)", greenBd:"rgba(44,200,128,0.25)",
-    red:"#f07070", redBg:"rgba(240,112,112,0.1)", redBd:"rgba(240,112,112,0.25)",
+    // Si daltonien: Vert devient Bleu clair, Rouge devient Magenta
+    green: cb ? "#3b82f6" : "#2cc880", 
+    greenBg: cb ? "rgba(59,130,246,0.12)" : "rgba(44,200,128,0.1)", 
+    greenBd: cb ? "rgba(59,130,246,0.3)" : "rgba(44,200,128,0.25)",
+    red: cb ? "#d946ef" : "#f07070", 
+    redBg: cb ? "rgba(217,70,239,0.12)" : "rgba(240,112,112,0.1)", 
+    redBd: cb ? "rgba(217,70,239,0.3)" : "rgba(240,112,112,0.25)",
     amber:"#fbad14", amberBg:"rgba(251,173,20,0.12)", amberBd:"rgba(251,173,20,0.3)",
+    teal: "#2dd4bf", tealBg: "rgba(45,212,191,0.12)", tealBd: "rgba(45,212,191,0.3)",
+    purple: "#a855f7", purpleBg: "rgba(168,85,247,0.12)", purpleBd: "rgba(168,85,247,0.3)",
     shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)", shadowGold:"0 4px 16px rgba(212,160,48,0.18)",
   } : {
     bg:"#eef2f6", surface:"#ffffff", surface2:"#f8fafc", surface3:"#e2e8f0",
@@ -38,9 +46,16 @@ function buildTokens(dark) {
     textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.6)",
     accent:"#1d52d4", accentBg:"#eff6ff", accentBd:"#bfdbfe",
     gold:"#b07010", goldBg:"#fef4de", goldBd:"#f0cc70",
-    green:"#0e7a50", greenBg:"#e8f9f3", greenBd:"#9dddc5",
-    red:"#c42828", redBg:"#fdecea", redBd:"#f4a6a6",
+    // Si daltonien: Vert devient Bleu roi, Rouge devient Magenta profond
+    green: cb ? "#2563eb" : "#0e7a50", 
+    greenBg: cb ? "#eff6ff" : "#e8f9f3", 
+    greenBd: cb ? "#bfdbfe" : "#9dddc5",
+    red: cb ? "#c026d3" : "#c42828", 
+    redBg: cb ? "#fae8ff" : "#fdecea", 
+    redBd: cb ? "#f0abfc" : "#f4a6a6",
     amber:"#e08500", amberBg:"#fef6eb", amberBd:"#f8d799",
+    teal: "#0d9488", tealBg: "#f0fdfa", tealBd: "#99f6e4",
+    purple: "#9333ea", purpleBg: "#faf5ff", purpleBd: "#f0abfc",
     shadow:"0 4px 6px -1px rgba(0,0,0,0.05)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)", shadowGold:"0 4px 16px rgba(176,112,16,0.18)",
   };
 }
@@ -85,37 +100,26 @@ class ErrorBoundary extends React.Component {
 function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme_dark") !== "false");
   const [isColorblindMode, setIsColorblindMode] = useState(() => localStorage.getItem("theme_colorblind") === "true");
-  
-  // 🎯 GESTION DE LA LANGUE
   const [language, setLanguage] = useState(() => localStorage.getItem("app_lang") || "fr");
 
   useEffect(() => { localStorage.setItem("theme_dark", isDarkMode); }, [isDarkMode]);
   useEffect(() => { localStorage.setItem("theme_colorblind", isColorblindMode); }, [isColorblindMode]);
   useEffect(() => { localStorage.setItem("app_lang", language); }, [language]);
 
-  const t = buildTokens(isDarkMode); 
+  // 🎯 On passe isColorblindMode au générateur de Thème !
+  const t = buildTokens(isDarkMode, isColorblindMode); 
   
-  // 🎯 MOTEUR DE TRADUCTION INSTANTANÉE
   const l = useCallback((fr, en) => language === "en" ? en : fr, [language]);
   
   const dateJourFormat = useMemo(() => {
     return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(today);
   }, [language]);
 
-  const dayColor = useCallback((d) => { 
-    const daysLeft = days(d); 
-    if (isNaN(daysLeft)) return t.text3; 
-    if (daysLeft < 0) return isColorblindMode ? t.amber : t.red; 
-    if (daysLeft < 30) return t.amber; 
-    return t.text3; 
-  }, [isColorblindMode, t]);
-
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUid, setCurrentUid] = useState(null); 
   const [userProfile, setUserProfile] = useState(null); 
   
-  // 🎯 SIMULATEUR DE VUE SUPER ADMIN
   const [viewAs, setViewAs] = useState("superadmin");
 
   const effectiveProfile = useMemo(() => {
@@ -131,7 +135,6 @@ function MainApp() {
   const [activeCampaignId, setActiveCampaignId] = useState(null);
   const [activeTab, setActiveTab] = useState("dashboard");
 
-  // 🛡️ Sécurité du Simulateur
   useEffect(() => {
     if (viewAs === "user" && ["tour_controle", "equipe", "organigramme"].includes(activeTab)) {
       setActiveTab("dashboard");
@@ -154,7 +157,6 @@ function MainApp() {
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
   
-  // 🎯 VARIABLES POUR L'ONGLET EQUIPE (Ne pas supprimer sous peine de crash !)
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   
@@ -238,17 +240,11 @@ function MainApp() {
   }, [selectedIfsi, userProfile]);
 
   const handleLogout = () => signOut(auth);
-  
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
   const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
-  
-  const handleSaveEtab = async (fields) => {
-    if (!selectedIfsi) return;
-    await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true });
-  };
-
+  const handleSaveEtab = async (fields) => { if (!selectedIfsi) return; await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true }); };
   const handleDeleteUser = async (userId) => { if (window.confirm("Révoquer cet accès ?")) await deleteDoc(doc(db, "users", userId)); };
   
   const handleCreateUser = async () => {
@@ -343,7 +339,6 @@ function MainApp() {
 
   const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || effectiveProfile?.role === "superadmin"), [teamUsers, effectiveProfile]);
   
-  // 🎯 FONCTION POUR TRIER LES MEMBRES DANS L'ONGLET ADMIN
   const handleSortTeam = (key) => { 
     let direction = "asc"; 
     if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; 
@@ -791,7 +786,7 @@ function MainApp() {
           {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={effectiveProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} handleHardDeleteMember={handleHardDeleteMember} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
-          {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
+          {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} isColorblindMode={isColorblindMode} t={t} />}
           {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} t={t} />}
         </div>
@@ -800,4 +795,4 @@ function MainApp() {
   );
 }
 
-export default function App() { return <ErrorBoundary><MainApp /></ErrorBoundary>; }
+export default App;
