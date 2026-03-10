@@ -929,6 +929,7 @@ export function CompteTab({
             <div style={{ fontSize: "12px", color: t.text2, marginBottom: "16px" }}>{l("Télécharger une copie complète de vos informations personnelles au format PDF.", "Download a complete copy of your personal information in PDF format.")}</div>
             <button onClick={handleExportRGPD} style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "10px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>{l("📥 Télécharger mes données", "📥 Download my data")}</button>
           </div>
+          
         </div>
       )}
 
