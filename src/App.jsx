@@ -17,7 +17,6 @@ import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
 const GFONT = "https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Albert+Sans:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&display=swap";
 
-// 🎯 GESTION INTELLIGENTE DES COULEURS (Mode Sombre & Mode Daltonien)
 function buildTokens(dark, cb) {
   return dark ? {
     bg:"#0b111a", surface:"#151c2a", surface2:"#1a2235", surface3:"#1e2840",
@@ -27,7 +26,6 @@ function buildTokens(dark, cb) {
     textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.5)",
     accent:"#4f82f5", accentBg:"rgba(79,130,245,0.12)", accentBd:"rgba(79,130,245,0.28)",
     gold:"#d4a030", goldBg:"rgba(212,160,48,0.12)", goldBd:"rgba(212,160,48,0.3)",
-    // Si daltonien: Vert devient Bleu clair, Rouge devient Magenta
     green: cb ? "#3b82f6" : "#2cc880", 
     greenBg: cb ? "rgba(59,130,246,0.12)" : "rgba(44,200,128,0.1)", 
     greenBd: cb ? "rgba(59,130,246,0.3)" : "rgba(44,200,128,0.25)",
@@ -35,8 +33,6 @@ function buildTokens(dark, cb) {
     redBg: cb ? "rgba(217,70,239,0.12)" : "rgba(240,112,112,0.1)", 
     redBd: cb ? "rgba(217,70,239,0.3)" : "rgba(240,112,112,0.25)",
     amber:"#fbad14", amberBg:"rgba(251,173,20,0.12)", amberBd:"rgba(251,173,20,0.3)",
-    teal: "#2dd4bf", tealBg: "rgba(45,212,191,0.12)", tealBd: "rgba(45,212,191,0.3)",
-    purple: "#a855f7", purpleBg: "rgba(168,85,247,0.12)", purpleBd: "rgba(168,85,247,0.3)",
     shadow:"0 2px 8px rgba(0,0,0,0.5)", shadowSm:"0 1px 3px rgba(0,0,0,0.4)", shadowGold:"0 4px 16px rgba(212,160,48,0.18)",
   } : {
     bg:"#eef2f6", surface:"#ffffff", surface2:"#f8fafc", surface3:"#e2e8f0",
@@ -46,7 +42,6 @@ function buildTokens(dark, cb) {
     textNav:"#ffffff", textNavSub:"rgba(255,255,255,0.6)",
     accent:"#1d52d4", accentBg:"#eff6ff", accentBd:"#bfdbfe",
     gold:"#b07010", goldBg:"#fef4de", goldBd:"#f0cc70",
-    // Si daltonien: Vert devient Bleu roi, Rouge devient Magenta profond
     green: cb ? "#2563eb" : "#0e7a50", 
     greenBg: cb ? "#eff6ff" : "#e8f9f3", 
     greenBd: cb ? "#bfdbfe" : "#9dddc5",
@@ -54,8 +49,6 @@ function buildTokens(dark, cb) {
     redBg: cb ? "#fae8ff" : "#fdecea", 
     redBd: cb ? "#f0abfc" : "#f4a6a6",
     amber:"#e08500", amberBg:"#fef6eb", amberBd:"#f8d799",
-    teal: "#0d9488", tealBg: "#f0fdfa", tealBd: "#99f6e4",
-    purple: "#9333ea", purpleBg: "#faf5ff", purpleBd: "#f0abfc",
     shadow:"0 4px 6px -1px rgba(0,0,0,0.05)", shadowSm:"0 1px 3px rgba(0,0,0,0.05)", shadowGold:"0 4px 16px rgba(176,112,16,0.18)",
   };
 }
@@ -89,7 +82,7 @@ class ErrorBoundary extends React.Component {
     if (this.state.hasError) return (
       <div style={{ padding: "40px", textAlign: "center", fontFamily: "Albert Sans, sans-serif" }}>
         <h1 style={{ color: "#f05050" }}>⚠️ Erreur Système</h1>
-        <pre style={{ background: "rgba(240,80,80,0.12)", padding: "20px", borderRadius: "8px", overflowX: "auto", maxWidth: "800px", margin: "0 auto" }}>{this.state.error?.toString()}</pre>
+        <pre style={{ background: "rgba(240,80,80,0.12)", padding: "20px", borderRadius: "8px", overflowX: "auto", maxWidth: "800px", margin: "0 auto", textAlign: "left" }}>{this.state.error?.toString()}</pre>
         <button onClick={() => window.location.reload()} style={{ marginTop: "20px", padding: "10px 20px", background: "#4f80f0", color: "white", border: "none", borderRadius: "8px", cursor: "pointer" }}>Recharger l'application</button>
       </div>
     );
@@ -106,7 +99,6 @@ function MainApp() {
   useEffect(() => { localStorage.setItem("theme_colorblind", isColorblindMode); }, [isColorblindMode]);
   useEffect(() => { localStorage.setItem("app_lang", language); }, [language]);
 
-  // 🎯 On passe isColorblindMode au générateur de Thème !
   const t = buildTokens(isDarkMode, isColorblindMode); 
   
   const l = useCallback((fr, en) => language === "en" ? en : fr, [language]);
@@ -114,6 +106,14 @@ function MainApp() {
   const dateJourFormat = useMemo(() => {
     return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(today);
   }, [language]);
+
+  const dayColor = useCallback((d) => { 
+    const daysLeft = days(d); 
+    if (isNaN(daysLeft)) return t.text3; 
+    if (daysLeft < 0) return t.red; 
+    if (daysLeft < 30) return t.amber; 
+    return t.text3; 
+  }, [t]);
 
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [authChecked, setAuthChecked] = useState(false);
@@ -795,4 +795,4 @@ function MainApp() {
   );
 }
 
-export default App;
+export default function App() { return <ErrorBoundary><MainApp /></ErrorBoundary>; }
