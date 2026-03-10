@@ -6,7 +6,6 @@ import DashboardTab from "./components/DashboardTab";
 import TourControleTab from "./components/TourControleTab";
 import OrganigrammeTab from "./components/OrganigrammeTab";
 
-// 🎯 NOUVEAUX IMPORTS : LivreBlancTab est maintenant un fichier à part entière !
 import { CriteresTab } from "./components/TabsQualiopi";
 import LivreBlancTab from "./components/LivreBlancTab";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
@@ -67,7 +66,6 @@ const ROLE_PALETTE = [
 
 const today = new Date();
 const days = d => { if (!d) return NaN; const p = new Date(d); return isNaN(p.getTime()) ? NaN : Math.round((p - today) / 86400000); };
-const dateJourFormat = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(today);
 
 class ErrorBoundary extends React.Component {
   constructor(props) { super(props); this.state = { hasError: false, error: null }; }
@@ -87,11 +85,22 @@ class ErrorBoundary extends React.Component {
 function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme_dark") !== "false");
   const [isColorblindMode, setIsColorblindMode] = useState(() => localStorage.getItem("theme_colorblind") === "true");
+  
+  // 🎯 NOUVEAU : GESTION DE LA LANGUE
+  const [language, setLanguage] = useState(() => localStorage.getItem("app_lang") || "fr");
 
   useEffect(() => { localStorage.setItem("theme_dark", isDarkMode); }, [isDarkMode]);
   useEffect(() => { localStorage.setItem("theme_colorblind", isColorblindMode); }, [isColorblindMode]);
+  useEffect(() => { localStorage.setItem("app_lang", language); }, [language]);
 
   const t = buildTokens(isDarkMode); 
+  
+  // 🎯 MOTEUR DE TRADUCTION INSTANTANÉE
+  const l = useCallback((fr, en) => language === "en" ? en : fr, [language]);
+  
+  const dateJourFormat = useMemo(() => {
+    return new Intl.DateTimeFormat(language === 'en' ? 'en-US' : 'fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(today);
+  }, [language]);
 
   const dayColor = useCallback((d) => { 
     const daysLeft = days(d); 
@@ -106,9 +115,7 @@ function MainApp() {
   const [currentUid, setCurrentUid] = useState(null); 
   const [userProfile, setUserProfile] = useState(null); 
   
-  // SIMULATEUR DE VUE SUPER ADMIN
   const [viewAs, setViewAs] = useState("superadmin");
-
   const effectiveProfile = useMemo(() => {
     if (!userProfile) return null;
     if (userProfile.role === "superadmin" && viewAs !== "superadmin") {
@@ -145,7 +152,6 @@ function MainApp() {
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [tourSort, setTourSort] = useState("urgence");
-
   const [auditModal, setAuditModal] = useState({ show: false, name: "", date: "" });
 
   useEffect(() => {
@@ -225,18 +231,11 @@ function MainApp() {
   }, [selectedIfsi, userProfile]);
 
   const handleLogout = () => signOut(auth);
-
   const handleArchiveIfsi = async (id, name, status) => { if (window.confirm(`Voulez-vous ${status ? 'archiver' : 'restaurer'} ${name} ?`)) await setDoc(doc(db, "etablissements", id), { archived: status }, { merge: true }); };
   const handleHardDeleteIfsi = async (id, name) => { if (prompt(`Tapez SUPPRIMER pour détruire ${name}`) === "SUPPRIMER") { await deleteDoc(doc(db, "etablissements", id)); await deleteDoc(doc(db, "qualiopi", id === "demo_ifps_cham" ? "criteres" : id)); if (selectedIfsi === id) setSelectedIfsi("demo_ifps_cham"); } };
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
-  
   const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
-  
-  const handleSaveEtab = async (fields) => {
-    if (!selectedIfsi) return;
-    await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true });
-  };
-
+  const handleSaveEtab = async (fields) => { if (!selectedIfsi) return; await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true }); };
   const handleDeleteUser = async (userId) => { if (window.confirm("Révoquer cet accès ?")) await deleteDoc(doc(db, "users", userId)); };
   
   const handleCreateUser = async () => {
@@ -334,7 +333,7 @@ function MainApp() {
   const handleIfsiSwitch = async (e) => { 
     const val = e.target.value;
     if (val === "NEW") { 
-      const nom = prompt("Nom de l'établissement :"); 
+      const nom = prompt(l("Nom de l'établissement :", "Facility name:")); 
       if (nom?.trim()) { 
         const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); 
         await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, jobTitles: DEFAULT_JOB_TITLES, tags: DEFAULT_TAGS, roleColors: {}, archived: false }); 
@@ -554,7 +553,7 @@ function MainApp() {
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
   
-  const menuBtn = (id, label) => {
+  const menuBtn = (id, labelFr, labelEn) => {
     const act = activeTab === id;
     return (
       <button 
@@ -569,7 +568,7 @@ function MainApp() {
           cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px" 
         }}
       >
-        {label}
+        {l(labelFr, labelEn || labelFr)}
       </button>
     );
   };
@@ -582,7 +581,7 @@ function MainApp() {
     ? `${userProfile.prenom || ""} ${userProfile.nom || ""}`.trim() 
     : auth.currentUser?.email?.split('@')[0];
 
-  const userJobDisplay = userProfile?.jobTitles?.[0] || "Mon profil ⚙️";
+  const userJobDisplay = userProfile?.jobTitles?.[0] || l("Mon profil ⚙️", "My profile ⚙️");
   const userAvatarColor = userProfile?.avatarColor || t.accent;
 
   return (
@@ -605,21 +604,23 @@ function MainApp() {
       {auditModal.show && (
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
           <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", width:"420px", boxShadow:t.shadowLg }}>
-            <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", color:t.text, margin:"0 0 8px 0" }}>Nouvel Audit</h3>
-            <p style={{ fontSize:"13px", color:t.text2, marginBottom:"24px", lineHeight:"1.5" }}>Préparez un nouveau cycle d'évaluation. Tous les indicateurs seront réinitialisés pour cette campagne.</p>
+            <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", color:t.text, margin:"0 0 8px 0" }}>{l("Nouvel Audit", "New Audit")}</h3>
+            <p style={{ fontSize:"13px", color:t.text2, marginBottom:"24px", lineHeight:"1.5" }}>
+              {l("Préparez un nouveau cycle d'évaluation. Tous les indicateurs seront réinitialisés pour cette campagne.", "Prepare a new evaluation cycle. All indicators will be reset for this campaign.")}
+            </p>
             
             <div style={{ marginBottom:"16px" }}>
-              <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Nom de l'audit</label>
-              <input type="text" value={auditModal.name} onChange={e=>setAuditModal({...auditModal, name:e.target.value})} placeholder="Ex: Audit de renouvellement 2028" style={{ width:"100%", padding:"12px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontFamily:"inherit" }} />
+              <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>{l("Nom de l'audit", "Audit Name")}</label>
+              <input type="text" value={auditModal.name} onChange={e=>setAuditModal({...auditModal, name:e.target.value})} placeholder={l("Ex: Audit de renouvellement 2028", "Ex: Renewal Audit 2028")} style={{ width:"100%", padding:"12px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontFamily:"inherit" }} />
             </div>
             <div style={{ marginBottom:"32px" }}>
-              <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>Date d'évaluation prévue</label>
+              <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>{l("Date d'évaluation prévue", "Planned evaluation date")}</label>
               <input type="date" value={auditModal.date} onChange={e=>setAuditModal({...auditModal, date:e.target.value})} style={{ width:"100%", padding:"12px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontFamily:"inherit", colorScheme:isDarkMode?"dark":"light" }} />
             </div>
             
             <div style={{ display:"flex", justifyContent:"flex-end", gap:"12px" }}>
-              <button onClick={()=>setAuditModal({show:false, name:"", date:""})} style={{ padding:"12px 20px", borderRadius:"8px", border:"none", background:"transparent", color:t.text2, fontWeight:"600", cursor:"pointer", fontSize:"13px" }}>Annuler</button>
-              <button onClick={submitAuditModal} style={{ padding:"12px 24px", borderRadius:"8px", border:"none", background:t.accent, color:"white", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}`, fontSize:"13px" }}>Créer l'audit vierge</button>
+              <button onClick={()=>setAuditModal({show:false, name:"", date:""})} style={{ padding:"12px 20px", borderRadius:"8px", border:"none", background:"transparent", color:t.text2, fontWeight:"600", cursor:"pointer", fontSize:"13px" }}>{l("Annuler", "Cancel")}</button>
+              <button onClick={submitAuditModal} style={{ padding:"12px 24px", borderRadius:"8px", border:"none", background:t.accent, color:"white", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}`, fontSize:"13px" }}>{l("Créer l'audit vierge", "Create blank audit")}</button>
             </div>
           </div>
         </div>
@@ -683,49 +684,49 @@ function MainApp() {
         )}
 
         <div style={{ padding:"20px" }}>
-          <div style={{ fontSize:"10px", fontWeight:"700", color:t.textNavSub, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"10px" }}>Établissement</div>
+          <div style={{ fontSize:"10px", fontWeight:"700", color:t.textNavSub, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"10px" }}>{l("Établissement", "Facility")}</div>
           {effectiveProfile?.role === "superadmin" ? (
              <select value={selectedIfsi || ""} onChange={handleIfsiSwitch} style={{ width: "100%", padding:"10px 12px", borderRadius:"8px", background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, color:t.textNav, fontSize:"13px", fontWeight:"600", outline:"none", cursor:"pointer" }}>
                {ifsiList.map(i => <option key={i.id} value={i.id} style={{ color:"black" }}>{i.name}</option>)}
-               <option value="NEW" style={{ color:"black" }}>+ Nouvel établissement</option>
+               <option value="NEW" style={{ color:"black" }}>{l("+ Nouvel établissement", "+ New facility")}</option>
              </select>
           ) : (
             <div style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, color:t.textNav, fontSize:"13px", fontWeight:"600" }}>
-              {currentIfsiName || "Chargement..."}
+              {currentIfsiName || "..."}
             </div>
           )}
         </div>
 
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
-            <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>Prochain audit</div>
+            <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>{l("Prochain audit", "Next audit")}</div>
             <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#ffffff" }}>
-               {days(currentAuditDate) < 0 ? "Dépassé" : `J‑${days(currentAuditDate)}`}
+               {days(currentAuditDate) < 0 ? l("Dépassé", "Overdue") : `J‑${days(currentAuditDate)}`}
             </div>
           </div>
           <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color: isDarkMode ? "#ffffff" : "#162040", letterSpacing:"-0.2px", marginBottom:"12px" }}>
-            {new Date(currentAuditDate).toLocaleDateString("fr-FR", {day:'numeric', month:'long', year:'numeric'})}
+            {new Date(currentAuditDate).toLocaleDateString(language === 'en' ? 'en-US' : 'fr-FR', {day:'numeric', month:'long', year:'numeric'})}
           </div>
           <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
             <div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #f0c060)`, borderRadius:"3px" }}/>
           </div>
           <div style={{ display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% conforme</span>
+            <span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% {l("conforme", "compliant")}</span>
           </div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
-          <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Navigation</div>
-          {menuBtn("dashboard", "Tableau de bord")}
-          {menuBtn("criteres", "Indicateurs")}
-          {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme")}
+          <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>{l("Navigation", "Navigation")}</div>
+          {menuBtn("dashboard", "Tableau de bord", "Dashboard")}
+          {menuBtn("criteres", "Indicateurs", "Indicators")}
+          {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme", "Organization Chart")}
           
           <div style={{ margin:"16px 12px", height:"1px", background:t.borderNav }}/>
           
-          <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>Outils</div>
-          {menuBtn("livre_blanc", "Livre Blanc")}
-          {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("equipe", "Administration")}
-          {effectiveProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle")}
+          <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>{l("Outils", "Tools")}</div>
+          {menuBtn("livre_blanc", "Livre Blanc", "White Paper")}
+          {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("equipe", "Administration", "Administration")}
+          {effectiveProfile?.role === "superadmin" && menuBtn("tour_controle", "Tour de Contrôle", "Control Tower")}
         </div>
 
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
@@ -746,12 +747,21 @@ function MainApp() {
         
         <div className="no-print" style={{ height:"60px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
-            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>{activeTab === 'dashboard' ? 'Tableau de bord' : activeTab.replace('_', ' ')}</span>
+            <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>
+              {activeTab === 'dashboard' ? l('Tableau de bord', 'Dashboard') : 
+               activeTab === 'livre_blanc' ? l('Livre Blanc', 'White Paper') :
+               activeTab === 'tour_controle' ? l('Tour de Contrôle', 'Control Tower') :
+               activeTab === 'criteres' ? l('Indicateurs', 'Indicators') :
+               activeTab === 'equipe' ? l('Administration', 'Administration') :
+               activeTab === 'compte' ? l('Mon compte', 'My Account') :
+               activeTab === 'organigramme' ? l('Organigramme', 'Organization Chart') :
+               activeTab.replace('_', ' ')}
+            </span>
             <span style={{ fontSize:"12px", color:t.text3 }}>{currentIfsiName ? `· ${currentIfsiName}` : ""}</span>
           </div>
           <div style={{ display:"flex", gap:"12px" }}>
             <button onClick={() => setIsDarkMode(!isDarkMode)} style={{ background:t.surface2, border:`1px solid ${t.border}`, padding:"8px 14px", borderRadius:"8px", fontSize:"12px", fontWeight:"600", color:t.text, cursor:"pointer", transition:"all 0.15s" }}>
-              {isDarkMode ? "☀️ Mode Clair" : "🌙 Mode Sombre"}
+              {isDarkMode ? l("☀️ Mode Clair", "☀️ Light Mode") : l("🌙 Mode Sombre", "🌙 Dark Mode")}
             </button>
           </div>
         </div>
@@ -763,13 +773,11 @@ function MainApp() {
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={effectiveProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} handleHardDeleteMember={handleHardDeleteMember} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
-          
-          {/* 🎯 LIVRE BLANC AVEC LES BONNES PROPS POUR L'ORGANIGRAMME */}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
           
-          {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} t={t} />}
-          
-          {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} t={t} />}
+          {/* TRADUCTION PASSÉE AUX TABS ADMIN */}
+          {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
+          {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} t={t} />}
         </div>
       </main>
     </div>
