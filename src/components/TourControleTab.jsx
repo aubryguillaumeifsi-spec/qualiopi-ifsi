@@ -8,7 +8,7 @@ import { collectionGroup, query, orderBy, limit, onSnapshot } from "firebase/fir
 import { db } from "../firebase";
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  HELPERS
+//  HELPERS & COMPOSANTS PARTAGÉS
 // ─────────────────────────────────────────────────────────────────────────────
 
 function timeAgo(isoString) {
@@ -32,6 +32,16 @@ const LOG_CFG = {
   system:  { icon: "⚡", colorKey: "amber"   }
 };
 
+// Le fameux composant Toggle qui manquait pour l'onglet API
+function Toggle({ val, onChange, colorKey = "accent", t }) {
+  const { c, bd } = sc(t, colorKey);
+  return (
+    <div onClick={onChange} style={{ width: "36px", height: "20px", borderRadius: "10px", flexShrink: 0, background: val ? c : t.surface3, border: `1px solid ${val ? bd : t.border}`, cursor: "pointer", position: "relative", transition: "all 0.2s" }}>
+      <div style={{ position: "absolute", top: "2px", left: val ? "17px" : "2px", width: "16px", height: "16px", borderRadius: "50%", background: "white", transition: "left 0.2s", boxShadow: "0 1px 4px rgba(0,0,0,0.3)" }} />
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  COMPOSANT PRINCIPAL
 // ─────────────────────────────────────────────────────────────────────────────
@@ -44,7 +54,7 @@ export default function TourControleTab({
   const [subTab, setSubTab] = useState("globale");
 
   // 1. SIMULATION UTILISATEURS EN LIGNE
-  const totalUsers = activeIfsis.reduce((acc, i) => acc + i.users, 0);
+  const totalUsers = activeIfsis.reduce((acc, i) => acc + (i.users || 0), 0);
   const [onlineCount, setOnlineCount] = useState(Math.max(1, Math.floor(totalUsers * 0.12)));
 
   useEffect(() => {
@@ -53,7 +63,7 @@ export default function TourControleTab({
       setOnlineCount(prev => {
         const change = Math.random() > 0.5 ? 1 : -1;
         const next = prev + change;
-        return next > 0 && next < totalUsers ? next : prev;
+        return next > 0 && next <= totalUsers ? next : prev;
       });
     }, 8000);
     return () => clearInterval(interval);
@@ -125,7 +135,7 @@ export default function TourControleTab({
       </div>
 
       {/* ══════════════════════════════════════════════════════════════════════ */}
-      {/* 1. VUE GLOBALE (Établissements & Alertes)                              */}
+      {/* 1. VUE GLOBALE (Établissements & Alertes RESTAURÉS COMPLÈTEMENT)       */}
       {/* ══════════════════════════════════════════════════════════════════════ */}
       {subTab === "globale" && (
         <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
@@ -157,7 +167,8 @@ export default function TourControleTab({
             </div>
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "20px", alignItems: "start" }}>
+            
             {/* LISTE DES IFSI */}
             <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
               <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.border}`, background: t.surface2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
@@ -177,7 +188,10 @@ export default function TourControleTab({
                   return (
                     <div key={i.id} style={{ display: "grid", gridTemplateColumns: "1.5fr 1fr 1fr 100px", padding: "14px 20px", borderBottom: `1px solid ${t.border2}`, alignItems: "center", transition: "background 0.15s" }} onMouseOver={e=>e.currentTarget.style.background=t.surface2} onMouseOut={e=>e.currentTarget.style.background="transparent"}>
                       <div>
-                        <div style={{ fontSize: "14px", fontWeight: "700", color: t.text }}>{i.name}</div>
+                        <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+                          <div style={{ fontSize: "14px", fontWeight: "700", color: t.text }}>{i.name}</div>
+                          <button onClick={() => handleRenameIfsi(i.id, i.name)} title="Renommer l'IFSI" style={{ background: "transparent", border: "none", cursor: "pointer", fontSize: "10px", opacity: 0.5, padding: "2px" }}>✏️</button>
+                        </div>
                         <div style={{ fontSize: "10px", color: t.text3, marginTop: "2px" }}>{i.users} membres · N° NDA {i.nda || "—"}</div>
                       </div>
                       
@@ -208,8 +222,10 @@ export default function TourControleTab({
               </div>
             </div>
 
-            {/* ALERTES & ACTIONS */}
+            {/* COLONNE DROITE : ALERTES & ARCHIVES */}
             <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
+              
+              {/* ALERTES CRITIQUES */}
               <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
                 <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.border}`, background: t.surface2 }}>
                   <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>🔥 Urgences absolues</span>
@@ -228,6 +244,30 @@ export default function TourControleTab({
                   ))}
                 </div>
               </div>
+
+              {/* ÉTABLISSEMENTS ARCHIVÉS */}
+              <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
+                <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.border}`, background: t.surface2 }}>
+                  <span style={{ fontSize: "14px", fontWeight: "800", color: t.text }}>📦 Archives</span>
+                </div>
+                <div style={{ padding: "12px", display: "flex", flexDirection: "column", gap: "8px", maxHeight: "200px", overflowY: "auto" }}>
+                  {archivedIfsis.length === 0 ? (
+                    <div style={{ textAlign: "center", color: t.text3, fontSize: "12px", padding: "20px 0" }}>Aucun établissement archivé.</div>
+                  ) : archivedIfsis.map(i => (
+                    <div key={i.id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "8px", padding: "10px 12px" }}>
+                      <div>
+                        <div style={{ fontSize: "12px", fontWeight: "700", color: t.text2 }}>{i.name}</div>
+                        <div style={{ fontSize: "10px", color: t.text3 }}>ID: {i.id}</div>
+                      </div>
+                      <div style={{ display: "flex", gap: "6px" }}>
+                        <button onClick={() => handleArchiveIfsi(i.id, i.name, false)} title="Restaurer" style={{ padding: "4px 8px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "4px", color: t.text, cursor: "pointer", fontSize: "10px" }}>Restaurer</button>
+                        <button onClick={() => handleHardDeleteIfsi(i.id, i.name)} title="Détruire" style={{ padding: "4px 8px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "4px", color: t.red, cursor: "pointer", fontSize: "10px" }}>Supprimer</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
             </div>
           </div>
         </div>
@@ -252,7 +292,7 @@ export default function TourControleTab({
             <div style={{ padding: "16px 20px", borderBottom: `1px solid ${t.border}`, background: t.surface2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <div>
                 <span style={{ fontSize: "16px", fontWeight: "800", color: t.text, display: "block" }}>Flux d'activité de la plateforme</span>
-                <span style={{ fontSize: "11px", color: t.text3, mt: "2px" }}>Les 50 dernières actions effectuées sur l'ensemble des IFSI</span>
+                <span style={{ fontSize: "11px", color: t.text3, marginTop: "2px" }}>Les 50 dernières actions effectuées sur l'ensemble des IFSI</span>
               </div>
               <button onClick={() => setSubTab("globale")} style={{ padding: "6px 12px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", color: t.text2, fontSize: "11px", cursor: "pointer" }}>↻ Actualiser</button>
             </div>
