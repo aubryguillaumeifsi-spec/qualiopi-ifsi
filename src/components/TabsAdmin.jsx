@@ -7,36 +7,36 @@ import { db, auth, storage } from "../firebase";
 const sc = (t, k) => ({ c: t[k], bg: t[k + "Bg"], bd: t[k + "Bd"] });
 
 const ROLE_CFG = {
-  admin:      { label: "Admin",    icon: "⚙", colorKey: "accent"  },
-  user:       { label: "Éditeur",  icon: "✏", colorKey: "green"   },
-  guest:      { label: "Lecteur",  icon: "👁", colorKey: "purple"  },
-  superadmin: { label: "Super",    icon: "◈", colorKey: "gold"    },
+  admin: { label: "Admin", icon: "⚙", colorKey: "accent" },
+  user: { label: "Éditeur", icon: "✏", colorKey: "green" },
+  guest: { label: "Lecteur", icon: "👁", colorKey: "purple" },
+  superadmin: { label: "Super", icon: "◈", colorKey: "gold" },
 };
 
 const STATUS_CFG = {
-  ACTIF:   { label: "Actif",   colorKey: "green"  },
-  INACTIF: { label: "Inactif", colorKey: "amber"  },
-  INVITE:  { label: "Invité",  colorKey: "purple" },
+  ACTIF: { label: "Actif", colorKey: "green" },
+  INACTIF: { label: "Inactif", colorKey: "amber" },
+  INVITE: { label: "Invité", colorKey: "purple" },
 };
 
 const LOG_CFG = {
-  auth:    { icon: "🔐", colorKey: "accent"  },
-  data:    { icon: "✏️", colorKey: "green"   },
-  admin:   { icon: "⚙️", colorKey: "gold"    },
-  export:  { icon: "📤", colorKey: "purple"  },
-  alert:   { icon: "⚠️", colorKey: "red"     },
-  upload:  { icon: "📎", colorKey: "teal"    },
+  auth: { icon: "🔐", colorKey: "accent" },
+  data: { icon: "✏️", colorKey: "green" },
+  admin: { icon: "⚙️", colorKey: "gold" },
+  export: { icon: "📤", colorKey: "purple" },
+  alert: { icon: "⚠️", colorKey: "red" },
+  upload: { icon: "📎", colorKey: "teal" },
 };
 
 const DOC_CATS = ["Qualité", "Communication", "Pédagogie", "RH", "Partenariats", "Indicateur", "Autre"];
 const CAT_COLORS = {
-  "Qualité":       { c: "#4f80f0", bg: "rgba(79,128,240,0.1)"  },
+  "Qualité": { c: "#4f80f0", bg: "rgba(79,128,240,0.1)" },
   "Communication": { c: "#a78bfa", bg: "rgba(167,139,250,0.1)" },
-  "Pédagogie":     { c: "#2dd4bf", bg: "rgba(45,212,191,0.1)"  },
-  "RH":            { c: "#f0a030", bg: "rgba(240,160,48,0.1)"  },
-  "Partenariats":  { c: "#f07070", bg: "rgba(240,112,112,0.1)" },
-  "Indicateur":    { c: "#10b981", bg: "rgba(16,185,129,0.1)"  },
-  "Autre":         { c: "#a0a0b0", bg: "rgba(160,160,176,0.1)" },
+  "Pédagogie": { c: "#2dd4bf", bg: "rgba(45,212,191,0.1)" },
+  "RH": { c: "#f0a030", bg: "rgba(240,160,48,0.1)" },
+  "Partenariats": { c: "#f07070", bg: "rgba(240,112,112,0.1)" },
+  "Indicateur": { c: "#10b981", bg: "rgba(16,185,129,0.1)" },
+  "Autre": { c: "#a0a0b0", bg: "rgba(160,160,176,0.1)" },
 };
 
 const STANDARD_DOCS = [
@@ -49,8 +49,8 @@ function timeAgo(isoString, lang = "fr") {
   if (!isoString) return "—";
   const diff = (Date.now() - new Date(isoString).getTime()) / 1000;
   const isEn = lang === "en";
-  if (diff < 60)    return isEn ? "Just now" : "À l'instant";
-  if (diff < 3600)  return isEn ? `${Math.floor(diff / 60)} min ago` : `Il y a ${Math.floor(diff / 60)}min`;
+  if (diff < 60) return isEn ? "Just now" : "À l'instant";
+  if (diff < 3600) return isEn ? `${Math.floor(diff / 60)} min ago` : `Il y a ${Math.floor(diff / 60)}min`;
   if (diff < 86400) return isEn ? `${Math.floor(diff / 3600)} hrs ago` : `Il y a ${Math.floor(diff / 3600)}h`;
   return new Date(isoString).toLocaleDateString(isEn ? "en-US" : "fr-FR");
 }
@@ -66,13 +66,9 @@ async function writeLog(ifsiId, action, detail, type = "admin") {
   if (!ifsiId || !auth.currentUser) return;
   try {
     await addDoc(collection(db, "etablissements", ifsiId, "logs"), {
-      action, detail, type,
-      user: auth.currentUser.email,
-      createdAt: serverTimestamp(),
+      action, detail, type, user: auth.currentUser.email, createdAt: serverTimestamp(),
     });
-  } catch (e) {
-    console.warn("writeLog:", e.message);
-  }
+  } catch (e) { console.warn("writeLog:", e.message); }
 }
 
 function Toggle({ val, onChange, colorKey = "accent", t }) {
@@ -95,57 +91,41 @@ function Field({ label, value, onChange, type = "text", placeholder = "", hint =
   );
 }
 
-// ─────────────────────────────────────────────────────────────────────────────
-//  EquipeTab
-// ─────────────────────────────────────────────────────────────────────────────
-
 export function EquipeTab({
   userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser,
   selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm,
   sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t,
   ifsiData, handleSaveEtab, criteres, language
 }) {
-
   const l = (fr, en) => language === "en" ? en : fr;
-
   const [tab, setTab] = useState("membres");
-  const [roleFilter, setRoleFilter]   = useState("tous");
+  const [roleFilter, setRoleFilter] = useState("tous");
   const [statusFilter, setStatusFilter] = useState("tous");
-  const [showInvite, setShowInvite]   = useState(false);
-  const [confirmDel, setConfirmDel]   = useState(null); 
-  const [deleting, setDeleting]       = useState(false);
+  const [showInvite, setShowInvite] = useState(false);
+  const [confirmDel, setConfirmDel] = useState(null); 
+  const [deleting, setDeleting] = useState(false);
 
-  const [etabForm, setEtabForm]   = useState(null); 
+  const [etabForm, setEtabForm] = useState(null); 
   const [etabDirty, setEtabDirty] = useState(false);
   const [etabSaving, setEtabSaving] = useState(false);
-  const [etabSaved, setEtabSaved]  = useState(false);
+  const [etabSaved, setEtabSaved] = useState(false);
 
   useEffect(() => {
     if (ifsiData && !etabForm) {
       setEtabForm({
-        nom:        ifsiData.name        || "",
-        nda:        ifsiData.nda         || "",
-        certif:     ifsiData.certif      || "",
-        adresse:    ifsiData.adresse     || "",
-        tel:        ifsiData.tel         || "",
-        email:      ifsiData.email       || "",
-        directrice: ifsiData.directrice  || "",
-        dateCertif: ifsiData.dateCertif  || "",
-        dateAudit:  ifsiData.dateAudit   || "",
-        agrements:  ifsiData.agrements   || [
-          { l: "Accréditation place IFSI 1ere année",  v: "150 places", k: "green" },
-          { l: "Accréditation place IFAS Septembre",   v: "35 places",  k: "green" },
-          { l: "Accréditation place IFAS Février",     v: "35 places",  k: "green" },
+        nom: ifsiData.name || "", nda: ifsiData.nda || "", certif: ifsiData.certif || "",
+        adresse: ifsiData.adresse || "", tel: ifsiData.tel || "", email: ifsiData.email || "",
+        directrice: ifsiData.directrice || "", dateCertif: ifsiData.dateCertif || "", dateAudit: ifsiData.dateAudit || "",
+        agrements: ifsiData.agrements || [
+          { l: "Accréditation place IFSI 1ere année", v: "150 places", k: "green" },
+          { l: "Accréditation place IFAS Septembre", v: "35 places", k: "green" },
+          { l: "Accréditation place IFAS Février", v: "35 places", k: "green" }
         ]
       });
     }
   }, [ifsiData, etabForm]);
 
-  const updateEtabField = (key, val) => {
-    setEtabForm(f => ({ ...f, [key]: val }));
-    setEtabDirty(true);
-    setEtabSaved(false);
-  };
+  const updateEtabField = (key, val) => { setEtabForm(f => ({ ...f, [key]: val })); setEtabDirty(true); setEtabSaved(false); };
 
   const saveEtab = async () => {
     if (!handleSaveEtab || !etabForm) return;
@@ -156,17 +136,15 @@ export function EquipeTab({
       dateCertif: etabForm.dateCertif, dateAudit: etabForm.dateAudit, agrements: etabForm.agrements
     });
     await writeLog(selectedIfsi, "Paramètres établissement modifiés", "Identité mise à jour");
-    setEtabSaving(false);
-    setEtabDirty(false);
-    setEtabSaved(true);
+    setEtabSaving(false); setEtabDirty(false); setEtabSaved(true);
     setTimeout(() => setEtabSaved(false), 3000);
   };
 
   const documents = useMemo(() => ifsiData?.documents || [], [ifsiData]);
   const [docCatFilter, setDocCatFilter] = useState("tous");
-  const [docSearch, setDocSearch]       = useState("");
+  const [docSearch, setDocSearch] = useState("");
   const [uploadProgress, setUploadProgress] = useState(null); 
-  const [uploadModal, setUploadModal]   = useState(null);
+  const [uploadModal, setUploadModal] = useState(null);
   const [editDocModal, setEditDocModal] = useState(null);
   const fileInputRef = useRef();
 
@@ -190,13 +168,11 @@ export function EquipeTab({
     return [...baseDocs, ...preuveDocs].sort((a, b) => new Date(b.date) - new Date(a.date));
   }, [documents, criteres]);
 
-  const filteredDocs = useMemo(() =>
-    allMergedDocs.filter(d => {
-      if (docCatFilter !== "tous" && d.cat !== docCatFilter) return false;
-      if (docSearch && !d.name.toLowerCase().includes(docSearch.toLowerCase())) return false;
-      return true;
-    }), [allMergedDocs, docCatFilter, docSearch]
-  );
+  const filteredDocs = useMemo(() => allMergedDocs.filter(d => {
+    if (docCatFilter !== "tous" && d.cat !== docCatFilter) return false;
+    if (docSearch && !d.name.toLowerCase().includes(docSearch.toLowerCase())) return false;
+    return true;
+  }), [allMergedDocs, docCatFilter, docSearch]);
 
   const handleFileSelect = (file) => {
     if (!file) return;
@@ -213,7 +189,7 @@ export function EquipeTab({
 
     task.on("state_changed",
       (snap) => setUploadProgress(Math.round(snap.bytesTransferred / snap.totalBytes * 100)),
-      (err)  => { console.error(err); setUploadProgress(null); },
+      (err) => { console.error(err); setUploadProgress(null); },
       async () => {
         const url = await getDownloadURL(task.snapshot.ref);
         const newDoc = {
@@ -221,8 +197,7 @@ export function EquipeTab({
           size: file.size > 1048576 ? `${(file.size / 1048576).toFixed(1)} Mo` : `${Math.round(file.size / 1024)} Ko`,
           date: new Date().toISOString().slice(0, 10), author: auth.currentUser?.email || "—", tags: [], validated: false, storagePath: path, downloadURL: url,
         };
-        const updated = [...documents, newDoc];
-        await setDoc(doc(db, "etablissements", selectedIfsi), { documents: updated }, { merge: true });
+        await setDoc(doc(db, "etablissements", selectedIfsi), { documents: [...documents, newDoc] }, { merge: true });
         await writeLog(selectedIfsi, "Document déposé", newDoc.name, "upload");
         setUploadProgress(null);
       }
@@ -272,30 +247,7 @@ export function EquipeTab({
   const handleExportExcel = () => {
     if (!criteres || criteres.length === 0) return alert(l("Aucun indicateur disponible à l'export.", "No indicator available for export."));
     const sortedCriteres = [...criteres].sort((a,b) => (a.critere === b.critere ? a.num - b.num : a.critere - b.critere));
-    const htmlContent = `
-      <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40">
-      <head><meta charset="utf-8" /><style>
-          table { border-collapse: collapse; font-family: 'Segoe UI', Arial, sans-serif; width: 100%; }
-          th { background-color: #0f172a; color: #ffffff; font-weight: bold; text-align: left; padding: 12px; border: 1px solid #cbd5e1; font-size: 14px; }
-          td { padding: 10px; border: 1px solid #cbd5e1; vertical-align: top; font-size: 13px; color: #1e293b; }
-          .bg-conforme { background-color: #d1fae5; color: #065f46; font-weight: bold; text-align: center; }
-          .bg-encours { background-color: #fef3c7; color: #92400e; font-weight: bold; text-align: center; }
-          .bg-nonconforme { background-color: #fee2e2; color: #991b1b; font-weight: bold; text-align: center; }
-          .bg-nonconcerne { background-color: #f1f5f9; color: #475569; font-weight: bold; text-align: center; }
-          .titre { font-size: 14px; font-weight: bold; color: #0f172a; }
-        </style></head>
-      <body>
-        <h2 style="color: #0f172a; font-family: 'Segoe UI', Arial, sans-serif;">Tableau de suivi Qualiopi</h2>
-        <p style="color: #64748b; font-family: 'Segoe UI', Arial, sans-serif; margin-bottom: 20px;">Export généré le : ${new Date().toLocaleDateString(language==='en'?'en-US':'fr-FR')}</p>
-        <table><thead><tr><th style="width: 80px; text-align:center;">Numéro</th><th style="width: 130px; text-align:center;">Statut</th><th style="width: 500px;">Intitulé de l'indicateur</th><th style="width: 250px;">Responsables</th><th style="width: 120px; text-align:center;">Échéance</th></tr></thead>
-          <tbody>${sortedCriteres.map(c => {
-              const statutClass = c.statut === "conforme" ? "bg-conforme" : c.statut === "en-cours" ? "bg-encours" : c.statut === "non-conforme" ? "bg-nonconforme" : "bg-nonconcerne";
-              const statutLabel = c.statut === "conforme" ? "Conforme" : c.statut === "en-cours" ? "En cours" : c.statut === "non-conforme" ? "Non conforme" : c.statut === "non-concerne" ? "Non concerné" : "Non évalué";
-              const escapeHtml = (text) => (text||"").toString().replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-              return `<tr><td style="text-align: center; font-weight: bold; font-size: 14px;">${c.critere}.${c.num}</td><td class="${statutClass}">${statutLabel}</td><td><div class="titre">${escapeHtml(c.titre)}</div></td><td>${escapeHtml(Array.isArray(c.responsables) ? c.responsables.join(", ") : (c.responsables || ""))}</td><td style="text-align: center;">${escapeHtml(c.delai)}</td></tr>`;
-            }).join('')}</tbody></table>
-      </body></html>
-    `;
+    const htmlContent = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:x="urn:schemas-microsoft-com:office:excel" xmlns="http://www.w3.org/TR/REC-html40"><head><meta charset="utf-8" /><style>table { border-collapse: collapse; font-family: sans-serif; width: 100%; } th { background-color: #0f172a; color: #ffffff; font-weight: bold; text-align: left; padding: 12px; border: 1px solid #cbd5e1; font-size: 14px; } td { padding: 10px; border: 1px solid #cbd5e1; vertical-align: top; font-size: 13px; color: #1e293b; } .bg-conforme { background-color: #d1fae5; color: #065f46; font-weight: bold; text-align: center; } .bg-encours { background-color: #fef3c7; color: #92400e; font-weight: bold; text-align: center; } .bg-nonconforme { background-color: #fee2e2; color: #991b1b; font-weight: bold; text-align: center; } .bg-nonconcerne { background-color: #f1f5f9; color: #475569; font-weight: bold; text-align: center; } .titre { font-size: 14px; font-weight: bold; color: #0f172a; }</style></head><body><h2 style="color: #0f172a; font-family: sans-serif;">Tableau de suivi Qualiopi</h2><p style="color: #64748b; font-family: sans-serif; margin-bottom: 20px;">Export généré le : '+new Date().toLocaleDateString(language==='en'?'en-US':'fr-FR')+'</p><table><thead><tr><th style="width: 80px; text-align:center;">Numéro</th><th style="width: 130px; text-align:center;">Statut</th><th style="width: 500px;">Intitulé de l\'indicateur</th><th style="width: 250px;">Responsables</th><th style="width: 120px; text-align:center;">Échéance</th></tr></thead><tbody>'+sortedCriteres.map(c=>{const statutClass=c.statut==="conforme"?"bg-conforme":c.statut==="en-cours"?"bg-encours":c.statut==="non-conforme"?"bg-nonconforme":"bg-nonconcerne";const statutLabel=c.statut==="conforme"?"Conforme":c.statut==="en-cours"?"En cours":c.statut==="non-conforme"?"Non conforme":c.statut==="non-concerne"?"Non concerné":"Non évalué";const escapeHtml=(text)=>(text||"").toString().replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");return '<tr><td style="text-align: center; font-weight: bold; font-size: 14px;">'+c.critere+'.'+c.num+'</td><td class="'+statutClass+'">'+statutLabel+'</td><td><div class="titre">'+escapeHtml(c.titre)+'</div></td><td>'+escapeHtml(Array.isArray(c.responsables)?c.responsables.join(", "):c.responsables||"")+'</td><td style="text-align: center;">'+escapeHtml(c.delai)+'</td></tr>';}).join('')+'</tbody></table></body></html>';
     const blob = new Blob([htmlContent], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a'); link.href = url; link.download = `Suivi_Qualiopi_${new Date().toISOString().slice(0,10)}.xls`;
@@ -432,37 +384,6 @@ export function EquipeTab({
 
       {tab === "membres" && (
         <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
-          {showInvite && userProfile?.role === "superadmin" && (
-            <div className="animate-slide-down" style={{ background: t.surface, border: `1px dashed ${t.accentBd}`, borderLeft: `3px solid ${t.accent}`, borderRadius: "12px", padding: "20px 22px", boxShadow: t.shadowSm }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "14px" }}>
-                <div>
-                  <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "17px", color: t.text }}>{l("Inviter un nouveau membre", "Invite a new member")}</div>
-                  <div style={{ fontSize: "10px", color: t.text3, marginTop: "2px" }}>{l("Un mot de passe temporaire est défini — l'utilisateur devra le changer à la première connexion.", "A temporary password is set — the user will have to change it upon first login.")}</div>
-                </div>
-              </div>
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 140px 150px 160px", gap: "10px", alignItems: "end" }}>
-                <Field label="Email" value={newMember.email} type="email" onChange={e => setNewMember({ ...newMember, email: e.target.value })} placeholder="email@ifsi.fr" t={t} />
-                <Field label={l("Mot de passe temporaire", "Temporary password")} value={newMember.pwd} type="password" onChange={e => setNewMember({ ...newMember, pwd: e.target.value })} placeholder={l("Min. 6 caractères", "Min. 6 characters")} t={t} />
-                <div>
-                  <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>{l("Rôle", "Role")}</label>
-                  <select value={newMember.role} onChange={e => setNewMember({ ...newMember, role: e.target.value })} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}>
-                    <option value="user">{l("Éditeur", "Editor")}</option>
-                    <option value="admin">{l("Administrateur", "Administrator")}</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ fontSize: "9px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>{l("Établissement", "Facility")}</label>
-                  <select value={newMember.ifsi || selectedIfsi} onChange={e => setNewMember({ ...newMember, ifsi: e.target.value })} style={{ width: "100%", boxSizing: "border-box", padding: "9px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "12px", color: t.text, outline: "none", cursor: "pointer" }}>
-                    {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
-                  </select>
-                </div>
-                <button onClick={handleCreateUser} disabled={isCreatingUser || !newMember.email || !newMember.pwd} style={{ padding: "9px 14px", background: t.accent, border: "none", borderRadius: "8px", color: "white", fontSize: "11px", fontWeight: "700", height: "35px", cursor: isCreatingUser || !newMember.email || !newMember.pwd ? "not-allowed" : "pointer", opacity: !newMember.email || !newMember.pwd ? 0.55 : 1, boxShadow: `0 4px 12px ${t.accentBd}`, transition: "all 0.15s" }}>
-                  {isCreatingUser ? l("Création…", "Creating...") : l("Créer le compte", "Create account")}
-                </button>
-              </div>
-            </div>
-          )}
-
           <div style={{ display: "grid", gridTemplateColumns: "repeat(4,1fr)", gap: "10px" }}>
             {[
               { v: stats.total,   l: "Total",          k: "accent"  },
@@ -550,39 +471,23 @@ export function EquipeTab({
 
       {tab === "etablissement" && (
         <div className="animate-fade-in" style={{ display: "grid", gridTemplateColumns: "1fr 340px", gap: "20px", alignItems: "start" }}>
-
           <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", overflow: "hidden", boxShadow: t.shadowSm }}>
             <div style={{ padding: "13px 18px", borderBottom: `1px solid ${t.border}`, background: t.surface2, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
               <span style={{ fontFamily: "'Instrument Serif',serif", fontSize: "16px", color: t.text }}>{l("Identité & Configurations", "Identity & Configurations")}</span>
-              {etabDirty && !etabSaved && (
-                <span style={{ background: t.amberBg, border: `1px solid ${t.amberBd}`, color: t.amber, fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "5px" }}>
-                  {l("Modifications non sauvegardées", "Unsaved changes")}
-                </span>
-              )}
-              {etabSaved && (
-                <span style={{ background: t.greenBg, border: `1px solid ${t.greenBd}`, color: t.green, fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "5px" }}>
-                  {l("✓ Sauvegardé", "✓ Saved")}
-                </span>
-              )}
+              {etabDirty && !etabSaved && <span style={{ background: t.amberBg, border: `1px solid ${t.amberBd}`, color: t.amber, fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "5px" }}>{l("Modifications non sauvegardées", "Unsaved changes")}</span>}
+              {etabSaved && <span style={{ background: t.greenBg, border: `1px solid ${t.greenBd}`, color: t.green, fontSize: "9px", fontWeight: "800", padding: "2px 7px", borderRadius: "5px" }}>{l("✓ Sauvegardé", "✓ Saved")}</span>}
             </div>
 
             {etabForm ? (
               <div style={{ padding: "20px", display: "flex", flexDirection: "column", gap: "24px" }}>
-                
                 <div>
                   <div style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>{l("Informations générales", "General Information")}</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                    <div style={{ gridColumn: "1/-1" }}>
-                      <Field label={l("Nom de l'établissement", "Facility Name")} value={etabForm.nom} onChange={e => updateEtabField("nom", e.target.value)} t={t} />
-                    </div>
+                    <div style={{ gridColumn: "1/-1" }}><Field label={l("Nom de l'établissement", "Facility Name")} value={etabForm.nom} onChange={e => updateEtabField("nom", e.target.value)} t={t} /></div>
                     <Field label={l("Directrice / Directeur", "Director")} value={etabForm.directrice} onChange={e => updateEtabField("directrice", e.target.value)} t={t} />
                     <Field label={l("Téléphone", "Phone")} value={etabForm.tel} onChange={e => updateEtabField("tel", e.target.value)} type="tel" t={t} />
-                    <div style={{ gridColumn: "1/-1" }}>
-                      <Field label={l("Adresse email contact", "Contact email")} value={etabForm.email} onChange={e => updateEtabField("email", e.target.value)} type="email" t={t} />
-                    </div>
-                    <div style={{ gridColumn: "1/-1" }}>
-                      <Field label={l("Adresse postale complète", "Full postal address")} value={etabForm.adresse} onChange={e => updateEtabField("adresse", e.target.value)} t={t} />
-                    </div>
+                    <div style={{ gridColumn: "1/-1" }}><Field label={l("Adresse email contact", "Contact email")} value={etabForm.email} onChange={e => updateEtabField("email", e.target.value)} type="email" t={t} /></div>
+                    <div style={{ gridColumn: "1/-1" }}><Field label={l("Adresse postale complète", "Full postal address")} value={etabForm.adresse} onChange={e => updateEtabField("adresse", e.target.value)} t={t} /></div>
                   </div>
                 </div>
 
@@ -591,12 +496,8 @@ export function EquipeTab({
                 <div>
                   <div style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "12px" }}>Qualiopi</div>
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
-                    <div style={{ gridColumn: "1/-1" }}>
-                      <Field label={l("N° NDA (Numéro de Déclaration d'Activité)", "NDA Number (Training Declaration)")} value={etabForm.nda} onChange={e => updateEtabField("nda", e.target.value)} t={t} />
-                    </div>
-                    <div style={{ gridColumn: "1/-1" }}>
-                      <Field label={l("N° Certification Qualiopi", "Qualiopi Certification Number")} value={etabForm.certif} onChange={e => updateEtabField("certif", e.target.value)} t={t} />
-                    </div>
+                    <div style={{ gridColumn: "1/-1" }}><Field label={l("N° NDA (Numéro de Déclaration d'Activité)", "NDA Number (Training Declaration)")} value={etabForm.nda} onChange={e => updateEtabField("nda", e.target.value)} t={t} /></div>
+                    <div style={{ gridColumn: "1/-1" }}><Field label={l("N° Certification Qualiopi", "Qualiopi Certification Number")} value={etabForm.certif} onChange={e => updateEtabField("certif", e.target.value)} t={t} /></div>
                     <Field label={l("Date d'obtention initiale", "Initial obtaining date")} value={etabForm.dateCertif} onChange={e => updateEtabField("dateCertif", e.target.value)} type="date" t={t} />
                     <Field label={l("Date d'audit prévue", "Planned audit date")} value={etabForm.dateAudit} onChange={e => updateEtabField("dateAudit", e.target.value)} type="date" t={t} />
                   </div>
@@ -606,41 +507,23 @@ export function EquipeTab({
 
                 <div>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
-                    <span style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px" }}>
-                      {l("Agréments & Autorisations", "Approvals & Authorizations")}
-                    </span>
-                    <button onClick={() => updateEtabField("agrements", [...etabForm.agrements, { l: "", v: "", k: "green" }])}
-                      style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "4px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}
-                    >
-                      {l("+ Ajouter", "+ Add")}
-                    </button>
+                    <span style={{ fontSize: "11px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "1px" }}>{l("Agréments & Autorisations", "Approvals & Authorizations")}</span>
+                    <button onClick={() => updateEtabField("agrements", [...etabForm.agrements, { l: "", v: "", k: "green" }])} style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "4px 10px", borderRadius: "6px", fontSize: "10px", fontWeight: "700", cursor: "pointer" }}>{l("+ Ajouter", "+ Add")}</button>
                   </div>
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                     {etabForm.agrements.map((ag, i) => (
                       <div key={i} style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                        <input value={ag.l} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].l = e.target.value; updateEtabField("agrements", newAg); }}
-                          placeholder={l("Nom (ex: Accréditation IFSI)", "Name (ex: IFSI Approval)")}
-                          style={{ flex: 1, boxSizing: "border-box", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
-                        />
-                        <input value={ag.v} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].v = e.target.value; updateEtabField("agrements", newAg); }}
-                          placeholder={l("Valeur (ex: 150 places)", "Value (ex: 150 seats)")}
-                          style={{ flex: 1, boxSizing: "border-box", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }}
-                        />
-                        <select value={ag.k} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].k = e.target.value; updateEtabField("agrements", newAg); }}
-                          style={{ width: "95px", boxSizing: "border-box", padding: "8px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none", cursor:"pointer" }}
-                        >
+                        <input value={ag.l} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].l = e.target.value; updateEtabField("agrements", newAg); }} placeholder={l("Nom (ex: Accréditation IFSI)", "Name (ex: IFSI Approval)")} style={{ flex: 1, boxSizing: "border-box", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }} />
+                        <input value={ag.v} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].v = e.target.value; updateEtabField("agrements", newAg); }} placeholder={l("Valeur (ex: 150 places)", "Value (ex: 150 seats)")} style={{ flex: 1, boxSizing: "border-box", padding: "8px 10px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none" }} />
+                        <select value={ag.k} onChange={e => { const newAg = [...etabForm.agrements]; newAg[i].k = e.target.value; updateEtabField("agrements", newAg); }} style={{ width: "95px", boxSizing: "border-box", padding: "8px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "6px", fontSize: "11px", color: t.text, outline: "none", cursor:"pointer" }}>
                           <option value="green">{l("Succès", "Success")}</option>
                           <option value="amber">{l("Alerte", "Warning")}</option>
                           <option value="red">{l("Erreur", "Error")}</option>
                         </select>
-                        <button onClick={() => { const newAg = etabForm.agrements.filter((_, idx) => idx !== i); updateEtabField("agrements", newAg); }}
-                          style={{ background: t.redBg, border: `1px solid ${t.redBd}`, color: t.red, width: "28px", height: "28px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink:0 }}
-                        >✕</button>
+                        <button onClick={() => { const newAg = etabForm.agrements.filter((_, idx) => idx !== i); updateEtabField("agrements", newAg); }} style={{ background: t.redBg, border: `1px solid ${t.redBd}`, color: t.red, width: "28px", height: "28px", borderRadius: "6px", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "12px", flexShrink:0 }}>✕</button>
                       </div>
                     ))}
-                    {etabForm.agrements.length === 0 && (
-                       <div style={{ fontSize: "11px", color: t.text3, fontStyle: "italic", padding:"10px 0" }}>{l("Aucun agrément configuré. Cliquez sur + Ajouter.", "No approvals configured. Click + Add.")}</div>
-                    )}
+                    {etabForm.agrements.length === 0 && <div style={{ fontSize: "11px", color: t.text3, fontStyle: "italic", padding:"10px 0" }}>{l("Aucun agrément configuré. Cliquez sur + Ajouter.", "No approvals configured. Click + Add.")}</div>}
                   </div>
                 </div>
 
@@ -658,12 +541,8 @@ export function EquipeTab({
             <div style={{ background: t.goldBg, border: `1px solid ${t.goldBd}`, borderRadius: "12px", padding: "20px", boxShadow: `0 4px 16px ${t.goldBd}` }}>
               <div style={{ fontSize: "10px", fontWeight: "800", color: t.gold, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>Certification Qualiopi</div>
               <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "18px", color: t.text, marginBottom: "4px" }}>{etabForm?.certif || "Non renseigné"}</div>
-              <div style={{ fontSize: "11px", color: t.text3, marginBottom: "12px" }}>
-                {l("Prochain audit prévu le", "Next audit planned on")} {etabForm?.dateAudit ? new Date(etabForm.dateAudit).toLocaleDateString(language==='en'?'en-US':'fr-FR', {day:'numeric', month:'long', year:'numeric'}) : "—"}
-              </div>
-              <div style={{ height: "4px", background: `rgba(212,160,48,0.15)`, borderRadius: "2px", marginBottom: "6px" }}>
-                <div style={{ width: "62%", height: "100%", background: `linear-gradient(90deg,${t.gold},#f0c060)`, borderRadius: "2px" }} />
-              </div>
+              <div style={{ fontSize: "11px", color: t.text3, marginBottom: "12px" }}>{l("Prochain audit prévu le", "Next audit planned on")} {etabForm?.dateAudit ? new Date(etabForm.dateAudit).toLocaleDateString(language==='en'?'en-US':'fr-FR', {day:'numeric', month:'long', year:'numeric'}) : "—"}</div>
+              <div style={{ height: "4px", background: `rgba(212,160,48,0.15)`, borderRadius: "2px", marginBottom: "6px" }}><div style={{ width: "62%", height: "100%", background: `linear-gradient(90deg,${t.gold},#f0c060)`, borderRadius: "2px" }} /></div>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: "10px", color: t.gold, fontWeight: "700" }}>
                 <span>{l("Délivré", "Issued")} {etabForm?.dateCertif ? formatMonthYear(etabForm.dateCertif, language) : "—"}</span>
                 <span>{l("Renouvellement", "Renewal")} {etabForm?.dateAudit ? formatMonthYear(etabForm.dateAudit, language) : "—"}</span>
@@ -672,7 +551,6 @@ export function EquipeTab({
 
             <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "12px", padding: "16px", boxShadow: t.shadowSm }}>
               <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "16px", color: t.text, marginBottom: "12px" }}>{l("Agréments & Autorisations", "Approvals & Authorizations")}</div>
-              
               {etabForm?.agrements?.length === 0 ? (
                  <div style={{ fontSize:"11px", color:t.text3, fontStyle:"italic" }}>Aucun agrément à afficher.</div>
               ) : (
@@ -697,9 +575,7 @@ export function EquipeTab({
             <span style={{ fontSize: "20px" }}>🛡️</span>
             <div>
               <div style={{ fontSize: "12px", fontWeight: "800", color: t.accent, marginBottom: "2px" }}>{l("Rappel de Confidentialité & RGPD", "Privacy & GDPR Reminder")}</div>
-              <div style={{ fontSize: "11px", color: t.text2, lineHeight: "1.4" }}>
-                {l("Cet espace est partagé avec toute l'équipe. Veillez à ne déposer ", "This space is shared with the whole team. Do not upload ")}<strong>{l("aucune donnée personnelle sensible, médicale ou non anonymisée", "any sensitive personal data")}</strong> {l("(dossiers de patients, notes nominatives d'étudiants, etc.).", "(patient files, student grades, etc.).")}
-              </div>
+              <div style={{ fontSize: "11px", color: t.text2, lineHeight: "1.4" }}>{l("Cet espace est partagé avec toute l'équipe. Veillez à ne déposer ", "This space is shared with the whole team. Do not upload ")}<strong>{l("aucune donnée personnelle sensible, médicale ou non anonymisée", "any sensitive personal data")}</strong> {l("(dossiers de patients, notes nominatives d'étudiants, etc.).", "(patient files, student grades, etc.).")}</div>
             </div>
           </div>
 
@@ -806,20 +682,12 @@ export function EquipeTab({
               <div><div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>{l("Export JSON brut", "Raw JSON Export")}</div><div style={{ fontSize: "9px", color: t.text3 }}>{l("Toutes les données Qualiopi", "All Qualiopi data")}</div></div>
               <button onClick={handleExportJson} style={{ padding: "5px 11px", background: t.accentBg, border: `1px solid ${t.accentBd}`, color: t.accent, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>{l("Exporter JSON", "Export JSON")}</button>
             </div>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderBottom: `1px solid ${t.border2}` }}>
-              <div><div style={{ fontSize: "11px", fontWeight: "600", color: t.text }}>{l("Sauvegarde complète", "Full backup")}</div><div style={{ fontSize: "9px", color: t.text3 }}>{l("Archive ZIP", "ZIP Archive")}</div></div>
-              <button onClick={() => alert('À venir...')} style={{ padding: "5px 11px", background: t.goldBg, border: `1px solid ${t.goldBd}`, color: t.gold, borderRadius: "6px", fontSize: "9px", fontWeight: "700", cursor: "pointer" }}>{l("Exporter ZIP", "Export ZIP")}</button>
-            </div>
           </div>
         </div>
       )}
     </div>
   );
 }
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  CompteTab (PROFIL UTILISATEUR)
-// ─────────────────────────────────────────────────────────────────────────────
 
 export function CompteTab({
   auth: firebaseAuth, userProfile, orgJobTitles, rolePalette,
@@ -831,11 +699,8 @@ export function CompteTab({
   const [tab, setTab] = useState("profil");
 
   const [profilForm, setProfilForm] = useState({
-    prenom: userProfile?.prenom || "",
-    nom: userProfile?.nom || "",
-    phone: userProfile?.phone || "",
-    jobTitle: (userProfile?.jobTitles && userProfile.jobTitles[0]) || "",
-    avatarColor: userProfile?.avatarColor || (rolePalette ? rolePalette[0].text : t.accent)
+    prenom: userProfile?.prenom || "", nom: userProfile?.nom || "", phone: userProfile?.phone || "",
+    jobTitle: (userProfile?.jobTitles && userProfile.jobTitles[0]) || "", avatarColor: userProfile?.avatarColor || (rolePalette ? rolePalette[0].text : t.accent)
   });
   const [profilSaving, setProfilSaving] = useState(false);
   const [profilSaved, setProfilSaved] = useState(false);
@@ -897,7 +762,7 @@ export function CompteTab({
 
   const handleExportRGPD = () => {
     const printWindow = window.open('', '_blank');
-    const html = `<html><head><title>${l("Export RGPD", "GDPR Export")}</title><style>body{font-family:sans-serif;padding:40px;} table{width:100%;border-collapse:collapse;margin-top:15px;} th,td{border:1px solid #ccc;padding:10px;text-align:left;} th{background:#f8f8f8;width:35%;}</style></head><body><h1>${l("Export RGPD", "GDPR Export")}</h1><table><tr><th>Email</th><td>${firebaseAuth.currentUser?.email}</td></tr><tr><th>Role</th><td>${userProfile?.role}</td></tr></table><script>window.onload=function(){window.print();window.close();}</script></body></html>`;
+    const html = '<html><head><title>'+l("Export RGPD","GDPR Export")+'</title><style>body{font-family:sans-serif;padding:40px;max-width:800px;margin:0 auto}h1{color:#1e3a8a;border-bottom:2px solid #cbd5e1;padding-bottom:10px}h2{color:#334155;margin-top:30px;font-size:18px;border-bottom:1px solid #e2e8f0;padding-bottom:5px}table{width:100%;border-collapse:collapse;margin-top:15px;font-size:14px}th,td{border:1px solid #cbd5e1;padding:10px 15px;text-align:left}th{background-color:#f8fafc;width:35%;color:#475569}.f{margin-top:50px;font-size:11px;color:#64748b;text-align:center;border-top:1px solid #e2e8f0;padding-top:15px}</style></head><body><h1>'+l("Rapport d'exportation des données personnelles","Personal Data Export Report")+'</h1><h2>1. '+l("Informations d'identification","Identification Information")+'</h2><table><tr><th>'+l("Prénom","First Name")+'</th><td>'+(userProfile?.prenom||l("Non renseigné","Not provided"))+'</td></tr><tr><th>'+l("Nom","Last Name")+'</th><td>'+(userProfile?.nom||l("Non renseigné","Not provided"))+'</td></tr><tr><th>Email</th><td>'+(firebaseAuth.currentUser?.email||"")+'</td></tr><tr><th>'+l("Téléphone professionnel","Professional Phone")+'</th><td>'+(userProfile?.phone||l("Non renseigné","Not provided"))+'</td></tr></table><h2>2. '+l("Système","System")+'</h2><table><tr><th>ID Établissement</th><td>'+(userProfile?.etablissementId||"")+'</td></tr><tr><th>Role</th><td>'+(userProfile?.role||"")+'</td></tr><tr><th>Fonction</th><td>'+(userProfile?.jobTitles?.[0]||"")+'</td></tr><tr><th>UID</th><td>'+(firebaseAuth.currentUser?.uid||"")+'</td></tr></table><h2>3. '+l("Activité","Activity")+'</h2><table><thead><tr><th>Date</th><th>Action</th><th>Détail</th></tr></thead><tbody>'+(userLogs.length>0?userLogs.map(log=>'<tr><td>'+(log.createdAt?.toDate?new Date(log.createdAt.toDate()).toLocaleString(language==='en'?'en-US':'fr-FR'):"")+'</td><td>'+log.action+'</td><td>'+log.detail+'</td></tr>').join(''):'<tr><td colspan="3" align="center">Vide</td></tr>')+'</tbody></table><div class="f">'+new Date().toLocaleString(language==='en'?'en-US':'fr-FR')+'</div><script>window.onload=function(){window.print();window.close();}</script></body></html>';
     printWindow.document.write(html); printWindow.document.close();
   };
 
@@ -984,10 +849,20 @@ export function CompteTab({
                   <input type={showPwd ? "text" : "password"} value={pwdNew} onChange={e => setPwdNew(e.target.value)} placeholder={l("Minimum 6 caractères", "Minimum 6 characters")} style={{ width: "100%", boxSizing: "border-box", padding: "10px 38px 10px 14px", borderRadius: "8px", border: `1px solid ${pwdNew && pwdStrength >= 3 ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
                   <button onClick={() => setShowPwd(v => !v)} style={{ position: "absolute", right: "10px", top: "50%", transform: "translateY(-50%)", background: "transparent", border: "none", cursor: "pointer", color: t.text3, fontSize: "14px" }}>{showPwd ? "🙈" : "👁"}</button>
                 </div>
+                {pwdNew && (
+                  <div style={{ marginTop: "6px" }}>
+                    <div style={{ display: "flex", gap: "3px", marginBottom: "3px" }}>
+                      {[1, 2, 3, 4, 5].map(i => <div key={i} style={{ flex: 1, height: "3px", borderRadius: "2px", background: i <= pwdStrength ? strengthColors[pwdStrength] : t.border, transition: "background 0.2s" }} />)}
+                    </div>
+                    <span style={{ fontSize: "9px", fontWeight: "700", color: strengthColors[pwdStrength] }}>{strengthLabels[pwdStrength]}</span>
+                  </div>
+                )}
               </div>
               <div>
                 <label style={{ fontSize: "10px", fontWeight: "700", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "5px" }}>{l("Confirmer le nouveau mot de passe", "Confirm new password")}</label>
                 <input type="password" value={pwdConfirm} onChange={e => setPwdConfirm(e.target.value)} placeholder={l("Répéter", "Repeat")} style={{ width: "100%", boxSizing: "border-box", padding: "10px 14px", borderRadius: "8px", border: `1px solid ${pwdConfirm && pwdNew !== pwdConfirm ? t.redBd : pwdConfirm && pwdNew === pwdConfirm ? t.greenBd : t.border}`, background: t.surface2, color: t.text, outline: "none", fontSize: "13px", fontFamily: "inherit", transition: "border-color 0.2s" }} />
+                {pwdConfirm && pwdNew !== pwdConfirm && <div style={{ fontSize: "10px", color: t.red, marginTop: "3px" }}>{l("Les mots de passe ne correspondent pas.", "Passwords do not match.")}</div>}
+                {pwdConfirm && pwdNew === pwdConfirm && <div style={{ fontSize: "10px", color: t.green, marginTop: "3px" }}>{l("✓ Identiques.", "✓ Match.")}</div>}
               </div>
               <button onClick={changePwd} disabled={loading} style={{ padding: "11px 22px", background: pwdSuccess ? t.greenBg : t.accent, border: `1px solid ${pwdSuccess ? t.greenBd : t.accentBd}`, borderRadius: "8px", color: pwdSuccess ? t.green : "white", fontSize: "13px", fontWeight: "700", cursor: loading ? "not-allowed" : "pointer", boxShadow: pwdSuccess ? "none" : `0 4px 12px ${t.accentBd}`, transition: "all 0.2s", alignSelf: "flex-start", marginTop:"8px" }}>
                 {loading ? l("Mise à jour...", "Updating...") : pwdSuccess ? l("✓ Mot de passe modifié !", "✓ Password changed!") : l("Mettre à jour", "Update")}
@@ -1059,19 +934,6 @@ export function CompteTab({
             <h3 style={{ fontSize: "14px", fontWeight: "800", color: t.text, marginBottom: "8px" }}>{l("Exporter mes données", "Export my data")}</h3>
             <div style={{ fontSize: "12px", color: t.text2, marginBottom: "16px" }}>{l("Télécharger une copie complète de vos informations personnelles au format PDF.", "Download a complete copy of your personal information in PDF format.")}</div>
             <button onClick={handleExportRGPD} style={{ background: t.surface2, border: `1px solid ${t.border}`, color: t.text, padding: "10px 18px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", transition:"all 0.2s" }} onMouseOver={e=>e.currentTarget.style.borderColor=t.accent} onMouseOut={e=>e.currentTarget.style.borderColor=t.border}>{l("📥 Télécharger mes données", "📥 Download my data")}</button>
-          </div>
-          <div style={{ background: t.surface, border: `1px solid ${t.redBd}`, borderRadius: "16px", overflow: "hidden", boxShadow: t.shadowSm }}>
-            <div style={{ padding: "24px" }}>
-              <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "24px", color: t.red, marginBottom: "6px" }}>{l("⚠️ Zone dangereuse", "⚠️ Danger Zone")}</div>
-              <div style={{ fontSize: "12px", color: t.text2, marginBottom: "20px" }}>{l("Ces actions sont définitives et ne peuvent pas être annulées.", "These actions are final and cannot be undone.")}</div>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "10px" }}>
-                <div>
-                  <div style={{ fontSize: "13px", fontWeight: "700", color: t.red, marginBottom: "3px" }}>{l("Désactiver mon compte", "Deactivate my account")}</div>
-                  <div style={{ fontSize: "11px", color: t.red, opacity: 0.75 }}>{l("Votre accès sera suspendu immédiatement, contactez l'administrateur.", "Your access will be suspended immediately, contact the administrator.")}</div>
-                </div>
-                <button onClick={() => alert(l("Contactez votre Super Admin pour procéder à la désactivation.", "Contact your Super Admin to proceed with deactivation."))} style={{ background: t.red, border: "none", color: "white", padding: "10px 20px", borderRadius: "8px", fontSize: "12px", fontWeight: "700", cursor: "pointer", boxShadow: `0 4px 12px ${t.redBd}` }}>{l("Désactiver", "Deactivate")}</button>
-              </div>
-            </div>
           </div>
         </div>
       )}
