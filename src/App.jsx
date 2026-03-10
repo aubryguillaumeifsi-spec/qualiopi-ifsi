@@ -6,7 +6,6 @@ import DashboardTab from "./components/DashboardTab";
 import TourControleTab from "./components/TourControleTab";
 import OrganigrammeTab from "./components/OrganigrammeTab";
 
-// 🎯 IMPORT SÉPARÉ DU LIVRE BLANC
 import { CriteresTab } from "./components/TabsQualiopi";
 import LivreBlancTab from "./components/LivreBlancTab";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
@@ -154,6 +153,8 @@ function MainApp() {
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
+  
+  // 🎯 VARIABLES RESTAURÉES ! (Empêche le crash du composant EquipeTab)
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
   const [tourSort, setTourSort] = useState("urgence");
@@ -335,6 +336,13 @@ function MainApp() {
   }, [criteres, filterStatut, filterCritere, searchTerm]);
 
   const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || effectiveProfile?.role === "superadmin"), [teamUsers, effectiveProfile]);
+  
+  // 🎯 FONCTION RESTAURÉE
+  const handleSortTeam = (key) => { 
+    let direction = "asc"; 
+    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; 
+    setTeamSortConfig({ key, direction }); 
+  };
   
   const handleIfsiSwitch = async (e) => { 
     const val = e.target.value;
@@ -780,10 +788,9 @@ function MainApp() {
           
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           
-          {/* 🎯 LIVRE BLANC */}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} t={t} />}
           
-          {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
+          {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} t={t} />}
         </div>
       </main>
