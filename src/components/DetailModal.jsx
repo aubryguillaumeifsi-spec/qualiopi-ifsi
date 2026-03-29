@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { ref, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
+import { ref, uploadBytesResumable, getDownloadURL, deleteObject, getBytes } from "firebase/storage";
 import { GoogleGenerativeAI } from "@google/generative-ai";
 import { storage, auth } from "../firebase";
 import { CRITERES_LABELS, STATUT_CONFIG, GUIDE_QUALIOPI } from "../data";
@@ -154,35 +154,54 @@ export default function DetailModal({ critere, onClose, onSave, onAutoSave, isRe
   async function handleAnalyze(file) {
     if (!window.confirm("⚠️ ALERTE RGPD - CONFIDENTIALITÉ DES DONNÉES\n\nAvant de transmettre ce document à l'Intelligence Artificielle, veuillez confirmer qu'il ne contient AUCUNE donnée personnelle, médicale ou sensible (noms de patients, numéros de sécurité sociale, etc.).\n\nAvez-vous bien anonymisé ou biffé les informations sensibles ?")) return;
 
-    if (!file.url) return;
-    setIsAnalyzing(true); setAiReport("");
+    if (!file.path) {
+        setAiReport("🚨 Erreur : Le chemin du fichier est introuvable.");
+        return;
+    }
+    
+    setIsAnalyzing(true); 
+    setAiReport("");
+    
     try {
       const apiKey = import.meta.env.VITE_GEMINI_API_KEY;
-      const response = await fetch(file.url);
-      const blob = await response.blob();
-      const reader = new FileReader();
-      reader.readAsDataURL(blob);
-      reader.onloadend = async () => {
-         const base64data = reader.result.split(',')[1];
-         let mimeType = blob.type;
-         if (file.name.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
-         const genAI = new GoogleGenerativeAI(apiKey);
-         const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
-         
-         const prompt = `CRITIQUE : Avant toute analyse, tu dois vérifier que le document fourni a un lien DIRECT et ÉVIDENT avec la formation professionnelle et le référentiel Qualiopi. Si le document n'a rien à voir (ex: politique, élection, recette de cuisine, publicité, etc.), TU DOIS REFUSER L'ANALYSE et répondre UNIQUEMENT : '❌ Document non pertinent : Ce document ne semble avoir aucun lien avec la formation professionnelle ou les exigences de cet indicateur Qualiopi.'
+      
+      // 1. Récupérer le fichier via le SDK Firebase (plus robuste que fetch)
+      const fileRef = ref(storage, file.path);
+      const arrayBuffer = await getBytes(fileRef);
+      
+      // 2. Convertir en Base64
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+      }
+      const base64data = window.btoa(binary);
+      
+      // 3. Déduire le type MIME
+      let mimeType = 'application/octet-stream';
+      if (file.name.toLowerCase().endsWith('.pdf')) mimeType = 'application/pdf';
+      else if (file.name.toLowerCase().endsWith('.png')) mimeType = 'image/png';
+      else if (file.name.toLowerCase().match(/\.(jpg|jpeg)$/)) mimeType = 'image/jpeg';
 
-Tu es un Auditeur Qualiopi expert et strict. Analyse ce document pour le critère ${data.num} : "${data.titre}".
-Niveau attendu : ${guide.niveau}.
-Fais un résumé court (avec emojis) structuré ainsi :
-1. Contenu (Ce que contient vraiment le document)
-2. Pertinence (En quoi il répond aux exigences de l'indicateur)
-3. Manques (Ce qu'il manque pour être une preuve parfaite)`;
-         
-         const result = await model.generateContent([prompt, { inlineData: { data: base64data, mimeType } }]);
-         setAiReport(result.response.text());
-         setIsAnalyzing(false);
-      };
-    } catch (error) { setAiReport("Erreur IA : " + error.message); setIsAnalyzing(false); }
+      // 4. Appel à Gemini
+      const genAI = new GoogleGenerativeAI(apiKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash" });
+      
+      const prompt = `CRITIQUE : Avant toute analyse, tu dois vérifier que le document fourni a un lien DIRECT et ÉVIDENT avec la formation professionnelle et le référentiel Qualiopi. Si le document n'a rien à voir (ex: politique, élection, recette de cuisine, publicité, etc.), TU DOIS REFUSER L'ANALYSE et répondre UNIQUEMENT : '❌ Document non pertinent : Ce document ne semble avoir aucun lien avec la formation professionnelle ou les exigences de cet indicateur Qualiopi.'\n\nTu es un Auditeur Qualiopi expert et strict. Analyse ce document pour le critère ${data.num} : "${data.titre}".\nNiveau attendu : ${guide.niveau}.\nFais un résumé court (avec emojis) structuré ainsi :\n1. Contenu (Ce que contient vraiment le document)\n2. Pertinence (En quoi il répond aux exigences de l'indicateur)\n3. Manques (Ce qu'il manque pour être une preuve parfaite)`;
+      
+      const result = await model.generateContent([prompt, { inlineData: { data: base64data, mimeType } }]);
+      setAiReport(result.response.text());
+      
+    } catch (error) { 
+        console.error("Erreur IA / Firebase :", error);
+        if (error.message.includes("CORS") || error.code === "storage/unauthorized" || error.code === "storage/unknown") {
+            setAiReport("🚨 ERREUR DE SÉCURITÉ (CORS) :\nVotre navigateur Web bloque la lecture du fichier pour l'envoyer à l'IA.\n\n👉 Pour réparer cela, vous devez exécuter la commande 'gsutil cors set' dans votre console Google Cloud pour autoriser votre application à lire les documents.");
+        } else {
+            setAiReport("Erreur IA : " + error.message); 
+        }
+    } finally {
+        setIsAnalyzing(false); 
+    }
   }
 
   const tabBtnStyle = (tabId) => ({
@@ -279,7 +298,7 @@ Fais un résumé court (avec emojis) structuré ainsi :
                       </div>
                     </div>
                 ))}
-                {aiReport && <div style={{ background: "#f0fdfa", border: "1px solid #5eead4", padding: "15px", borderRadius: "8px", marginTop: "15px", fontSize: "13px", whiteSpace: "pre-wrap" }}>🤖 <strong>Analyse QualiForma :</strong><br/>{aiReport}</div>}
+                {aiReport && <div style={{ background: "#f0fdfa", border: "1px solid #5eead4", padding: "15px", borderRadius: "8px", marginTop: "15px", fontSize: "13px", whiteSpace: "pre-wrap", color: "#0f766e" }}>{aiReport}</div>}
                 {!isReadOnly && (
                   <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", marginTop: "15px" }}>
                     <div style={{ background: "white", padding: "10px", borderRadius: "8px", border: "1px solid #fcd34d" }}>
