@@ -693,10 +693,10 @@ export function CompteTab({
   auth: firebaseAuth, userProfile, orgJobTitles, rolePalette,
   pwdUpdate, setPwdUpdate, handleChangePassword,
   isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode,
-  language, setLanguage, t,
+  language, setLanguage, uiZoom, setUiZoom, t,
 }) {
   const l = (fr, en) => language === "en" ? en : fr;
-  const [tab, setTab] = useState("profil");
+  const [tab, setTab] = useState("preferences"); // Mis par défaut sur préférences pour voir tout de suite la modif
 
   const [profilForm, setProfilForm] = useState({
     prenom: userProfile?.prenom || "", nom: userProfile?.nom || "", phone: userProfile?.phone || "",
@@ -892,13 +892,28 @@ export function CompteTab({
                   <Toggle val={p.val} onChange={p.set} colorKey={p.color || "accent"} t={t} />
                 </div>
               ))}
-              <div style={{ paddingTop: "8px" }}>
-                <label style={{ fontSize: "10px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "8px" }}>{l("Langue de l'interface", "Interface Language")}</label>
-                <select value={language} onChange={e => setLanguage(e.target.value)} style={{ width: "100%", maxWidth:"300px", boxSizing: "border-box", padding: "10px 14px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "13px", color: t.text, outline: "none", cursor:"pointer" }}>
-                  <option value="fr">Français</option>
-                  <option value="en">English</option>
-                </select>
+              
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "20px", paddingTop: "8px" }}>
+                <div>
+                  <label style={{ fontSize: "10px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "8px" }}>{l("Langue de l'interface", "Interface Language")}</label>
+                  <select value={language} onChange={e => setLanguage(e.target.value)} style={{ width: "100%", maxWidth:"300px", boxSizing: "border-box", padding: "10px 14px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "13px", color: t.text, outline: "none", cursor:"pointer" }}>
+                    <option value="fr">Français</option>
+                    <option value="en">English</option>
+                  </select>
+                </div>
+                
+                {/* 💎 L'OPTION SAAS PREMIUM : TAILLE DE L'INTERFACE */}
+                <div>
+                  <label style={{ fontSize: "10px", fontWeight: "800", color: t.text3, textTransform: "uppercase", letterSpacing: "0.7px", display: "block", marginBottom: "8px" }}>{l("Taille de l'interface", "Interface Size")}</label>
+                  <select value={uiZoom} onChange={e => setUiZoom(e.target.value)} style={{ width: "100%", maxWidth:"300px", boxSizing: "border-box", padding: "10px 14px", background: t.surface, border: `1px solid ${t.border}`, borderRadius: "8px", fontSize: "13px", color: t.text, outline: "none", cursor:"pointer" }}>
+                    <option value="100%">{l("Standard (100%)", "Standard (100%)")}</option>
+                    <option value="110%">{l("Confortable (110%) - Recommandé", "Comfortable (110%) - Recommended")}</option>
+                    <option value="125%">{l("Large (125%)", "Large (125%)")}</option>
+                  </select>
+                  <div style={{ fontSize: "10px", color: t.text3, marginTop: "6px" }}>{l("Agrandit l'ensemble des textes et des menus pour plus de lisibilité.", "Enlarges all texts and menus for better readability.")}</div>
+                </div>
               </div>
+
             </div>
           </div>
         </div>
