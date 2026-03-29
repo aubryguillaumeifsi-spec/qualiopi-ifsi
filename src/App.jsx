@@ -88,8 +88,6 @@ function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme_dark") !== "false");
   const [isColorblindMode, setIsColorblindMode] = useState(() => localStorage.getItem("theme_colorblind") === "true");
   const [language, setLanguage] = useState(() => localStorage.getItem("app_lang") || "fr");
-  
-  // 💎 NOUVEAU : GESTION DE LA TAILLE DE L'INTERFACE
   const [uiZoom, setUiZoom] = useState(() => localStorage.getItem("app_zoom") || "100%");
 
   useEffect(() => { localStorage.setItem("theme_dark", isDarkMode); }, [isDarkMode]);
@@ -510,7 +508,6 @@ function MainApp() {
   const userJobDisplay = userProfile?.jobTitles?.[0] || l("Mon profil ⚙️", "My profile ⚙️");
   const userAvatarColor = userProfile?.avatarColor || t.accent;
 
-  // 🎯 GESTION DU ZOOM DYNAMIQUE SUR TOUTE L'APP
   const zoomStyle = uiZoom === "110%" ? { zoom: 1.1 } : uiZoom === "125%" ? { zoom: 1.25 } : { zoom: 1 };
 
   return (
@@ -557,7 +554,6 @@ function MainApp() {
         />
       )}
 
-      {/* 🧭 SIDEBAR GAUCHE */}
       <aside className="no-print" style={{ width: "250px", background: t.sidebar, borderRight: `1px solid ${t.borderNav}`, display: "flex", flexDirection: "column", flexShrink: 0, zIndex: 50, paddingTop: userProfile?.role === "superadmin" ? "10px" : "0" }}>
         
         <div onClick={() => setActiveTab('dashboard')} style={{ padding:"24px 20px 16px", display:"flex", alignItems:"center", gap:"14px", cursor:"pointer" }}>
@@ -628,7 +624,6 @@ function MainApp() {
         </div>
       </aside>
 
-      {/* 🖥️ MAIN CONTENT */}
       <main style={{ flex: 1, height: "100vh", overflowY: "auto", overflowX: "hidden", background: t.bg, position: "relative", display: "flex", flexDirection: "column" }}>
         
         <div className="no-print" style={{ height:"60px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
@@ -652,7 +647,6 @@ function MainApp() {
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} isColorblindMode={isColorblindMode} t={t} />}
           {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
-          {/* 💎 COMPTETAB REÇOIT L'UI ZOOM ! */}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} uiZoom={uiZoom} setUiZoom={setUiZoom} t={t} />}
         </div>
       </main>
@@ -660,4 +654,10 @@ function MainApp() {
   );
 }
 
-export default App;
+export default function App() { 
+  return (
+    <ErrorBoundary>
+      <MainApp />
+    </ErrorBoundary>
+  ); 
+}
