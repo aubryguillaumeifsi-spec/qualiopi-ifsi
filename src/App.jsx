@@ -58,18 +58,12 @@ const DEFAULT_JOB_TITLES = ["Directrice IFPS", "Coordinatrice pédagogique", "Fo
 const DEFAULT_TAGS = ["Référent Laïcité", "Référent ABS", "Référent Simulation", "Référent Qualité", "AFGSU"];
 
 const ROLE_PALETTE = [ 
-  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, 
-  { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, 
-  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, 
-  { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, 
-  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, 
-  { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, 
-  { bg: "#ecfeff", border: "#7dd3fc", text: "#0369a1" }, 
-  { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, 
-  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, 
-  { bg: "#fef08a", border: "#fde047", text: "#a16207" }, 
-  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }, 
-  { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }  
+  { bg: "#fef4de", border: "#f0cc70", text: "#b07010" }, { bg: "#eff6ff", border: "#bfdbfe", text: "#1d52d4" }, 
+  { bg: "#e8f9f3", border: "#9dddc5", text: "#0e7a50" }, { bg: "#fce7f3", border: "#f9a8d4", text: "#be185d" }, 
+  { bg: "#f3e8ff", border: "#d8b4fe", text: "#7e22ce" }, { bg: "#ffedd5", border: "#fdba74", text: "#c2410c" }, 
+  { bg: "#ecfeff", border: "#7dd3fc", text: "#0369a1" }, { bg: "#fee2e2", border: "#fca5a5", text: "#b91c1c" }, 
+  { bg: "#ccfbf1", border: "#5eead4", text: "#0f766e" }, { bg: "#fef08a", border: "#fde047", text: "#a16207" }, 
+  { bg: "#e0e7ff", border: "#c7d2fe", text: "#4338ca" }, { bg: "#fae8ff", border: "#f3ccff", text: "#a21caf" }  
 ];
 
 const today = new Date();
@@ -94,13 +88,16 @@ function MainApp() {
   const [isDarkMode, setIsDarkMode] = useState(() => localStorage.getItem("theme_dark") !== "false");
   const [isColorblindMode, setIsColorblindMode] = useState(() => localStorage.getItem("theme_colorblind") === "true");
   const [language, setLanguage] = useState(() => localStorage.getItem("app_lang") || "fr");
+  
+  // 💎 NOUVEAU : GESTION DE LA TAILLE DE L'INTERFACE
+  const [uiZoom, setUiZoom] = useState(() => localStorage.getItem("app_zoom") || "100%");
 
   useEffect(() => { localStorage.setItem("theme_dark", isDarkMode); }, [isDarkMode]);
   useEffect(() => { localStorage.setItem("theme_colorblind", isColorblindMode); }, [isColorblindMode]);
   useEffect(() => { localStorage.setItem("app_lang", language); }, [language]);
+  useEffect(() => { localStorage.setItem("app_zoom", uiZoom); }, [uiZoom]);
 
   const t = buildTokens(isDarkMode, isColorblindMode); 
-  
   const l = useCallback((fr, en) => language === "en" ? en : fr, [language]);
   
   const dateJourFormat = useMemo(() => {
@@ -119,7 +116,6 @@ function MainApp() {
   const [authChecked, setAuthChecked] = useState(false);
   const [currentUid, setCurrentUid] = useState(null); 
   const [userProfile, setUserProfile] = useState(null); 
-  
   const [viewAs, setViewAs] = useState("superadmin");
 
   const effectiveProfile = useMemo(() => {
@@ -136,12 +132,8 @@ function MainApp() {
   const [activeTab, setActiveTab] = useState("dashboard");
 
   useEffect(() => {
-    if (viewAs === "user" && ["tour_controle", "equipe", "organigramme"].includes(activeTab)) {
-      setActiveTab("dashboard");
-    }
-    if (viewAs === "admin" && activeTab === "tour_controle") {
-      setActiveTab("dashboard");
-    }
+    if (viewAs === "user" && ["tour_controle", "equipe", "organigramme"].includes(activeTab)) { setActiveTab("dashboard"); }
+    if (viewAs === "admin" && activeTab === "tour_controle") { setActiveTab("dashboard"); }
   }, [viewAs, activeTab]);
 
   const [filterStatut, setFilterStatut] = useState("tous");
@@ -156,10 +148,8 @@ function MainApp() {
   const [newMember, setNewMember] = useState({ email: "", pwd: "", role: "user", ifsi: "" });
   const [isCreatingUser, setIsCreatingUser] = useState(false);
   const [pwdUpdate, setPwdUpdate] = useState({ p1: "", p2: "", loading: false, error: "", success: "" });
-  
   const [teamSearchTerm, setTeamSearchTerm] = useState("");
   const [teamSortConfig, setTeamSortConfig] = useState({ key: "email", direction: "asc" });
-  
   const [tourSort, setTourSort] = useState("urgence");
   const [auditModal, setAuditModal] = useState({ show: false, name: "", date: "" });
 
@@ -174,15 +164,9 @@ function MainApp() {
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
-        setIsLoggedIn(true);
-        setCurrentUid(user.uid);
-        if (!user.emailVerified) { setActiveTab("validation_requise"); } 
-        else { setActiveTab("dashboard"); }
-      } else { 
-        setIsLoggedIn(false); 
-        setCurrentUid(null);
-        setUserProfile(null);
-      }
+        setIsLoggedIn(true); setCurrentUid(user.uid);
+        if (!user.emailVerified) { setActiveTab("validation_requise"); } else { setActiveTab("dashboard"); }
+      } else { setIsLoggedIn(false); setCurrentUid(null); setUserProfile(null); }
       setAuthChecked(true);
     });
     return () => unsubscribe();
@@ -266,9 +250,7 @@ function MainApp() {
   const getRoleColor = useCallback((roleName) => { 
     if (!roleName) return ROLE_PALETTE[0];
     let idx = orgRoleColors[roleName];
-    if (idx === undefined) {
-      idx = (ifsiData?.roles || []).indexOf(roleName); 
-    }
+    if (idx === undefined) { idx = (ifsiData?.roles || []).indexOf(roleName); }
     return ROLE_PALETTE[idx % ROLE_PALETTE.length] || ROLE_PALETTE[5]; 
   }, [ifsiData, orgRoleColors, t]);
 
@@ -287,36 +269,20 @@ function MainApp() {
 
   const allIfsiMembers = useMemo(() => [
     ...orgAccounts.map(u => ({ 
-      id: u.id, 
-      prenom: u.prenom || (u.email ? u.email.split('@')[0].split('.')[0] : "Utilisateur"), 
+      id: u.id, prenom: u.prenom || (u.email ? u.email.split('@')[0].split('.')[0] : "Utilisateur"), 
       nom: u.nom || (u.email && u.email.includes('.') ? u.email.split('@')[0].split('.')[1] : ""), 
       name: u.name || (u.email ? u.email.split('@')[0] : "Utilisateur"), 
-      roles: u.orgRoles || [], 
-      jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
-      tags: Array.isArray(u.tags) ? u.tags : [], 
-      orgLevel: u.orgLevel || null,
-      type: 'account', 
-      email: u.email,
-      phone: u.phone || "",
-      status: u.status || "ACTIF",
-      archived: u.archived || false
+      roles: u.orgRoles || [], jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
+      tags: Array.isArray(u.tags) ? u.tags : [], orgLevel: u.orgLevel || null, type: 'account', email: u.email, phone: u.phone || "",
+      status: u.status || "ACTIF", archived: u.archived || false
     })),
     ...manualUsers.map(u => {
       const parts = (u.name || "Membre Inconnu").trim().split(' ');
       return { 
-        id: u.id, 
-        prenom: u.prenom || parts[0] || "Membre", 
-        nom: u.nom || parts.slice(1).join(' ') || "", 
-        name: u.name || "Membre", 
-        roles: u.roles || [], 
-        jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
-        tags: Array.isArray(u.tags) ? u.tags : [], 
-        orgLevel: u.orgLevel || null,
-        type: 'manual',
-        email: u.email || "",
-        phone: u.phone || "",
-        status: u.status || "ACTIF",
-        archived: u.archived || false
+        id: u.id, prenom: u.prenom || parts[0] || "Membre", nom: u.nom || parts.slice(1).join(' ') || "", name: u.name || "Membre", 
+        roles: u.roles || [], jobTitles: Array.isArray(u.jobTitles) ? u.jobTitles : (u.jobTitle ? [u.jobTitle] : []),
+        tags: Array.isArray(u.tags) ? u.tags : [], orgLevel: u.orgLevel || null, type: 'manual', email: u.email || "", phone: u.phone || "",
+        status: u.status || "ACTIF", archived: u.archived || false
       };
     })
   ].sort((a,b) => (a.prenom||"").localeCompare(b.prenom||"")), [orgAccounts, manualUsers]);
@@ -332,16 +298,14 @@ function MainApp() {
     return {
       stats: { total, conforme: criteres.filter(c => c.statut === "conforme").length, enCours: criteres.filter(c => c.statut === "en-cours").length, nonConforme: criteres.filter(c => c.statut === "non-conforme").length, nonEvalue: criteres.filter(c => c.statut === "non-evalue").length, nonConcerne: criteres.filter(c => c.statut === "non-concerne").length },
       urgents: criteres.filter(c => days(c.delai) <= 30 && c.statut !== "conforme" && c.statut !== "non-concerne").sort((a,b) => days(a.delai) - days(b.delai)),
-      filtered: filt,
-      axes: criteres.filter(c => ["non-conforme", "en-cours"].includes(c.statut)).sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]))
+      filtered: filt, axes: criteres.filter(c => ["non-conforme", "en-cours"].includes(c.statut)).sort((a, b) => ({"non-conforme":0,"en-cours":1}[a.statut] - {"non-conforme":0,"en-cours":1}[b.statut]))
     };
   }, [criteres, filterStatut, filterCritere, searchTerm]);
 
   const sortedTeamUsers = useMemo(() => teamUsers.filter(u => u.role !== "superadmin" || effectiveProfile?.role === "superadmin"), [teamUsers, effectiveProfile]);
   
   const handleSortTeam = (key) => { 
-    let direction = "asc"; 
-    if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; 
+    let direction = "asc"; if (teamSortConfig.key === key && teamSortConfig.direction === "asc") direction = "desc"; 
     setTeamSortConfig({ key, direction }); 
   };
   
@@ -353,9 +317,7 @@ function MainApp() {
         const id = nom.trim().toLowerCase().replace(/[^a-z0-9]/g, '_') + '_' + Math.floor(Math.random() * 1000); 
         await setDoc(doc(db, "etablissements", id), { name: nom.trim(), roles: DEFAULT_ROLES, jobTitles: DEFAULT_JOB_TITLES, tags: DEFAULT_TAGS, roleColors: {}, archived: false }); 
         setSelectedIfsi(id); 
-      } else {
-        setSelectedIfsi(null); setTimeout(() => setSelectedIfsi(selectedIfsi), 0);
-      }
+      } else { setSelectedIfsi(null); setTimeout(() => setSelectedIfsi(selectedIfsi), 0); }
     } else { setSelectedIfsi(val); } 
   };
 
@@ -408,9 +370,7 @@ function MainApp() {
     if (prompt(`⚠️ ATTENTION ACTION IRRÉVERSIBLE !\nTapez "SUPPRIMER" pour détruire définitivement l'audit "${camp.name}".`) === "SUPPRIMER") {
       const newCampaigns = campaigns.filter(c => c.id !== campaignId);
       saveData(newCampaigns);
-      if (activeCampaignId === campaignId) {
-        setActiveCampaignId(newCampaigns[newCampaigns.length - 1]?.id || null);
-      }
+      if (activeCampaignId === campaignId) { setActiveCampaignId(newCampaigns[newCampaigns.length - 1]?.id || null); }
     }
   };
 
@@ -446,18 +406,16 @@ function MainApp() {
   };
 
   const handleUpdateUserDetail = async (memberId, type, updates) => {
-    if (type === 'account') {
-      await setDoc(doc(db, "users", memberId), updates, { merge: true });
-    } else if (type === 'manual') {
+    if (type === 'account') { await setDoc(doc(db, "users", memberId), updates, { merge: true }); } 
+    else if (type === 'manual') {
       const updatedManuals = manualUsers.map(u => u.id === memberId ? { ...u, ...updates } : u);
       await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true });
     }
   };
 
   const handleHardDeleteMember = async (memberId, type) => {
-    if (type === 'account') {
-      await deleteDoc(doc(db, "users", memberId));
-    } else if (type === 'manual') {
+    if (type === 'account') { await deleteDoc(doc(db, "users", memberId)); } 
+    else if (type === 'manual') {
       const updatedManuals = manualUsers.filter(u => u.id !== memberId);
       await setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: updatedManuals }, { merge: true });
     }
@@ -465,17 +423,10 @@ function MainApp() {
 
   const handleAddManualUser = (userData) => {
     const newUser = { 
-      id: 'm_' + Date.now(), 
-      prenom: userData.prenom.trim(), 
-      nom: userData.nom.toUpperCase().trim(), 
-      name: `${userData.prenom.trim()} ${userData.nom.toUpperCase().trim()}`, 
-      roles: userData.roles || [], 
-      status: "ACTIF", 
-      jobTitles: userData.jobTitles || [],
-      tags: userData.tags || [],
-      email: userData.email || "",
-      phone: userData.phone || "",
-      orgLevel: 3 
+      id: 'm_' + Date.now(), prenom: userData.prenom.trim(), nom: userData.nom.toUpperCase().trim(), 
+      name: `${userData.prenom.trim()} ${userData.nom.toUpperCase().trim()}`, roles: userData.roles || [], 
+      status: "ACTIF", jobTitles: userData.jobTitles || [], tags: userData.tags || [],
+      email: userData.email || "", phone: userData.phone || "", orgLevel: 3 
     };
     setDoc(doc(db, "etablissements", selectedIfsi), { manualUsers: [...manualUsers, newUser] }, { merge: true });
   };
@@ -487,48 +438,28 @@ function MainApp() {
     const data = snap.data();
     
     if (type === 'roleColor') {
-       const newRoleColors = { ...(data.roleColors || {}) };
-       newRoleColors[oldVal] = newVal; 
-       await setDoc(docRef, { roleColors: newRoleColors }, { merge: true });
-       return;
+       const newRoleColors = { ...(data.roleColors || {}) }; newRoleColors[oldVal] = newVal; 
+       await setDoc(docRef, { roleColors: newRoleColors }, { merge: true }); return;
     }
 
-    let arr = type === 'role' ? (data.roles || DEFAULT_ROLES) : 
-              type === 'jobTitle' ? (data.jobTitles || DEFAULT_JOB_TITLES) : 
-              (data.tags || DEFAULT_TAGS);
-              
-    let mUsers = data.manualUsers || [];
-    let updates = { manualUsers: mUsers };
+    let arr = type === 'role' ? (data.roles || DEFAULT_ROLES) : type === 'jobTitle' ? (data.jobTitles || DEFAULT_JOB_TITLES) : (data.tags || DEFAULT_TAGS);
+    let mUsers = data.manualUsers || []; let updates = { manualUsers: mUsers };
 
-    if (action === 'add') {
-        if (!newVal || arr.includes(newVal)) return;
-        arr.push(newVal);
-    } else if (action === 'edit') {
-        if (!newVal || arr.includes(newVal)) return;
-        arr = arr.map(x => x === oldVal ? newVal : x);
-        
+    if (action === 'add') { if (!newVal || arr.includes(newVal)) return; arr.push(newVal); } 
+    else if (action === 'edit') {
+        if (!newVal || arr.includes(newVal)) return; arr = arr.map(x => x === oldVal ? newVal : x);
         if (type === 'role') {
             mUsers = mUsers.map(u => ({...u, roles: (u.roles||[]).map(r => r === oldVal ? newVal : r)}));
             const newRoleColors = { ...(data.roleColors || {}) };
-            if (newRoleColors[oldVal] !== undefined) {
-               newRoleColors[newVal] = newRoleColors[oldVal];
-               delete newRoleColors[oldVal];
-               updates.roleColors = newRoleColors;
-            }
+            if (newRoleColors[oldVal] !== undefined) { newRoleColors[newVal] = newRoleColors[oldVal]; delete newRoleColors[oldVal]; updates.roleColors = newRoleColors; }
         }
         else if (type === 'jobTitle') mUsers = mUsers.map(u => ({...u, jobTitles: (u.jobTitles||[]).map(j => j === oldVal ? newVal : j)}));
         else if (type === 'tag') mUsers = mUsers.map(u => ({...u, tags: (u.tags||[]).map(t => t === oldVal ? newVal : t)}));
         
         orgAccounts.forEach(async (user) => {
-           if (type === 'role' && user.orgRoles?.includes(oldVal)) {
-               await setDoc(doc(db, "users", user.id), { orgRoles: user.orgRoles.map(r => r === oldVal ? newVal : r) }, { merge: true });
-           }
-           if (type === 'jobTitle' && user.jobTitles?.includes(oldVal)) {
-               await setDoc(doc(db, "users", user.id), { jobTitles: user.jobTitles.map(j => j === oldVal ? newVal : j) }, { merge: true });
-           }
-           if (type === 'tag' && user.tags?.includes(oldVal)) {
-               await setDoc(doc(db, "users", user.id), { tags: user.tags.map(t => t === oldVal ? newVal : t) }, { merge: true });
-           }
+           if (type === 'role' && user.orgRoles?.includes(oldVal)) { await setDoc(doc(db, "users", user.id), { orgRoles: user.orgRoles.map(r => r === oldVal ? newVal : r) }, { merge: true }); }
+           if (type === 'jobTitle' && user.jobTitles?.includes(oldVal)) { await setDoc(doc(db, "users", user.id), { jobTitles: user.jobTitles.map(j => j === oldVal ? newVal : j) }, { merge: true }); }
+           if (type === 'tag' && user.tags?.includes(oldVal)) { await setDoc(doc(db, "users", user.id), { tags: user.tags.map(t => t === oldVal ? newVal : t) }, { merge: true }); }
         });
     } else if (action === 'delete') {
         arr = arr.filter(x => x !== oldVal);
@@ -537,28 +468,17 @@ function MainApp() {
         else if (type === 'tag') mUsers = mUsers.map(u => ({...u, tags: (u.tags||[]).filter(t => t !== oldVal)}));
         
         orgAccounts.forEach(async (user) => {
-           if (type === 'role' && user.orgRoles?.includes(oldVal)) {
-               await setDoc(doc(db, "users", user.id), { orgRoles: user.orgRoles.filter(r => r !== oldVal) }, { merge: true });
-           }
-           if (type === 'jobTitle' && user.jobTitles?.includes(oldVal)) {
-               await setDoc(doc(db, "users", user.id), { jobTitles: user.jobTitles.filter(j => j !== oldVal) }, { merge: true });
-           }
-           if (type === 'tag' && user.tags?.includes(oldVal)) {
-               await setDoc(doc(db, "users", user.id), { tags: user.tags.filter(t => t !== oldVal) }, { merge: true });
-           }
+           if (type === 'role' && user.orgRoles?.includes(oldVal)) { await setDoc(doc(db, "users", user.id), { orgRoles: user.orgRoles.filter(r => r !== oldVal) }, { merge: true }); }
+           if (type === 'jobTitle' && user.jobTitles?.includes(oldVal)) { await setDoc(doc(db, "users", user.id), { jobTitles: user.jobTitles.filter(j => j !== oldVal) }, { merge: true }); }
+           if (type === 'tag' && user.tags?.includes(oldVal)) { await setDoc(doc(db, "users", user.id), { tags: user.tags.filter(t => t !== oldVal) }, { merge: true }); }
         });
     }
 
-    if (type === 'role') updates.roles = arr;
-    else if (type === 'jobTitle') updates.jobTitles = arr;
-    else if (type === 'tag') updates.tags = arr;
-
+    if (type === 'role') updates.roles = arr; else if (type === 'jobTitle') updates.jobTitles = arr; else if (type === 'tag') updates.tags = arr;
     await setDoc(docRef, updates, { merge: true });
   };
 
-  const handleUpdateConnections = async (newConns) => {
-    await setDoc(doc(db, "etablissements", selectedIfsi), { orgConnections: newConns }, { merge: true });
-  };
+  const handleUpdateConnections = async (newConns) => { await setDoc(doc(db, "etablissements", selectedIfsi), { orgConnections: newConns }, { merge: true }); };
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
@@ -574,12 +494,9 @@ function MainApp() {
       <button 
         onClick={() => { setActiveTab(id); setSearchTerm(""); setFilterStatut("tous"); setFilterCritere("tous"); }} 
         style={{ 
-          width: "100%", display: "block", padding: "10px 16px", 
-          background: act ? "rgba(212,160,48,0.08)" : "transparent", 
-          color: act ? t.textNav : t.textNavSub, 
-          border: act ? `1px solid rgba(212,160,48,0.5)` : "1px solid transparent", 
-          boxShadow: act ? `0 0 10px rgba(212,160,48,0.1)` : "none",
-          borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", 
+          width: "100%", display: "block", padding: "10px 16px", background: act ? "rgba(212,160,48,0.08)" : "transparent", 
+          color: act ? t.textNav : t.textNavSub, border: act ? `1px solid rgba(212,160,48,0.5)` : "1px solid transparent", 
+          boxShadow: act ? `0 0 10px rgba(212,160,48,0.1)` : "none", borderRadius: "8px", fontSize: "13px", fontWeight: act ? "700" : "500", 
           cursor: "pointer", transition: "all 0.2s", textAlign: "left", marginBottom: "4px" 
         }}
       >
@@ -588,19 +505,16 @@ function MainApp() {
     );
   };
 
-  const userInitials = (userProfile?.prenom || userProfile?.nom) 
-    ? `${(userProfile.prenom || "")[0] || ""}${(userProfile.nom || "")[0] || ""}`.toUpperCase()
-    : (auth.currentUser?.email?.charAt(0).toUpperCase() || "?");
-
-  const userNameDisplay = (userProfile?.prenom || userProfile?.nom)
-    ? `${userProfile.prenom || ""} ${userProfile.nom || ""}`.trim() 
-    : auth.currentUser?.email?.split('@')[0];
-
+  const userInitials = (userProfile?.prenom || userProfile?.nom) ? `${(userProfile.prenom || "")[0] || ""}${(userProfile.nom || "")[0] || ""}`.toUpperCase() : (auth.currentUser?.email?.charAt(0).toUpperCase() || "?");
+  const userNameDisplay = (userProfile?.prenom || userProfile?.nom) ? `${userProfile.prenom || ""} ${userProfile.nom || ""}`.trim() : auth.currentUser?.email?.split('@')[0];
   const userJobDisplay = userProfile?.jobTitles?.[0] || l("Mon profil ⚙️", "My profile ⚙️");
   const userAvatarColor = userProfile?.avatarColor || t.accent;
 
+  // 🎯 GESTION DU ZOOM DYNAMIQUE SUR TOUTE L'APP
+  const zoomStyle = uiZoom === "110%" ? { zoom: 1.1 } : uiZoom === "125%" ? { zoom: 1.25 } : { zoom: 1 };
+
   return (
-    <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif", position: "relative" }}>
+    <div style={{ display: "flex", minHeight: "100vh", background: t.bg, color: t.text, fontFamily: "'Albert Sans', sans-serif", position: "relative", ...zoomStyle }}>
       <link href={GFONT} rel="stylesheet" />
       <style>{`
         html, body, #root { margin: 0; padding: 0; min-height: 100vh; background: ${t.bg}; }
@@ -620,10 +534,7 @@ function MainApp() {
         <div style={{ position:"fixed", inset:0, background:"rgba(0,0,0,0.8)", zIndex:9999, display:"flex", alignItems:"center", justifyContent:"center", backdropFilter:"blur(4px)" }}>
           <div className="animate-fade-in" style={{ background:t.surface, border:`1px solid ${t.border}`, borderRadius:"16px", padding:"32px", width:"420px", boxShadow:t.shadowLg }}>
             <h3 style={{ fontFamily:"'Instrument Serif',serif", fontSize:"32px", color:t.text, margin:"0 0 8px 0" }}>{l("Nouvel Audit", "New Audit")}</h3>
-            <p style={{ fontSize:"13px", color:t.text2, marginBottom:"24px", lineHeight:"1.5" }}>
-              {l("Préparez un nouveau cycle d'évaluation. Tous les indicateurs seront réinitialisés pour cette campagne.", "Prepare a new evaluation cycle. All indicators will be reset for this campaign.")}
-            </p>
-            
+            <p style={{ fontSize:"13px", color:t.text2, marginBottom:"24px", lineHeight:"1.5" }}>{l("Préparez un nouveau cycle d'évaluation. Tous les indicateurs seront réinitialisés pour cette campagne.", "Prepare a new evaluation cycle. All indicators will be reset for this campaign.")}</p>
             <div style={{ marginBottom:"16px" }}>
               <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>{l("Nom de l'audit", "Audit Name")}</label>
               <input type="text" value={auditModal.name} onChange={e=>setAuditModal({...auditModal, name:e.target.value})} placeholder={l("Ex: Audit de renouvellement 2028", "Ex: Renewal Audit 2028")} style={{ width:"100%", padding:"12px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontFamily:"inherit" }} />
@@ -632,7 +543,6 @@ function MainApp() {
               <label style={{ display:"block", fontSize:"11px", fontWeight:"700", color:t.text3, textTransform:"uppercase", letterSpacing:"1px", marginBottom:"8px" }}>{l("Date d'évaluation prévue", "Planned evaluation date")}</label>
               <input type="date" value={auditModal.date} onChange={e=>setAuditModal({...auditModal, date:e.target.value})} style={{ width:"100%", padding:"12px 16px", borderRadius:"8px", border:`1px solid ${t.border}`, background:t.surface2, color:t.text, outline:"none", fontSize:"14px", fontFamily:"inherit", colorScheme:isDarkMode?"dark":"light" }} />
             </div>
-            
             <div style={{ display:"flex", justifyContent:"flex-end", gap:"12px" }}>
               <button onClick={()=>setAuditModal({show:false, name:"", date:""})} style={{ padding:"12px 20px", borderRadius:"8px", border:"none", background:"transparent", color:t.text2, fontWeight:"600", cursor:"pointer", fontSize:"13px" }}>{l("Annuler", "Cancel")}</button>
               <button onClick={submitAuditModal} style={{ padding:"12px 24px", borderRadius:"8px", border:"none", background:t.accent, color:"white", fontWeight:"700", cursor:"pointer", boxShadow:`0 4px 12px ${t.accentBd}`, fontSize:"13px" }}>{l("Créer l'audit vierge", "Create blank audit")}</button>
@@ -643,18 +553,7 @@ function MainApp() {
 
       {modalCritere && (
         <DetailModal 
-          critere={modalCritere} 
-          onClose={() => setModalCritere(null)} 
-          onSave={saveModal} 
-          onAutoSave={handleAutoSave} 
-          saveData={saveData} 
-          isReadOnly={isArchive} 
-          isAuditMode={isAuditMode} 
-          allMembers={allIfsiMembers} 
-          rolePalette={ROLE_PALETTE} 
-          orgRoles={orgRoles} 
-          hasPrev={hasPrev} 
-          hasNext={hasNext} 
+          critere={modalCritere} onClose={() => setModalCritere(null)} onSave={saveModal} onAutoSave={handleAutoSave} saveData={saveData} isReadOnly={isArchive} isAuditMode={isAuditMode} allMembers={allIfsiMembers} rolePalette={ROLE_PALETTE} orgRoles={orgRoles} hasPrev={hasPrev} hasNext={hasNext} 
         />
       )}
 
@@ -667,30 +566,16 @@ function MainApp() {
           </div>
           <div>
             <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.textNav, letterSpacing:"0.2px", lineHeight:1 }}>QualiForma</div>
-            <div style={{ fontSize:"9px", color: userProfile?.role === "superadmin" ? t.gold : t.textNavSub, letterSpacing:"1px", textTransform:"uppercase", marginTop:"4px", fontWeight: userProfile?.role === "superadmin" ? "800" : "500" }}>
-               {userProfile?.role === "superadmin" ? "Console SuperAdmin" : "Pilotage Qualiopi"}
-            </div>
+            <div style={{ fontSize:"9px", color: userProfile?.role === "superadmin" ? t.gold : t.textNavSub, letterSpacing:"1px", textTransform:"uppercase", marginTop:"4px", fontWeight: userProfile?.role === "superadmin" ? "800" : "500" }}>{userProfile?.role === "superadmin" ? "Console SuperAdmin" : "Pilotage Qualiopi"}</div>
           </div>
         </div>
 
-        <div style={{ padding:"0 20px 15px", fontSize:"12px", color:t.textNavSub, textTransform:"capitalize", fontWeight:"500", borderBottom: userProfile?.role !== "superadmin" ? `1px solid ${t.borderNav}` : "none" }}>
-          {dateJourFormat}
-        </div>
+        <div style={{ padding:"0 20px 15px", fontSize:"12px", color:t.textNavSub, textTransform:"capitalize", fontWeight:"500", borderBottom: userProfile?.role !== "superadmin" ? `1px solid ${t.borderNav}` : "none" }}>{dateJourFormat}</div>
 
         {userProfile?.role === "superadmin" && (
           <div style={{ padding: "0 20px 15px", borderBottom:`1px solid ${t.borderNav}` }}>
             <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", marginBottom: "8px" }}>👁️ Vue (Simulation)</div>
-            <select
-              value={viewAs}
-              onChange={(e) => setViewAs(e.target.value)}
-              style={{
-                width: "100%", padding: "8px 10px", borderRadius: "8px", cursor: "pointer",
-                background: viewAs === "superadmin" ? "rgba(212,160,48,0.15)" : "rgba(255,255,255,0.05)",
-                border: viewAs === "superadmin" ? `1px solid ${t.goldBd}` : `1px solid rgba(255,255,255,0.1)`,
-                color: viewAs === "superadmin" ? t.gold : t.textNav,
-                fontSize: "12px", fontWeight: "700", outline: "none", transition: "all 0.2s"
-              }}
-            >
+            <select value={viewAs} onChange={(e) => setViewAs(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: "8px", cursor: "pointer", background: viewAs === "superadmin" ? "rgba(212,160,48,0.15)" : "rgba(255,255,255,0.05)", border: viewAs === "superadmin" ? `1px solid ${t.goldBd}` : `1px solid rgba(255,255,255,0.1)`, color: viewAs === "superadmin" ? t.gold : t.textNav, fontSize: "12px", fontWeight: "700", outline: "none", transition: "all 0.2s" }}>
               <option value="superadmin" style={{ color: "black" }}>👑 Super Admin</option>
               <option value="admin" style={{ color: "black" }}>⚙️ Admin IFSI</option>
               <option value="user" style={{ color: "black" }}>👤 Utilisateur</option>
@@ -706,28 +591,18 @@ function MainApp() {
                <option value="NEW" style={{ color:"black" }}>{l("+ Nouvel établissement", "+ New facility")}</option>
              </select>
           ) : (
-            <div style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, color:t.textNav, fontSize:"13px", fontWeight:"600" }}>
-              {currentIfsiName || "..."}
-            </div>
+            <div style={{ padding:"10px 12px", borderRadius:"8px", background:"rgba(255,255,255,0.05)", border:`1px solid rgba(255,255,255,0.1)`, color:t.textNav, fontSize:"13px", fontWeight:"600" }}>{currentIfsiName || "..."}</div>
           )}
         </div>
 
         <div style={{ margin:"0 16px 20px", padding:"16px", background:t.goldBg, border:`1px solid ${t.goldBd}`, borderRadius:"12px" }}>
           <div style={{ display:"flex", justifyContent:"space-between", alignItems:"center", marginBottom:"10px" }}>
             <div style={{ fontSize:"9px", fontWeight:"800", color:t.gold, textTransform:"uppercase", letterSpacing:"1px" }}>{l("Prochain audit", "Next audit")}</div>
-            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#ffffff" }}>
-               {days(currentAuditDate) < 0 ? l("Dépassé", "Overdue") : `J‑${days(currentAuditDate)}`}
-            </div>
+            <div style={{ background:t.gold, borderRadius:"6px", padding:"2px 8px", fontSize:"11px", fontWeight:"800", color:"#ffffff" }}>{days(currentAuditDate) < 0 ? l("Dépassé", "Overdue") : `J‑${days(currentAuditDate)}`}</div>
           </div>
-          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color: isDarkMode ? "#ffffff" : "#162040", letterSpacing:"-0.2px", marginBottom:"12px" }}>
-            {new Date(currentAuditDate).toLocaleDateString(language === 'en' ? 'en-US' : 'fr-FR', {day:'numeric', month:'long', year:'numeric'})}
-          </div>
-          <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}>
-            <div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #f0c060)`, borderRadius:"3px" }}/>
-          </div>
-          <div style={{ display:"flex", justifyContent:"space-between" }}>
-            <span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% {l("conforme", "compliant")}</span>
-          </div>
+          <div style={{ fontFamily:"'Instrument Serif',serif", fontSize:"18px", color: isDarkMode ? "#ffffff" : "#162040", letterSpacing:"-0.2px", marginBottom:"12px" }}>{new Date(currentAuditDate).toLocaleDateString(language === 'en' ? 'en-US' : 'fr-FR', {day:'numeric', month:'long', year:'numeric'})}</div>
+          <div style={{ height:"5px", background:"rgba(212,160,48,0.15)", borderRadius:"3px", marginBottom:"6px" }}><div style={{ width:`${pctGlobal}%`, height:"100%", background:`linear-gradient(90deg, ${t.gold}, #f0c060)`, borderRadius:"3px" }}/></div>
+          <div style={{ display:"flex", justifyContent:"space-between" }}><span style={{ fontSize:"11px", color:t.gold, fontWeight:"800" }}>{pctGlobal}% {l("conforme", "compliant")}</span></div>
         </div>
 
         <div style={{ flex: 1, overflowY: "auto", padding: "0 12px 20px" }}>
@@ -735,9 +610,7 @@ function MainApp() {
           {menuBtn("dashboard", "Tableau de bord", "Dashboard")}
           {menuBtn("criteres", "Indicateurs", "Indicators")}
           {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("organigramme", "Organigramme", "Organization Chart")}
-          
           <div style={{ margin:"16px 12px", height:"1px", background:t.borderNav }}/>
-          
           <div style={{ fontSize: "10px", fontWeight: "700", color: t.textNavSub, textTransform: "uppercase", letterSpacing: "1px", padding: "0 12px 10px" }}>{l("Outils", "Tools")}</div>
           {menuBtn("livre_blanc", "Livre Blanc", "White Paper")}
           {(effectiveProfile?.role === "admin" || effectiveProfile?.role === "superadmin") && menuBtn("equipe", "Administration", "Administration")}
@@ -746,9 +619,7 @@ function MainApp() {
 
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
           <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="translateX(4px)"} onMouseOut={e=>e.currentTarget.style.transform="translateX(0)"}>
-            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: userAvatarColor, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:"14px", fontWeight:"800", flexShrink:0, boxShadow:`0 2px 8px ${userAvatarColor}60` }}>
-              {userInitials}
-            </div>
+            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: userAvatarColor, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:"14px", fontWeight:"800", flexShrink:0, boxShadow:`0 2px 8px ${userAvatarColor}60` }}>{userInitials}</div>
             <div style={{ overflow: "hidden" }}>
               <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{userNameDisplay}</div>
               <div style={{ fontSize: "11px", color: t.textNavSub, marginTop:"2px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow:"hidden" }}>{userJobDisplay}</div>
@@ -763,14 +634,7 @@ function MainApp() {
         <div className="no-print" style={{ height:"60px", background:t.surface, borderBottom:`1px solid ${t.border}`, display:"flex", alignItems:"center", justifyContent:"space-between", padding:"0 32px", flexShrink:0, boxShadow:t.shadowSm }}>
           <div style={{ display:"flex", alignItems:"center", gap:"10px" }}>
             <span style={{ fontFamily:"'Instrument Serif',serif", fontSize:"20px", color:t.text, textTransform:"capitalize" }}>
-              {activeTab === 'dashboard' ? l('Tableau de bord', 'Dashboard') : 
-               activeTab === 'livre_blanc' ? l('Livre Blanc', 'White Paper') :
-               activeTab === 'tour_controle' ? l('Tour de Contrôle', 'Control Tower') :
-               activeTab === 'criteres' ? l('Indicateurs', 'Indicators') :
-               activeTab === 'equipe' ? l('Administration', 'Administration') :
-               activeTab === 'compte' ? l('Mon compte', 'My Account') :
-               activeTab === 'organigramme' ? l('Organigramme', 'Organization Chart') :
-               activeTab.replace('_', ' ')}
+              {activeTab === 'dashboard' ? l('Tableau de bord', 'Dashboard') : activeTab === 'livre_blanc' ? l('Livre Blanc', 'White Paper') : activeTab === 'tour_controle' ? l('Tour de Contrôle', 'Control Tower') : activeTab === 'criteres' ? l('Indicateurs', 'Indicators') : activeTab === 'equipe' ? l('Administration', 'Administration') : activeTab === 'compte' ? l('Mon compte', 'My Account') : activeTab === 'organigramme' ? l('Organigramme', 'Organization Chart') : activeTab.replace('_', ' ')}
             </span>
             <span style={{ fontSize:"12px", color:t.text3 }}>{currentIfsiName ? `· ${currentIfsiName}` : ""}</span>
           </div>
@@ -783,16 +647,17 @@ function MainApp() {
 
         <div className="animate-fade-in" style={{ flex: 1, padding: "32px", boxSizing: "border-box", maxWidth: "1400px", margin: "0 auto", width: "100%" }}>
           {activeTab === "dashboard" && campaigns && <DashboardTab campaigns={campaigns} activeCampaignId={activeCampaignId} setActiveCampaignId={setActiveCampaignId} currentAuditDate={currentAuditDate} stats={stats} urgents={urgents} criteres={criteres} axes={axes} setModalCritere={setModalCritere} userProfile={effectiveProfile} handleEditAuditDate={handleEditAuditDate} handleCreateCampaign={() => setAuditModal({show:true, name:"", date:""})} handleAutoSave={handleAutoSave} handleArchiveCampaign={handleArchiveCampaign} handleDeleteCampaign={handleDeleteCampaign} t={t} />}
-          {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} t={t} />}
+          {activeTab === "tour_controle" && <TourControleTab globalScore={tourData.score} activeIfsis={tourData.active} topAlerts={tourData.alerts} sortedTourIfsis={sortedTourIfsis} setSelectedIfsi={setSelectedIfsi} archivedIfsis={tourData.archived} handleArchiveIfsi={handleArchiveIfsi} handleHardDeleteIfsi={handleHardDeleteIfsi} handleRenameIfsi={handleRenameIfsi} setActiveTab={setActiveTab} tourSort={tourSort} setTourSort={setTourSort} language={language} t={t} />}
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={effectiveProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} handleHardDeleteMember={handleHardDeleteMember} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} isColorblindMode={isColorblindMode} t={t} />}
           {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
-          {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} t={t} />}
+          {/* 💎 COMPTETAB REÇOIT L'UI ZOOM ! */}
+          {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} uiZoom={uiZoom} setUiZoom={setUiZoom} t={t} />}
         </div>
       </main>
     </div>
   );
 }
 
-export default function App() { return <ErrorBoundary><MainApp /></ErrorBoundary>; }
+export default App;
