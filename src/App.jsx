@@ -11,7 +11,7 @@ import LivreBlancTab from "./components/LivreBlancTab";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
 import { db, auth, storage, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -163,7 +163,7 @@ function MainApp() {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
       if (user) {
         setIsLoggedIn(true); setCurrentUid(user.uid);
-        if (!user.emailVerified) { setActiveTab("validation_requise"); } else { setActiveTab("dashboard"); }
+        setActiveTab("dashboard");
       } else { setIsLoggedIn(false); setCurrentUid(null); setUserProfile(null); }
       setAuthChecked(true);
     });
@@ -204,7 +204,7 @@ function MainApp() {
   }, [selectedIfsi, userProfile]);
 
   useEffect(() => {
-    if (!selectedIfsi || !userProfile || userProfile.mustChangePassword || !auth.currentUser?.emailVerified) return;
+    if (!selectedIfsi || !userProfile || userProfile.mustChangePassword) return;
     setCampaigns(null);
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     const unsub = onSnapshot(doc(db, "qualiopi", docId), (snap) => {
@@ -480,7 +480,6 @@ function MainApp() {
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
-  if (activeTab === "validation_requise") return <div style={{ minHeight: "100vh", background: t.bg, color: t.text, display: "flex", justifyContent: "center", alignItems: "center" }}>Vérification Email Requise</div>;
   if (userProfile?.mustChangePassword) return <div style={{ minHeight: "100vh", background: t.bg, color: t.text, display: "flex", justifyContent: "center", alignItems: "center" }}>Veuillez changer votre mot de passe.</div>;
 
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
