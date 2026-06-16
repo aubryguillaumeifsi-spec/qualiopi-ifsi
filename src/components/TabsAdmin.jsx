@@ -155,7 +155,7 @@ export function EquipeTab({
   // Props existants (inchangés depuis App.jsx)
   userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser,
   selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm,
-  sortedTeamUsers, handleDeleteUser, handleSendResetEmail, t,
+  sortedTeamUsers, handleDeleteUser, handleReactivateUser, handleSendResetEmail, t,
   // Nouveaux props (à ajouter dans App.jsx — voir header)
   ifsiData, handleSaveEtab,
   isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode,
@@ -343,7 +343,7 @@ export function EquipeTab({
     if (!confirmDel) return;
     setDeleting(true);
     await handleDeleteUser(confirmDel.id);
-    await writeLog(selectedIfsi, "Utilisateur supprimé", confirmDel.email, "admin");
+    await writeLog(selectedIfsi, "Accès désactivé", confirmDel.email, "admin");
     setDeleting(false);
     setConfirmDel(null);
   };
@@ -371,12 +371,12 @@ export function EquipeTab({
             padding: "28px 30px", width: "380px", boxShadow: t.shadow,
           }}>
             <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "22px", color: t.red, marginBottom: "8px" }}>
-              Révoquer l'accès
+              Désactiver l'accès
             </div>
             <div style={{ fontSize: "12px", color: t.text2, lineHeight: "1.65", marginBottom: "22px" }}>
-              Voulez-vous vraiment supprimer l'accès de&nbsp;
+              Voulez-vous désactiver l'accès de&nbsp;
               <strong style={{ color: t.text }}>{confirmDel.email}</strong>&nbsp;?
-              Cette action est irréversible.
+              L'utilisateur ne pourra plus se connecter, mais le compte est conservé et pourra être réactivé à tout moment.
             </div>
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
               <button
@@ -386,7 +386,7 @@ export function EquipeTab({
               <button
                 onClick={doDeleteUser} disabled={deleting}
                 style={{ padding: "9px 18px", background: t.red, border: "none", borderRadius: "7px", color: "white", fontSize: "12px", fontWeight: "700", cursor: "pointer", opacity: deleting ? 0.6 : 1 }}
-              >{deleting ? "Suppression…" : "Supprimer"}</button>
+              >{deleting ? "Désactivation…" : "Désactiver"}</button>
             </div>
           </div>
         </div>
@@ -598,12 +598,20 @@ export function EquipeTab({
                         onMouseOver={e => { e.currentTarget.style.borderColor = t.accentBd; e.currentTarget.style.color = t.accent; }}
                         onMouseOut={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}
                       >🔑</button>
-                      {userProfile?.role === "superadmin" && (
-                        <button
-                          onClick={() => setConfirmDel(u)}
-                          title="Supprimer l'accès"
-                          style={{ width: "26px", height: "26px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.red, display: "flex", alignItems: "center", justifyContent: "center" }}
-                        >✕</button>
+                      {userProfile?.role === "superadmin" && u.id !== userProfile?.id && (
+                        u.status === "INACTIF" ? (
+                          <button
+                            onClick={() => handleReactivateUser(u.id)}
+                            title="Réactiver l'accès"
+                            style={{ width: "26px", height: "26px", background: t.greenBg, border: `1px solid ${t.greenBd}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.green, display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >↻</button>
+                        ) : (
+                          <button
+                            onClick={() => setConfirmDel(u)}
+                            title="Désactiver l'accès"
+                            style={{ width: "26px", height: "26px", background: t.redBg, border: `1px solid ${t.redBd}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.red, display: "flex", alignItems: "center", justifyContent: "center" }}
+                          >✕</button>
+                        )
                       )}
                     </div>
                   </div>
