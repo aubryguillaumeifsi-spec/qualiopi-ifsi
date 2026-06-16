@@ -164,7 +164,7 @@ function MainApp() {
       if (user) {
         setIsLoggedIn(true); setCurrentUid(user.uid);
         setActiveTab("dashboard");
-      } else { setIsLoggedIn(false); setCurrentUid(null); setUserProfile(null); }
+      } else { setIsLoggedIn(false); setCurrentUid(null); setUserProfile(null); setSelectedIfsi(null); }
       setAuthChecked(true);
     });
     return () => unsubscribe();
@@ -182,7 +182,13 @@ function MainApp() {
           return;
         }
         setUserProfile({ id: snap.id, ...profile });
-        setSelectedIfsi(prev => prev ? prev : (profile.etablissementId || "demo_ifps_cham"));
+        // Un non-superadmin est toujours rattaché à SON établissement.
+        // Un superadmin garde l'établissement qu'il a choisi (navigation multi-IFSI).
+        if (profile.role === "superadmin") {
+          setSelectedIfsi(prev => prev ? prev : (profile.etablissementId || "demo_ifps_cham"));
+        } else {
+          setSelectedIfsi(profile.etablissementId || "demo_ifps_cham");
+        }
       }
     });
     return () => unsub();
