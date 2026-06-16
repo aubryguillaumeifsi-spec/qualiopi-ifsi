@@ -155,7 +155,7 @@ export function EquipeTab({
   // Props existants (inchangés depuis App.jsx)
   userProfile, newMember, setNewMember, isCreatingUser, handleCreateUser,
   selectedIfsi, ifsiList, teamSearchTerm, setTeamSearchTerm,
-  sortedTeamUsers, handleDeleteUser, handleReactivateUser, handleSendResetEmail, t,
+  sortedTeamUsers, handleDeleteUser, handleReactivateUser, handleChangeUserIfsi, handleSendResetEmail, t,
   // Nouveaux props (à ajouter dans App.jsx — voir header)
   ifsiData, handleSaveEtab,
   isDarkMode, setIsDarkMode, isColorblindMode, setIsColorblindMode,
@@ -167,6 +167,8 @@ export function EquipeTab({
   const [showInvite, setShowInvite]   = useState(false);
   const [confirmDel, setConfirmDel]   = useState(null); // user object à supprimer
   const [deleting, setDeleting]       = useState(false);
+  const [reassign, setReassign]       = useState(null); // user en cours de réaffectation
+  const [reassignTarget, setReassignTarget] = useState(""); // id établissement cible
 
   // ── Établissement ──────────────────────────────────
   const [etabForm, setEtabForm]   = useState(null); // initialisé quand ifsiData arrive
@@ -359,6 +361,34 @@ export function EquipeTab({
 
   return (
     <div className="animate-fade-in" style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+
+      {/* ── MODALE RÉAFFECTATION ÉTABLISSEMENT ─────────────── */}
+      {reassign && (
+        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.72)", backdropFilter: "blur(4px)", zIndex: 1000, display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <div style={{ background: t.surface, border: `1px solid ${t.border}`, borderRadius: "14px", padding: "28px 30px", width: "420px", boxShadow: t.shadow }}>
+            <div style={{ fontFamily: "'Instrument Serif',serif", fontSize: "22px", color: t.text, marginBottom: "8px" }}>
+              Changer l'établissement
+            </div>
+            <div style={{ fontSize: "12px", color: t.text2, lineHeight: "1.65", marginBottom: "18px" }}>
+              Réaffecter <strong style={{ color: t.text }}>{reassign.email}</strong> à l'établissement :
+            </div>
+            <select value={reassignTarget} onChange={e => setReassignTarget(e.target.value)}
+              style={{ width: "100%", padding: "10px 12px", borderRadius: "8px", border: `1px solid ${t.border}`, background: t.surface2, color: t.text, fontSize: "13px", marginBottom: "22px", cursor: "pointer", outline: "none" }}>
+              {ifsiList.map(i => <option key={i.id} value={i.id}>{i.name}</option>)}
+            </select>
+            <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+              <button onClick={() => setReassign(null)}
+                style={{ padding: "9px 18px", background: "transparent", border: `1px solid ${t.border}`, borderRadius: "7px", color: t.text2, fontSize: "12px", fontWeight: "600", cursor: "pointer" }}
+              >Annuler</button>
+              <button
+                onClick={async () => { await handleChangeUserIfsi(reassign.id, reassignTarget); await writeLog(selectedIfsi, "Établissement modifié", reassign.email, "admin"); setReassign(null); }}
+                disabled={!reassignTarget || reassignTarget === reassign.etablissementId}
+                style={{ padding: "9px 18px", background: t.accent, border: "none", borderRadius: "7px", color: "white", fontSize: "12px", fontWeight: "700", cursor: (!reassignTarget || reassignTarget === reassign.etablissementId) ? "not-allowed" : "pointer", opacity: (!reassignTarget || reassignTarget === reassign.etablissementId) ? 0.5 : 1 }}
+              >Valider</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── MODALE CONFIRMATION SUPPRESSION ─────────────── */}
       {confirmDel && (
@@ -598,6 +628,15 @@ export function EquipeTab({
                         onMouseOver={e => { e.currentTarget.style.borderColor = t.accentBd; e.currentTarget.style.color = t.accent; }}
                         onMouseOut={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}
                       >🔑</button>
+                      {userProfile?.role === "superadmin" && (
+                        <button
+                          onClick={() => { setReassign(u); setReassignTarget(u.etablissementId || ""); }}
+                          title="Changer d'établissement"
+                          style={{ width: "26px", height: "26px", background: t.surface2, border: `1px solid ${t.border}`, borderRadius: "6px", cursor: "pointer", fontSize: "11px", color: t.text2, display: "flex", alignItems: "center", justifyContent: "center", transition: "all 0.12s" }}
+                          onMouseOver={e => { e.currentTarget.style.borderColor = t.accentBd; e.currentTarget.style.color = t.accent; }}
+                          onMouseOut={e => { e.currentTarget.style.borderColor = t.border; e.currentTarget.style.color = t.text2; }}
+                        >🏛</button>
+                      )}
                       {userProfile?.role === "superadmin" && u.id !== userProfile?.id && (
                         u.status === "INACTIF" ? (
                           <button
