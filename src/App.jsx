@@ -621,12 +621,22 @@ function MainApp() {
         </div>
 
         <div style={{ borderTop: `1px solid ${t.borderNav}`, background:"rgba(0,0,0,0.15)", padding:"16px" }}>
-          <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", paddingBottom:"12px", transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="translateX(4px)"} onMouseOut={e=>e.currentTarget.style.transform="translateX(0)"}>
-            <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: userAvatarColor, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:"14px", fontWeight:"800", flexShrink:0, boxShadow:`0 2px 8px ${userAvatarColor}60` }}>{userInitials}</div>
-            <div style={{ overflow: "hidden" }}>
-              <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis" }}>{userNameDisplay}</div>
-              <div style={{ fontSize: "11px", color: t.textNavSub, marginTop:"2px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow:"hidden" }}>{userJobDisplay}</div>
+          <div style={{ display:"flex", alignItems:"center", gap:"8px" }}>
+            {/* Bloc profil cliquable -> Mon compte */}
+            <div onClick={() => setActiveTab("compte")} style={{ display: "flex", alignItems: "center", gap: "12px", overflow: "hidden", cursor:"pointer", flex:1, minWidth:0, transition: "all 0.2s" }} onMouseOver={e=>e.currentTarget.style.transform="translateX(4px)"} onMouseOut={e=>e.currentTarget.style.transform="translateX(0)"}>
+              <div style={{ width: "36px", height: "36px", borderRadius:"10px", background: userAvatarColor, display:"flex", alignItems:"center", justifyContent:"center", color:"white", fontSize:"14px", fontWeight:"800", flexShrink:0, boxShadow:`0 2px 8px ${userAvatarColor}60` }}>{userInitials}</div>
+              <div style={{ overflow: "hidden" }}>
+                <div style={{ fontSize: "13px", fontWeight: "700", color: t.textNav, whiteSpace: "nowrap", textOverflow: "ellipsis", overflow:"hidden" }}>{userNameDisplay}</div>
+                <div style={{ fontSize: "11px", color: t.textNavSub, marginTop:"2px", whiteSpace: "nowrap", textOverflow: "ellipsis", overflow:"hidden" }}>{userJobDisplay}</div>
+              </div>
             </div>
+            {/* Bouton de déconnexion (isolé du clic profil) */}
+            <button onClick={handleLogout} title={l("Se déconnecter", "Sign out")}
+              style={{ flexShrink:0, width:"36px", height:"36px", borderRadius:"10px", background:"rgba(255,255,255,0.06)", border:`1px solid ${t.borderNav}`, color:t.textNavSub, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontSize:"15px", transition:"all 0.15s" }}
+              onMouseOver={e=>{ e.currentTarget.style.background=t.redBg; e.currentTarget.style.color=t.red; e.currentTarget.style.borderColor=t.redBd; }}
+              onMouseOut={e=>{ e.currentTarget.style.background="rgba(255,255,255,0.06)"; e.currentTarget.style.color=t.textNavSub; e.currentTarget.style.borderColor=t.borderNav; }}>
+              ⏻
+            </button>
           </div>
         </div>
       </aside>
