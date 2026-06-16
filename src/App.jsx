@@ -10,7 +10,7 @@ import { CriteresTab } from "./components/TabsQualiopi";
 import LivreBlancTab from "./components/LivreBlancTab";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
-import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
+import { getDoc, setDoc, deleteDoc, updateDoc, doc, collection, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, storage, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
@@ -175,6 +175,12 @@ function MainApp() {
     const unsub = onSnapshot(doc(db, "users", currentUid), (snap) => {
       if (snap.exists()) {
         const profile = snap.data();
+        // Accès révoqué : on déconnecte immédiatement (révocation temps réel).
+        if (profile.status === "INACTIF") {
+          signOut(auth);
+          alert("Votre compte a été désactivé. Contactez votre administrateur.");
+          return;
+        }
         setUserProfile({ id: snap.id, ...profile });
         setSelectedIfsi(prev => prev ? prev : (profile.etablissementId || "demo_ifps_cham"));
       }
@@ -227,7 +233,10 @@ function MainApp() {
   const handleRenameIfsi = async (id, currentName) => { const n = prompt("Nouveau nom :", currentName); if (n?.trim() && n !== currentName) await setDoc(doc(db, "etablissements", id), { name: n.trim() }, { merge: true }); };
   const handleSendResetEmail = async (userEmail) => { if (window.confirm(`Envoyer un email de réinitialisation à ${userEmail} ?`)) { try { await sendPasswordResetEmail(auth, userEmail); alert("✅ Email envoyé."); } catch (error) { alert(error.message); } } };
   const handleSaveEtab = async (fields) => { if (!selectedIfsi) return; await setDoc(doc(db, "etablissements", selectedIfsi), fields, { merge: true }); };
-  const handleDeleteUser = async (userId) => { if (window.confirm("Révoquer cet accès ?")) await deleteDoc(doc(db, "users", userId)); };
+  // Désactivation (soft delete) : on conserve la fiche + le compte Auth, on coupe l'accès.
+  // La confirmation est déjà gérée par la modale d'EquipeTab -> pas de window.confirm ici.
+  const handleDeleteUser = async (userId) => { await updateDoc(doc(db, "users", userId), { status: "INACTIF" }); };
+  const handleReactivateUser = async (userId) => { await updateDoc(doc(db, "users", userId), { status: "ACTIF" }); };
   
   const handleCreateUser = async () => {
     if (!newMember.email || !newMember.pwd) return alert("Requis.");
@@ -644,7 +653,7 @@ function MainApp() {
           {activeTab === "organigramme" && <OrganigrammeTab currentIfsiName={currentIfsiName} orgRoles={orgRoles} orgJobTitles={orgJobTitles} orgTags={orgTags} allIfsiMembers={allIfsiMembers} criteres={criteres} userProfile={effectiveProfile} getRoleColor={getRoleColor} rolePalette={ROLE_PALETTE} handleManageStructure={handleManageStructure} handleAddManualUser={handleAddManualUser} handleUpdateUserDetail={handleUpdateUserDetail} handleHardDeleteMember={handleHardDeleteMember} orgConnections={orgConnections} handleUpdateConnections={handleUpdateConnections} setModalCritere={setModalCritere} days={days} t={t} />}
           {activeTab === "criteres" && <CriteresTab searchTerm={searchTerm} setSearchTerm={setSearchTerm} filterStatut={filterStatut} setFilterStatut={setFilterStatut} filterCritere={filterCritere} setFilterCritere={setFilterCritere} filtered={filtered} days={days} setModalCritere={setModalCritere} handleAutoSave={handleAutoSave} t={t} />}
           {activeTab === "livre_blanc" && <LivreBlancTab currentIfsiName={currentIfsiName} criteres={criteres} ifsiData={ifsiData} currentAuditDate={currentAuditDate} allIfsiMembers={allIfsiMembers} getRoleColor={getRoleColor} isColorblindMode={isColorblindMode} t={t} />}
-          {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
+          {activeTab === "equipe" && <EquipeTab userProfile={effectiveProfile} newMember={newMember} setNewMember={setNewMember} isCreatingUser={isCreatingUser} handleCreateUser={handleCreateUser} selectedIfsi={selectedIfsi} ifsiList={ifsiList} teamSearchTerm={teamSearchTerm} setTeamSearchTerm={setTeamSearchTerm} sortedTeamUsers={sortedTeamUsers} teamSortConfig={teamSortConfig} handleSortTeam={handleSortTeam} handleDeleteUser={handleDeleteUser} handleReactivateUser={handleReactivateUser} handleSendResetEmail={handleSendResetEmail} ifsiData={ifsiData} handleSaveEtab={handleSaveEtab} criteres={criteres} language={language} t={t} />}
           {activeTab === "compte" && <CompteTab auth={auth} userProfile={userProfile} pwdUpdate={pwdUpdate} setPwdUpdate={setPwdUpdate} handleChangePassword={()=>{}} isDarkMode={isDarkMode} setIsDarkMode={setIsDarkMode} isColorblindMode={isColorblindMode} setIsColorblindMode={setIsColorblindMode} orgJobTitles={orgJobTitles} rolePalette={ROLE_PALETTE} language={language} setLanguage={setLanguage} uiZoom={uiZoom} setUiZoom={setUiZoom} t={t} />}
         </div>
       </main>
