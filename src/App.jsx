@@ -11,7 +11,7 @@ import LivreBlancTab from "./components/LivreBlancTab";
 import { EquipeTab, CompteTab } from "./components/TabsAdmin";
 
 import { getDoc, setDoc, deleteDoc, doc, collection, onSnapshot } from "firebase/firestore";
-import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword } from "firebase/auth";
+import { onAuthStateChanged, signOut, createUserWithEmailAndPassword, updatePassword, sendPasswordResetEmail } from "firebase/auth";
 import { db, auth, storage, secondaryAuth } from "./firebase";
 import { DEFAULT_CRITERES, CRITERES_LABELS, STATUT_CONFIG } from "./data";
 
@@ -204,7 +204,7 @@ function MainApp() {
   }, [selectedIfsi, userProfile]);
 
   useEffect(() => {
-    if (!selectedIfsi || !userProfile || userProfile.mustChangePassword) return;
+    if (!selectedIfsi || !userProfile) return;
     setCampaigns(null);
     const docId = selectedIfsi === "demo_ifps_cham" ? "criteres" : selectedIfsi;
     const unsub = onSnapshot(doc(db, "qualiopi", docId), (snap) => {
@@ -235,7 +235,7 @@ function MainApp() {
     try {
       const cred = await createUserWithEmailAndPassword(secondaryAuth, newMember.email, newMember.pwd);
       const targetIfsi = userProfile.role === "superadmin" && newMember.ifsi ? newMember.ifsi : selectedIfsi;
-      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], jobTitles: [], tags: [], mustChangePassword: true, status: "ACTIF", orgLevel: 3 });
+      await setDoc(doc(db, "users", cred.user.uid), { email: newMember.email, role: newMember.role, etablissementId: targetIfsi, orgRoles: [], jobTitles: [], tags: [], status: "ACTIF", orgLevel: 3 });
       alert("✅ Compte créé !");
       setNewMember({ email: "", pwd: "", role: "user", ifsi: "" });
       secondaryAuth.signOut();
@@ -480,7 +480,6 @@ function MainApp() {
 
   if (!authChecked) return null;
   if (!isLoggedIn) return <LoginPage />;
-  if (userProfile?.mustChangePassword) return <div style={{ minHeight: "100vh", background: t.bg, color: t.text, display: "flex", justifyContent: "center", alignItems: "center" }}>Veuillez changer votre mot de passe.</div>;
 
   const currentIfsiName = ifsiList.find(i => i.id === selectedIfsi)?.name || "";
   const pctGlobal = stats?.total > 0 ? Math.round(((stats?.conforme || 0) / stats.total) * 100) : 0;
